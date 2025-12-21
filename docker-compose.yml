@@ -1,0 +1,39 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount source code for hot reloading
+      - .:/app
+      # Use named volume for node_modules to avoid host/container conflicts
+      - node_modules:/app/node_modules
+      # Persist SQLite database
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=file:./data/topograph.db
+      - AUTH_BYPASS=true
+
+  # Production service (use: docker compose up app)
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=file:/data/topograph.db
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
+      - MICROSOFT_TENANT_ID=${MICROSOFT_TENANT_ID}
+      - AUTH_BYPASS=${AUTH_BYPASS:-false}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - APP_URL=${APP_URL:-http://localhost:3000}
+      - NODE_ENV=production
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+volumes:
+  node_modules:

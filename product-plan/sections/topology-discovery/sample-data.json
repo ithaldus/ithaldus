@@ -1,0 +1,416 @@
+{
+  "_meta": {
+    "models": {
+      "topology": "The complete network scan result with metadata and the root device.",
+      "device": "A network device. MAC address is the unique ID. Fully recursive structure. openPorts lists all discovered open ports.",
+      "interface": "A physical port on a device with child devices connected downstream.",
+      "logMessages": "Debug console messages for UI preview (actual logs come via WebSocket).",
+      "deviceComments": "User comments stored separately by MAC to survive rescans."
+    },
+    "relationships": [
+      "Topology points to one root Device",
+      "Device has many Interfaces",
+      "Interface has many child Devices (same structure, fully recursive)"
+    ]
+  },
+  "scanState": "complete",
+  "topology": {
+    "scannedAt": "2024-12-19T10:23:45Z",
+    "rootIp": "192.168.1.1",
+    "root": {
+      "mac": "AA:BB:CC:00:11:01",
+      "hostname": "MikroTik-RB4011",
+      "ip": "192.168.1.1",
+      "type": "router",
+      "vendor": "MikroTik",
+      "model": "RB4011iGS+",
+      "firmwareVersion": "RouterOS 7.12",
+      "accessible": true,
+      "openPorts": [22, 80, 443, 161],
+      "driver": "mikrotik-routeros",
+      "upstreamInterface": null,
+      "previousNetworkId": null,
+      "previousNetworkName": null,
+      "nomad": false,
+      "interfaces": [
+        {
+          "name": "ether1",
+          "ip": null,
+          "bridge": null,
+          "vlan": null,
+          "children": []
+        },
+        {
+          "name": "ether2",
+          "ip": "192.168.10.1/24",
+          "bridge": "bridge-lan",
+          "vlan": null,
+          "children": [
+            {
+              "mac": "BB:CC:DD:00:22:02",
+              "hostname": "Zyxel-GS1920",
+              "ip": "192.168.10.2",
+              "type": "switch",
+              "vendor": "Zyxel",
+              "model": "GS1920-24HP",
+              "firmwareVersion": "V4.70",
+              "accessible": true,
+              "openPorts": [22, 23, 80, 161],
+              "driver": "zyxel",
+              "upstreamInterface": "port24",
+              "previousNetworkId": null,
+              "previousNetworkName": null,
+              "nomad": false,
+              "interfaces": [
+                {
+                  "name": "port1",
+                  "ip": null,
+                  "bridge": null,
+                  "vlan": "10",
+                  "children": [
+                    {
+                      "mac": "CC:DD:EE:00:33:03",
+                      "hostname": "HP-LaserJet",
+                      "ip": "192.168.10.50",
+                      "type": "end-device",
+                      "vendor": "HP",
+                      "model": "LaserJet Pro M404",
+                      "firmwareVersion": null,
+                      "accessible": false,
+                      "openPorts": [80, 443, 9100, 631, 161, 5353],
+                      "driver": null,
+                      "upstreamInterface": "eth0",
+                      "interfaces": []
+                    }
+                  ]
+                },
+                {
+                  "name": "port2",
+                  "ip": null,
+                  "bridge": null,
+                  "vlan": "10",
+                  "children": [
+                    {
+                      "mac": "DD:EE:FF:00:44:04",
+                      "hostname": "Teacher-PC-01",
+                      "ip": "192.168.10.101",
+                      "type": "end-device",
+                      "vendor": "Dell",
+                      "model": "OptiPlex 7090",
+                      "firmwareVersion": null,
+                      "accessible": false,
+                      "openPorts": [135, 139, 445, 3389],
+                      "driver": null,
+                      "upstreamInterface": "eth0",
+                      "interfaces": []
+                    }
+                  ]
+                },
+                {
+                  "name": "port3",
+                  "ip": null,
+                  "bridge": null,
+                  "vlan": "10",
+                  "poe": {
+                    "powerWatts": 12.4,
+                    "standard": "at",
+                    "voltage": 53,
+                    "currentMa": 234
+                  },
+                  "children": [
+                    {
+                      "mac": "EE:FF:00:00:55:05",
+                      "hostname": "UniFi-AP-01",
+                      "ip": "192.168.10.10",
+                      "type": "access-point",
+                      "vendor": "Ubiquiti",
+                      "model": "UniFi AP AC Pro",
+                      "firmwareVersion": "6.5.28",
+                      "accessible": false,
+                      "openPorts": [22, 80, 443],
+                      "driver": null,
+                      "upstreamInterface": "eth0",
+                      "interfaces": [
+                        {
+                          "name": "wlan0",
+                          "ip": null,
+                          "bridge": null,
+                          "vlan": null,
+                          "children": [
+                            {
+                              "mac": "FF:00:11:00:66:06",
+                              "hostname": "Student-Laptop-01",
+                              "ip": "192.168.10.201",
+                              "type": "end-device",
+                              "vendor": "Lenovo",
+                              "model": "ThinkPad",
+                              "firmwareVersion": null,
+                              "accessible": false,
+                              "openPorts": [],
+                              "driver": null,
+                              "upstreamInterface": "wlan0",
+                              "previousNetworkId": "net-002",
+                              "previousNetworkName": "Tõrva Muusikakool",
+                              "nomad": false,
+                              "interfaces": []
+                            },
+                            {
+                              "mac": "00:11:22:00:77:07",
+                              "hostname": "Student-Laptop-02",
+                              "ip": "192.168.10.202",
+                              "type": "end-device",
+                              "vendor": "HP",
+                              "model": "ProBook",
+                              "firmwareVersion": null,
+                              "accessible": false,
+                              "openPorts": [],
+                              "driver": null,
+                              "upstreamInterface": "wlan0",
+                              "interfaces": []
+                            },
+                            {
+                              "mac": "00:19:99:00:78:08",
+                              "hostname": "Student-Laptop-03",
+                              "ip": "192.168.10.203",
+                              "type": "end-device",
+                              "vendor": "Fujitsu",
+                              "model": "LIFEBOOK U748",
+                              "firmwareVersion": null,
+                              "accessible": false,
+                              "openPorts": [],
+                              "driver": null,
+                              "upstreamInterface": "wlan0",
+                              "interfaces": []
+                            },
+                            {
+                              "mac": "DC:2C:6E:00:88:08",
+                              "hostname": "hAP-AC2-Portable",
+                              "ip": "192.168.10.220",
+                              "type": "router",
+                              "vendor": "MikroTik",
+                              "model": "hAP ac²",
+                              "firmwareVersion": "RouterOS 7.14",
+                              "accessible": true,
+                              "openPorts": [22, 80, 443],
+                              "driver": "mikrotik-routeros",
+                              "upstreamInterface": "wlan2",
+                              "interfaces": [
+                                {
+                                  "name": "wlan1",
+                                  "ip": null,
+                                  "bridge": "bridge-lan",
+                                  "vlan": null,
+                                  "children": [
+                                    {
+                                      "mac": "A4:83:E7:00:CC:01",
+                                      "hostname": "iPhone-Teacher",
+                                      "ip": "192.168.10.230",
+                                      "type": "end-device",
+                                      "vendor": "Apple",
+                                      "model": "iPhone 15",
+                                      "firmwareVersion": null,
+                                      "accessible": false,
+                                      "openPorts": [],
+                                      "driver": null,
+                                      "upstreamInterface": "wlan0",
+                                      "previousNetworkId": null,
+                                      "previousNetworkName": null,
+                                      "nomad": true,
+                                      "interfaces": []
+                                    },
+                                    {
+                                      "mac": "B8:27:EB:00:DD:02",
+                                      "hostname": "RaspberryPi-Display",
+                                      "ip": "192.168.10.231",
+                                      "type": "end-device",
+                                      "vendor": "Raspberry Pi",
+                                      "model": "Pi 4 Model B",
+                                      "firmwareVersion": null,
+                                      "accessible": false,
+                                      "openPorts": [22, 80],
+                                      "driver": null,
+                                      "upstreamInterface": "wlan0",
+                                      "interfaces": []
+                                    }
+                                  ]
+                                },
+                                {
+                                  "name": "ether2",
+                                  "ip": null,
+                                  "bridge": "bridge-lan",
+                                  "vlan": null,
+                                  "children": [
+                                    {
+                                      "mac": "F0:DE:F1:00:EE:03",
+                                      "hostname": "Projector-HDMI",
+                                      "ip": "192.168.10.240",
+                                      "type": "end-device",
+                                      "vendor": "Epson",
+                                      "model": "EB-L200F",
+                                      "firmwareVersion": null,
+                                      "accessible": false,
+                                      "openPorts": [80, 443],
+                                      "driver": null,
+                                      "upstreamInterface": "eth0",
+                                      "interfaces": []
+                                    }
+                                  ]
+                                },
+                                {
+                                  "name": "ether3",
+                                  "ip": null,
+                                  "bridge": "bridge-lan",
+                                  "vlan": null,
+                                  "children": [
+                                    {
+                                      "mac": "00:1E:C9:00:FF:04",
+                                      "hostname": "SmartTV-Classroom",
+                                      "ip": "192.168.10.241",
+                                      "type": "end-device",
+                                      "vendor": "Samsung",
+                                      "model": "QN65Q80B",
+                                      "firmwareVersion": null,
+                                      "accessible": false,
+                                      "openPorts": [8001, 8002],
+                                      "driver": null,
+                                      "upstreamInterface": "eth0",
+                                      "interfaces": []
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "port4",
+                  "ip": null,
+                  "bridge": null,
+                  "vlan": "20",
+                  "children": [
+                    {
+                      "mac": "22:33:44:00:99:09",
+                      "hostname": "Unknown-Device-1",
+                      "ip": "192.168.10.150",
+                      "type": "end-device",
+                      "vendor": null,
+                      "model": null,
+                      "firmwareVersion": null,
+                      "accessible": false,
+                      "openPorts": [],
+                      "driver": null,
+                      "upstreamInterface": null,
+                      "interfaces": []
+                    },
+                    {
+                      "mac": "22:33:44:00:99:10",
+                      "hostname": "Unknown-Device-2",
+                      "ip": "192.168.10.151",
+                      "type": "end-device",
+                      "vendor": null,
+                      "model": null,
+                      "firmwareVersion": null,
+                      "accessible": false,
+                      "openPorts": [],
+                      "driver": null,
+                      "upstreamInterface": null,
+                      "interfaces": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "ether3",
+          "ip": "192.168.20.1/24",
+          "bridge": "bridge-servers",
+          "vlan": "20",
+          "children": [
+            {
+              "mac": "33:44:55:00:AA:10",
+              "hostname": "Server-Switch",
+              "ip": "192.168.20.2",
+              "type": "switch",
+              "vendor": "Zyxel",
+              "model": "GS1900-8",
+              "firmwareVersion": "V2.80",
+              "accessible": true,
+              "openPorts": [22, 80, 161],
+              "driver": "zyxel",
+              "upstreamInterface": "port8",
+              "interfaces": [
+                {
+                  "name": "port1",
+                  "ip": null,
+                  "bridge": null,
+                  "vlan": null,
+                  "children": [
+                    {
+                      "mac": "44:55:66:00:BB:11",
+                      "hostname": "FileServer",
+                      "ip": "192.168.20.10",
+                      "type": "end-device",
+                      "vendor": "Dell",
+                      "model": "PowerEdge R640",
+                      "firmwareVersion": null,
+                      "accessible": false,
+                      "openPorts": [22, 80, 443, 139, 445, 3389],
+                      "driver": null,
+                      "upstreamInterface": "eno1",
+                      "interfaces": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "deviceComments": {
+    "AA:BB:CC:00:11:01": "Server Room",
+    "BB:CC:DD:00:22:02": "Main Building - Floor 1",
+    "CC:DD:EE:00:33:03": "Reception Desk",
+    "DD:EE:FF:00:44:04": "Classroom 101",
+    "EE:FF:00:00:55:05": "Hallway - Floor 1",
+    "DC:2C:6E:00:88:08": "Classroom 102 - Portable AP",
+    "33:44:55:00:AA:10": "Server Room - Rack 2",
+    "44:55:66:00:BB:11": "Server Room - Rack 1"
+  },
+  "logMessages": [
+    { "timestamp": "2024-12-19T10:23:01.000Z", "level": "info", "message": "Starting scan from 192.168.1.1" },
+    { "timestamp": "2024-12-19T10:23:02.000Z", "level": "info", "message": "Connecting via SSH to 192.168.1.1..." },
+    { "timestamp": "2024-12-19T10:23:03.000Z", "level": "success", "message": "Connected to MikroTik-RB4011 (RB4011iGS+)" },
+    { "timestamp": "2024-12-19T10:23:04.000Z", "level": "info", "message": "Querying interfaces..." },
+    { "timestamp": "2024-12-19T10:23:05.000Z", "level": "info", "message": "Found 3 physical interfaces: ether1, ether2, ether3" },
+    { "timestamp": "2024-12-19T10:23:06.000Z", "level": "info", "message": "Skipping ether1 (WAN interface)" },
+    { "timestamp": "2024-12-19T10:23:07.000Z", "level": "info", "message": "Querying ARP table for ether2 (192.168.10.0/24)..." },
+    { "timestamp": "2024-12-19T10:23:08.000Z", "level": "info", "message": "Found 8 MAC addresses on ether2" },
+    { "timestamp": "2024-12-19T10:23:09.000Z", "level": "info", "message": "Checking neighbor discovery..." },
+    { "timestamp": "2024-12-19T10:23:10.000Z", "level": "info", "message": "Neighbor found: Zyxel-GS1920 (192.168.10.2)" },
+    { "timestamp": "2024-12-19T10:23:11.000Z", "level": "info", "message": "Connecting via SSH to 192.168.10.2..." },
+    { "timestamp": "2024-12-19T10:23:12.000Z", "level": "success", "message": "Connected to Zyxel-GS1920" },
+    { "timestamp": "2024-12-19T10:23:13.000Z", "level": "info", "message": "Querying MAC table..." },
+    { "timestamp": "2024-12-19T10:23:14.000Z", "level": "info", "message": "Restructuring topology: 5 devices moved under Zyxel-GS1920" },
+    { "timestamp": "2024-12-19T10:23:15.000Z", "level": "info", "message": "Neighbor found: UniFi-AP-01 (192.168.10.10)" },
+    { "timestamp": "2024-12-19T10:23:16.000Z", "level": "warn", "message": "Cannot access 192.168.10.10 - no valid credentials" },
+    { "timestamp": "2024-12-19T10:23:16.500Z", "level": "info", "message": "Found MikroTik device on UniFi-AP-01 wlan0: hAP-AC2-Portable (192.168.10.220)" },
+    { "timestamp": "2024-12-19T10:23:16.800Z", "level": "info", "message": "Connecting via SSH to 192.168.10.220..." },
+    { "timestamp": "2024-12-19T10:23:17.000Z", "level": "success", "message": "Connected to hAP-AC2-Portable (hAP ac²)" },
+    { "timestamp": "2024-12-19T10:23:17.200Z", "level": "info", "message": "Device running in station mode on wlan2 (client to UniFi-AP-01)" },
+    { "timestamp": "2024-12-19T10:23:17.500Z", "level": "info", "message": "Found 5 devices on hAP-AC2-Portable (wlan1: 2, ether2: 1, ether3: 1)" },
+    { "timestamp": "2024-12-19T10:23:18.000Z", "level": "info", "message": "Found 2 devices on port4" },
+    { "timestamp": "2024-12-19T10:23:18.000Z", "level": "info", "message": "Querying ARP table for ether3 (192.168.20.0/24)..." },
+    { "timestamp": "2024-12-19T10:23:19.000Z", "level": "info", "message": "Neighbor found: Server-Switch (192.168.20.2)" },
+    { "timestamp": "2024-12-19T10:23:20.000Z", "level": "success", "message": "Connected to Server-Switch" },
+    { "timestamp": "2024-12-19T10:23:21.000Z", "level": "info", "message": "Found 1 device on Server-Switch" },
+    { "timestamp": "2024-12-19T10:23:22.000Z", "level": "success", "message": "Scan complete. Discovered 16 devices." }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "_meta": {
+    "description": "Sample data for login screen states",
+    "models": {
+      "authState": "Current authentication state: idle, loading, or error"
+    }
+  },
+  "states": {
+    "idle": {
+      "state": "idle",
+      "errorMessage": null
+    },
+    "loading": {
+      "state": "loading",
+      "errorMessage": null
+    },
+    "error": {
+      "state": "error",
+      "errorMessage": "Access Denied - Your email address is not authorized to access this application. Please contact an administrator if you believe this is an error."
+    }
+  },
+  "sampleUsers": [
+    {
+      "id": "user-001",
+      "email": "admin@example.com",
+      "name": "System Administrator",
+      "role": "admin",
+      "avatarUrl": null
+    },
+    {
+      "id": "user-002",
+      "email": "viewer@example.com",
+      "name": "Read-Only User",
+      "role": "user",
+      "avatarUrl": null
+    }
+  ]
+}

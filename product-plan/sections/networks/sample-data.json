@@ -1,0 +1,55 @@
+{
+  "_meta": {
+    "description": "Sample data for networks section",
+    "models": {
+      "network": "A standalone network environment with its own root device"
+    }
+  },
+  "networks": [
+    {
+      "id": "net-001",
+      "name": "Tõrva Gümnaasium",
+      "rootIp": "192.168.1.1",
+      "rootUsername": "admin",
+      "rootPassword": "school2024",
+      "createdAt": "2024-09-15T10:00:00Z",
+      "lastScannedAt": "2024-12-20T14:30:00Z",
+      "deviceCount": 47,
+      "isOnline": true
+    },
+    {
+      "id": "net-002",
+      "name": "Tõrva Muusikakool",
+      "rootIp": "192.168.2.1",
+      "rootUsername": "admin",
+      "rootPassword": "music2024",
+      "createdAt": "2024-10-01T09:00:00Z",
+      "lastScannedAt": "2024-12-20T08:45:00Z",
+      "deviceCount": 23,
+      "isOnline": true
+    },
+    {
+      "id": "net-003",
+      "name": "Tõrva Spordikeskus",
+      "rootIp": "192.168.3.1",
+      "rootUsername": "admin",
+      "rootPassword": "sport2024",
+      "createdAt": "2024-11-20T14:00:00Z",
+      "lastScannedAt": null,
+      "deviceCount": null,
+      "isOnline": false
+    },
+    {
+      "id": "net-004",
+      "name": "Tõrva Raamatukogu",
+      "rootIp": "192.168.4.1",
+      "rootUsername": "admin",
+      "rootPassword": "library2024",
+      "createdAt": "2024-12-01T08:30:00Z",
+      "lastScannedAt": "2024-12-17T16:00:00Z",
+      "deviceCount": 12,
+      "isOnline": null
+    }
+  ],
+  "isAdmin": true
+}

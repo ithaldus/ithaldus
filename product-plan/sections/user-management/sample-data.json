@@ -1,0 +1,43 @@
+{
+  "_meta": {
+    "description": "Sample data for user management section",
+    "models": {
+      "user": "A user authorized to access the application via email whitelist"
+    }
+  },
+  "users": [
+    {
+      "id": "user-001",
+      "email": "admin@torva.ee",
+      "name": "System Administrator",
+      "role": "admin",
+      "createdAt": "2024-01-15T10:00:00Z",
+      "lastLoginAt": "2024-12-20T09:30:00Z"
+    },
+    {
+      "id": "user-002",
+      "email": "it.tugi@torva.ee",
+      "name": "IT Support",
+      "role": "admin",
+      "createdAt": "2024-03-20T09:15:00Z",
+      "lastLoginAt": "2024-12-19T14:45:00Z"
+    },
+    {
+      "id": "user-003",
+      "email": "direktor@gumnaasium.torva.ee",
+      "name": "Kooli Direktor",
+      "role": "user",
+      "createdAt": "2024-06-10T16:30:00Z",
+      "lastLoginAt": "2024-12-18T11:20:00Z"
+    },
+    {
+      "id": "user-004",
+      "email": "haldur@muusikakool.torva.ee",
+      "name": "Muusikakooli Haldur",
+      "role": "user",
+      "createdAt": "2024-08-05T08:00:00Z",
+      "lastLoginAt": null
+    }
+  ],
+  "currentUserId": "user-001"
+}
