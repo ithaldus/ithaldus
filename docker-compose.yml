@@ -4,7 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     ports:
-      - "3000:3000"
+      - "3000:5173"
+      - "3001:3001"  # API/WebSocket server for direct connections
     volumes:
       # Mount source code for hot reloading
       - .:/app

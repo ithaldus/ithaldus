@@ -58,7 +58,7 @@ export const api = {
   // Credentials
   credentials: {
     list: (networkId?: string) =>
-      request<Credential[]>(`/credentials${networkId ? `?networkId=${networkId}` : ''}`),
+      request<(Credential & { matchedDevices: MatchedDevice[] })[]>(`/credentials${networkId ? `?networkId=${networkId}` : ''}`),
     get: (id: string) =>
       request<Credential & { matchedDevices: MatchedDevice[] }>(`/credentials/${id}`),
     create: (data: { username: string; password: string; networkId?: string }) =>
@@ -79,7 +79,7 @@ export const api = {
     list: (networkId?: string) =>
       request<Device[]>(`/devices${networkId ? `?networkId=${networkId}` : ''}`),
     get: (id: string) =>
-      request<Device & { interfaces: Interface[] }>(`/devices/${id}`),
+      request<Device & { interfaces: Interface[]; workingCredential: { username: string } | null }>(`/devices/${id}`),
     updateComment: (id: string, comment: string) =>
       request<{ success: boolean }>(`/devices/${id}/comment`, {
         method: 'PATCH',
@@ -87,8 +87,40 @@ export const api = {
       }),
     toggleNomad: (id: string) =>
       request<{ nomad: boolean }>(`/devices/${id}/nomad`, { method: 'PATCH' }),
+    updateType: (id: string, userType: string | null) =>
+      request<{ success: boolean; userType: string | null }>(`/devices/${id}/type`, {
+        method: 'PATCH',
+        body: JSON.stringify({ userType }),
+      }),
     delete: (id: string) =>
       request<{ success: boolean }>(`/devices/${id}`, { method: 'DELETE' }),
+    testCredentials: (id: string, username: string, password: string) =>
+      request<{ success: boolean; error?: string }>(`/devices/${id}/test-credentials`, {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      }),
+  },
+
+  // Scan
+  scan: {
+    start: (networkId: string) =>
+      request<{ success: boolean; message: string }>(`/scan/${networkId}/start`, { method: 'POST' }),
+    stop: (networkId: string) =>
+      request<{ success: boolean }>(`/scan/${networkId}/stop`, { method: 'POST' }),
+    status: (networkId: string) =>
+      request<{ status: string; logCount: number; deviceCount: number }>(`/scan/${networkId}/status`),
+    logs: (networkId: string, afterIndex = 0) =>
+      request<{ logs: LogMessage[]; status: string; nextIndex: number }>(
+        `/scan/${networkId}/logs?after=${afterIndex}`
+      ),
+    devices: (networkId: string, afterIndex = 0) =>
+      request<{ devices: Device[]; status: string; nextIndex: number }>(
+        `/scan/${networkId}/devices?after=${afterIndex}`
+      ),
+    topology: (networkId: string) =>
+      request<TopologyResponse>(`/scan/${networkId}/topology`),
+    history: (networkId: string) =>
+      request<Scan[]>(`/scan/${networkId}/history`),
   },
 }
 
@@ -127,7 +159,10 @@ export interface MatchedDevice {
   mac: string
   hostname: string | null
   ip: string | null
+  vendor: string | null
 }
+
+export type UserDeviceType = 'router' | 'switch' | 'access-point' | 'server' | 'computer' | 'phone' | 'tv' | 'tablet' | 'printer' | 'camera' | 'iot'
 
 export interface Device {
   id: string
@@ -141,6 +176,7 @@ export interface Device {
   model: string | null
   firmwareVersion: string | null
   type: 'router' | 'switch' | 'access-point' | 'end-device' | null
+  userType: UserDeviceType | null
   accessible: boolean | null
   openPorts: string | null
   driver: string | null
@@ -158,4 +194,47 @@ export interface Interface {
   vlan: string | null
   poeWatts: number | null
   poeStandard: string | null
+}
+
+export interface LogMessage {
+  timestamp: string
+  level: 'info' | 'success' | 'warn' | 'error'
+  message: string
+}
+
+export interface Scan {
+  id: string
+  networkId: string
+  startedAt: string
+  completedAt: string | null
+  status: 'running' | 'completed' | 'failed'
+  rootIp: string
+  deviceCount: number | null
+}
+
+export interface TopologyDevice extends Device {
+  interfaces: Interface[]
+  children: TopologyDevice[]
+}
+
+export interface TopologyResponse {
+  network: Network | null
+  devices: TopologyDevice[]
+  totalCount: number
+}
+
+// WebSocket message types
+export type ScanUpdateMessage =
+  | { type: 'log'; data: LogMessage }
+  | { type: 'topology'; data: TopologyResponse }
+  | { type: 'status'; data: { status: string } }
+
+// WebSocket URL helper
+export function getScanWebSocketUrl(networkId: string): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  // In development, Vite runs on 5173 (or 3000 via Docker) and proxies to backend on 3001
+  // WebSocket proxying through Vite can be unreliable, so connect directly to backend
+  const isDev = window.location.port === '5173' || window.location.port === '3000'
+  const host = isDev ? `${window.location.hostname}:3001` : window.location.host
+  return `${protocol}//${host}/api/scan/${networkId}/ws`
 }

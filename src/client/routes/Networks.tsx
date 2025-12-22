@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { api, type Network } from '../lib/api'
-import { Plus, Network as NetworkIcon, Loader2 } from 'lucide-react'
+import { Plus, Network as NetworkIcon } from 'lucide-react'
 import { NetworkCard } from '../components/networks/NetworkCard'
 import { NetworkModal } from '../components/networks/NetworkModal'
 
@@ -95,15 +95,15 @@ export function Networks() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
       </div>
     )
   }
 
   return (
     <div className="h-full overflow-auto">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
@@ -112,7 +112,7 @@ export function Networks() {
           {isAdmin && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-md hover:bg-primary-600 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-cyan-500 rounded-md hover:bg-cyan-600 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add Network
@@ -152,7 +152,7 @@ export function Networks() {
             {isAdmin && (
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-md hover:bg-primary-600 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-cyan-500 rounded-md hover:bg-cyan-600 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Add Network

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { api, type User } from '../lib/api'
-import { Plus, Search, Users as UsersIcon, Loader2 } from 'lucide-react'
+import { Plus, Search, Users as UsersIcon } from 'lucide-react'
 import { UserRow } from '../components/user-management/UserRow'
 import { AddUserModal } from '../components/user-management/AddUserModal'
 
@@ -81,15 +81,15 @@ export function Users() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
       </div>
     )
   }
 
   return (
     <div className="h-full overflow-auto">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-5xl mx-auto p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
@@ -97,7 +97,7 @@ export function Users() {
           </h1>
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-md hover:bg-primary-600 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-cyan-500 rounded-md hover:bg-cyan-600 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add User
@@ -119,7 +119,7 @@ export function Users() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by name or email..."
-            className="w-full pl-10 pr-4 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 focus:border-transparent"
           />
         </div>
 
@@ -176,7 +176,7 @@ export function Users() {
             {!searchQuery && (
               <button
                 onClick={() => setShowAddModal(true)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-md hover:bg-primary-600 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-cyan-500 rounded-md hover:bg-cyan-600 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Add User

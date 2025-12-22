@@ -62,13 +62,13 @@ export function NetworkCard({
 }: NetworkCardProps) {
   return (
     <div
-      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:border-primary-300 dark:hover:border-primary-700 transition-colors cursor-pointer"
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:border-cyan-300 dark:hover:border-cyan-700 transition-colors cursor-pointer"
       onClick={onSelect}
     >
       {/* Header */}
       <div className="flex items-center gap-3 mb-3">
-        <div className="p-2 bg-primary-50 dark:bg-primary-900/30 rounded-lg">
-          <Network className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+        <div className="p-2 bg-cyan-50 dark:bg-cyan-900/30 rounded-lg">
+          <Network className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
         </div>
         <div>
           <h3 className="font-semibold text-slate-900 dark:text-slate-100">
@@ -119,7 +119,7 @@ export function NetworkCard({
               e.stopPropagation()
               onScan?.()
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 rounded hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/30 rounded hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors"
           >
             <Play className="w-3.5 h-3.5" />
             Scan

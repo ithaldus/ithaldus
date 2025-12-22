@@ -74,7 +74,7 @@ export function NetworkModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Main Office"
-              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 focus:border-transparent"
             />
           </div>
 
@@ -88,7 +88,7 @@ export function NetworkModal({
               value={rootIp}
               onChange={(e) => setRootIp(e.target.value)}
               placeholder="e.g., 192.168.1.1"
-              className="w-full px-3 py-2 text-sm font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 focus:border-transparent"
             />
           </div>
 
@@ -102,7 +102,7 @@ export function NetworkModal({
               value={rootUsername}
               onChange={(e) => setRootUsername(e.target.value)}
               placeholder="e.g., admin"
-              className="w-full px-3 py-2 text-sm font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 focus:border-transparent"
             />
           </div>
 
@@ -117,7 +117,7 @@ export function NetworkModal({
                 value={rootPassword}
                 onChange={(e) => setRootPassword(e.target.value)}
                 placeholder="Enter password"
-                className="w-full px-3 py-2 pr-10 text-sm font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 focus:border-transparent"
+                className="w-full px-3 py-2 pr-10 text-sm font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 focus:border-transparent"
               />
               <button
                 type="button"
@@ -145,7 +145,7 @@ export function NetworkModal({
             <button
               type="submit"
               disabled={!isValid}
-              className="px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-md hover:bg-primary-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 text-sm font-medium text-white bg-cyan-500 rounded-md hover:bg-cyan-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors"
             >
               {network ? 'Save Changes' : 'Add Network'}
             </button>

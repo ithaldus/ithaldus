@@ -11,8 +11,8 @@ RUN bun install
 # Copy source code (will be overridden by volume mount in dev)
 COPY . .
 
-# Expose main dev port
-EXPOSE 3000
+# Expose Vite dev server port (proxies /api to Bun on 3001)
+EXPOSE 5173
 
-# Run both servers (Vite internally on 5173, Bun API on 3000)
+# Run both servers (Vite on 5173, Bun API on 3001)
 CMD ["bun", "run", "dev"]

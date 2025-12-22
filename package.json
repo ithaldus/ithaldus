@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun run dev:api & bun run dev:client",
     "dev:client": "vite",
-    "dev:api": "bun --watch src/server/dev.ts",
+    "dev:api": "bun --watch --watch-poll src/server/dev.ts",
     "build": "vite build && bun build src/server/serve.ts --outdir dist/server --target bun",
     "start": "NODE_ENV=production bun dist/server/serve.js",
     "db:generate": "drizzle-kit generate",
@@ -17,6 +17,7 @@
     "drizzle-orm": "^0.36.0",
     "hono": "^4.6.0",
     "lucide-react": "^0.468.0",
+    "mac-oui-lookup": "^1.1.4",
     "nanoid": "^5.0.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

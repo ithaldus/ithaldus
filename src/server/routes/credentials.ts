@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { db } from '../db/client'
-import { credentials, matchedDevices } from '../db/schema'
-import { eq, isNull } from 'drizzle-orm'
+import { credentials, matchedDevices, devices } from '../db/schema'
+import { eq, isNull, inArray } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { requireAdmin } from '../middleware/auth'
 
@@ -11,32 +11,67 @@ export const credentialsRoutes = new Hono()
 credentialsRoutes.get('/', async (c) => {
   const networkId = c.req.query('networkId')
 
-  let query = db.select().from(credentials)
+  let creds: typeof credentials.$inferSelect[] = []
 
   if (networkId === 'global') {
     // Get global credentials (no network association)
-    const globalCreds = await db.select()
+    creds = await db.select()
       .from(credentials)
       .where(isNull(credentials.networkId))
       .orderBy(credentials.username)
-
-    return c.json(globalCreds)
   } else if (networkId) {
     // Get credentials for specific network
-    const networkCreds = await db.select()
+    creds = await db.select()
       .from(credentials)
       .where(eq(credentials.networkId, networkId))
       .orderBy(credentials.username)
-
-    return c.json(networkCreds)
+  } else {
+    // Get all credentials
+    creds = await db.select()
+      .from(credentials)
+      .orderBy(credentials.username)
   }
 
-  // Get all credentials
-  const allCreds = await db.select()
-    .from(credentials)
-    .orderBy(credentials.username)
+  // Fetch all matched devices and group by credentialId
+  const allMatched = await db.select().from(matchedDevices)
 
-  return c.json(allCreds)
+  // Get all unique MACs from matched devices
+  const matchedMacs = [...new Set(allMatched.map(m => m.mac).filter(Boolean))]
+
+  // Fetch device info (vendor) for matched MACs
+  let devicesByMac = new Map<string, { vendor: string | null }>()
+  if (matchedMacs.length > 0) {
+    const deviceInfos = await db.select({
+      mac: devices.mac,
+      vendor: devices.vendor,
+    }).from(devices).where(inArray(devices.mac, matchedMacs))
+
+    for (const d of deviceInfos) {
+      devicesByMac.set(d.mac, { vendor: d.vendor })
+    }
+  }
+
+  // Group matched devices by credentialId with vendor info
+  const matchedByCredId = new Map<string, Array<typeof matchedDevices.$inferSelect & { vendor: string | null }>>()
+  for (const m of allMatched) {
+    if (m.credentialId) {
+      const list = matchedByCredId.get(m.credentialId) || []
+      const deviceInfo = devicesByMac.get(m.mac)
+      list.push({
+        ...m,
+        vendor: deviceInfo?.vendor || null,
+      })
+      matchedByCredId.set(m.credentialId, list)
+    }
+  }
+
+  // Attach matched devices to each credential
+  const result = creds.map(cred => ({
+    ...cred,
+    matchedDevices: matchedByCredId.get(cred.id) || [],
+  }))
+
+  return c.json(result)
 })
 
 // Get credential with matched devices
@@ -63,8 +98,8 @@ credentialsRoutes.post('/', requireAdmin, async (c) => {
   const body = await c.req.json()
   const { username, password, networkId } = body
 
-  if (!username || !password) {
-    return c.json({ error: 'Username and password are required' }, 400)
+  if (!username || password === undefined) {
+    return c.json({ error: 'Username is required' }, 400)
   }
 
   const newCredential = {
@@ -103,8 +138,8 @@ credentialsRoutes.post('/bulk', requireAdmin, async (c) => {
 
     const [username, password] = parts.map(p => p.trim())
 
-    if (!username || !password) {
-      errors.push(`Empty username or password: ${line}`)
+    if (!username) {
+      errors.push(`Empty username: ${line}`)
       continue
     }
 

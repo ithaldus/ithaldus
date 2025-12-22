@@ -85,6 +85,7 @@ export const devices = sqliteTable('devices', {
   // Metadata (user-managed)
   comment: text('comment'),
   nomad: integer('nomad', { mode: 'boolean' }).notNull().default(false),
+  userType: text('user_type', { enum: ['router', 'switch', 'access-point', 'server', 'computer', 'phone', 'tv', 'tablet', 'printer', 'camera', 'iot'] }),
   lastSeenAt: text('last_seen_at').notNull(),
 }, (table) => [
   index('idx_devices_mac').on(table.mac),
@@ -103,6 +104,19 @@ export const scans = sqliteTable('scans', {
   deviceCount: integer('device_count'),
 })
 
+// DHCP leases table (stores leases from root device for hostname resolution)
+export const dhcpLeases = sqliteTable('dhcp_leases', {
+  id: text('id').primaryKey(),
+  networkId: text('network_id').notNull().references(() => networks.id, { onDelete: 'cascade' }),
+  mac: text('mac').notNull(),
+  ip: text('ip'),
+  hostname: text('hostname'),
+  lastSeenAt: text('last_seen_at').notNull(),
+}, (table) => [
+  index('idx_dhcp_leases_network').on(table.networkId),
+  index('idx_dhcp_leases_mac').on(table.mac),
+])
+
 // Type exports for use in application
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -120,3 +134,5 @@ export type Device = typeof devices.$inferSelect
 export type NewDevice = typeof devices.$inferInsert
 export type Scan = typeof scans.$inferSelect
 export type NewScan = typeof scans.$inferInsert
+export type DhcpLease = typeof dhcpLeases.$inferSelect
+export type NewDhcpLease = typeof dhcpLeases.$inferInsert

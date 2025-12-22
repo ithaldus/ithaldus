@@ -1,0 +1,1 @@
+ALTER TABLE `devices` ADD `user_type` text;

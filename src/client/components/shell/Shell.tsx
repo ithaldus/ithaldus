@@ -1,14 +1,7 @@
+import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
+import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
-import {
-  Network,
-  Key,
-  Users,
-  LogOut,
-  Menu,
-  X,
-} from 'lucide-react'
-import { useState } from 'react'
 
 interface ShellProps {
   children: React.ReactNode
@@ -17,7 +10,22 @@ interface ShellProps {
 export function Shell({ children }: ShellProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
+
+  const toggleDarkMode = () => {
+    const newDark = !isDark
+    setIsDark(newDark)
+    if (newDark) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }
 
   const handleLogout = async () => {
     await logout()
@@ -32,119 +40,179 @@ export function Shell({ children }: ShellProps) {
       : []),
   ]
 
+  const initials = user?.name
+    ? user.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : '??'
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center">
-                <Network className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-semibold text-slate-900 dark:text-white">
-                TopoGraph
-              </span>
-            </div>
+    <div className="h-screen bg-slate-50 dark:bg-slate-950 font-sans flex overflow-hidden">
+      {/* Mobile menu overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="absolute inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800'
-                    }`
-                  }
-                >
-                  <item.icon className="w-4 h-4" />
-                  {item.label}
-                </NavLink>
-              ))}
-            </nav>
-
-            {/* User Menu */}
-            <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-3">
-                <div className="text-right">
-                  <div className="text-sm font-medium text-slate-900 dark:text-white">
-                    {user?.name}
-                  </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                    {user?.role === 'admin' ? 'Administrator' : 'User'}
-                  </div>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 transition-colors"
-                  title="Logout"
-                >
-                  <LogOut className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Mobile menu button */}
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800"
-              >
-                {mobileMenuOpen ? (
-                  <X className="w-6 h-6" />
-                ) : (
-                  <Menu className="w-6 h-6" />
-                )}
-              </button>
-            </div>
-          </div>
+      {/* Sidebar - using absolute on mobile, relative on desktop */}
+      <aside
+        className={`
+          bg-slate-900 text-white flex flex-col shrink-0
+          border-r border-slate-700
+          transition-all duration-300 ease-in-out
+          ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-60'}
+          absolute inset-y-0 left-0 z-50 w-60
+          ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:relative lg:inset-auto lg:h-full lg:translate-x-0
+        `}
+      >
+        {/* Sidebar header with collapse toggle */}
+        <div className={`h-14 flex items-center shrink-0 ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''} px-4`}>
+          <span className={`flex-1 text-lg font-semibold text-cyan-400 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>TopoGraph</span>
+          {/* Desktop collapse toggle */}
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="hidden lg:flex items-center justify-center w-8 h-8 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeft className="w-5 h-5" />
+            ) : (
+              <PanelLeftClose className="w-5 h-5" />
+            )}
+          </button>
+          {/* Mobile close button */}
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="lg:hidden flex items-center justify-center w-8 h-8 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Mobile Navigation */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-            <div className="px-4 py-3 space-y-1">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium ${
-                      isActive
-                        ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
-                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-                    }`
-                  }
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.label}
-                </NavLink>
-              ))}
-              <div className="pt-3 mt-3 border-t border-slate-200 dark:border-slate-800">
-                <div className="px-3 py-2 text-sm text-slate-600 dark:text-slate-400">
-                  Signed in as <span className="font-medium">{user?.name}</span>
-                </div>
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto p-2 space-y-1">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={() => setMobileMenuOpen(false)}
+              className={({ isActive }) =>
+                `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150 ${
+                  isActive
+                    ? 'bg-cyan-500/20 text-cyan-400'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                } ${sidebarCollapsed ? 'lg:justify-center' : ''}`
+              }
+              title={sidebarCollapsed ? item.label : undefined}
+            >
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              {!sidebarCollapsed && (
+                <span className="text-sm font-medium truncate lg:block hidden">{item.label}</span>
+              )}
+              <span className="text-sm font-medium truncate lg:hidden">{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* User menu at bottom */}
+        {user && (
+          <div className="shrink-0 relative">
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className={`
+                w-full flex items-center gap-3 p-3
+                text-slate-400 hover:bg-slate-800 hover:text-white
+                transition-colors duration-150
+                ${sidebarCollapsed ? 'lg:justify-center' : ''}
+              `}
+            >
+              {/* Avatar */}
+              <div className="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                {initials}
+              </div>
+
+              {!sidebarCollapsed && (
+                <>
+                  <span className="text-sm font-medium truncate flex-1 text-left hidden lg:block">
+                    {user.name}
+                  </span>
+                  <ChevronUp
+                    className={`w-4 h-4 transition-transform hidden lg:block ${userMenuOpen ? '' : 'rotate-180'}`}
+                  />
+                </>
+              )}
+              <span className="text-sm font-medium truncate flex-1 text-left lg:hidden">
+                {user.name}
+              </span>
+              <ChevronUp
+                className={`w-4 h-4 transition-transform lg:hidden ${userMenuOpen ? '' : 'rotate-180'}`}
+              />
+            </button>
+
+            {/* Dropdown menu */}
+            {userMenuOpen && (
+              <div
+                className={`
+                  absolute bottom-full mb-1 bg-slate-800 rounded-lg shadow-lg border border-slate-700
+                  overflow-hidden min-w-[160px]
+                  ${sidebarCollapsed ? 'lg:left-full lg:ml-2 lg:bottom-0 lg:mb-0' : 'left-2 right-2'}
+                `}
+              >
+                {sidebarCollapsed && (
+                  <div className="px-3 py-2 border-b border-slate-700 hidden lg:block">
+                    <p className="text-sm font-medium text-white">{user.name}</p>
+                  </div>
+                )}
                 <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                  onClick={() => {
+                    toggleDarkMode()
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:bg-slate-700 hover:text-white"
                 >
-                  <LogOut className="w-5 h-5" />
-                  Logout
+                  {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setUserMenuOpen(false)
+                    handleLogout()
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:bg-slate-700 hover:text-white"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout</span>
                 </button>
               </div>
-            </div>
+            )}
           </div>
         )}
-      </header>
+      </aside>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
+        {/* Mobile header bar */}
+        <header className="lg:hidden h-14 bg-slate-900 flex items-center justify-between px-4 shrink-0">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="p-2 -ml-2 text-slate-400 hover:text-white"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <span className="font-semibold text-cyan-400">TopoGraph</span>
+          <div className="w-9" /> {/* Spacer for centering */}
+        </header>
+
+        {/* Page content */}
+        <main className="flex-1 overflow-hidden">
+          {children}
+        </main>
+      </div>
     </div>
   )
 }

@@ -1,0 +1,443 @@
+import { useState, useEffect } from 'react'
+import {
+  Router,
+  Network,
+  Wifi,
+  Monitor,
+  ChevronRight,
+  ChevronDown,
+  AlertTriangle,
+  MapPin,
+  Zap,
+  HelpCircle,
+  ArrowRightLeft,
+  Server,
+  Smartphone,
+  Tv,
+  Tablet,
+  Printer,
+  Camera,
+  Cpu,
+} from 'lucide-react'
+import { VendorLogo } from './VendorLogo'
+import type { TopologyDevice, Interface } from '../../lib/api'
+
+interface DeviceCardProps {
+  device: TopologyDevice
+  level?: number
+  showEndDevices?: boolean
+  showFirmware?: boolean
+  showPorts?: boolean
+  showInterfaces?: boolean
+  showVendor?: boolean
+  onDeviceClick?: (device: TopologyDevice) => void
+}
+
+const deviceTypeIcons: Record<string, typeof Router> = {
+  router: Router,
+  switch: Network,
+  'access-point': Wifi,
+  'end-device': Monitor,
+  server: Server,
+  computer: Monitor,
+  phone: Smartphone,
+  tv: Tv,
+  tablet: Tablet,
+  printer: Printer,
+  camera: Camera,
+  iot: Cpu,
+}
+
+const deviceIconColors: Record<string, string> = {
+  router: 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
+  switch: 'bg-violet-500/20 text-violet-600 dark:text-violet-400 border-violet-500/30',
+  'access-point': 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+  'end-device': 'bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-500/30',
+}
+
+const deviceCardColors: Record<string, string> = {
+  router: 'bg-cyan-50 dark:bg-cyan-950/50 border-cyan-200 dark:border-cyan-800',
+  switch: 'bg-cyan-50 dark:bg-cyan-950/50 border-cyan-200 dark:border-cyan-800',
+  'access-point': 'bg-cyan-50 dark:bg-cyan-950/50 border-cyan-200 dark:border-cyan-800',
+  'end-device': 'bg-slate-100 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700',
+}
+
+function getStatusInfo(device: TopologyDevice): { label: string; color: string } | null {
+  const openPorts = parseOpenPorts(device.openPorts)
+  const hasOpenPorts = openPorts.length > 0
+
+  // Show status for devices that aren't accessible
+  // A device with management ports (22, 23, 80, 443, 8291, etc.) is likely a network device
+  const managementPorts = [22, 23, 80, 443, 8080, 8443, 161, 8291, 8728]
+  const hasManagementPorts = openPorts.some(p => managementPorts.includes(p))
+  const isLikelyNetworkDevice = device.type !== 'end-device' || hasManagementPorts
+
+  if (!device.accessible && isLikelyNetworkDevice && hasOpenPorts) {
+    return {
+      label: 'No credentials',
+      color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
+    }
+  }
+  if (!device.accessible && isLikelyNetworkDevice && !hasOpenPorts) {
+    return {
+      label: 'Unreachable',
+      color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
+    }
+  }
+  return null
+}
+
+function parseOpenPorts(openPorts: string | null): number[] {
+  if (!openPorts) return []
+  try {
+    return JSON.parse(openPorts)
+  } catch {
+    return []
+  }
+}
+
+// Check if we need a virtual switch placeholder
+// (multiple children, all inaccessible = there's an unmanaged switch in between)
+// Only applies to wired interfaces - wireless interfaces naturally have multiple clients
+function needsVirtualSwitch(interfaceName: string, children: TopologyDevice[]): boolean {
+  if (children.length < 2) return false
+  // Wireless interfaces don't need virtual switch inference
+  if (interfaceName.toLowerCase().startsWith('wlan')) return false
+  return children.every((child) => !child.accessible)
+}
+
+export function DeviceCard({
+  device,
+  level = 0,
+  showEndDevices = true,
+  showFirmware = true,
+  showPorts = true,
+  showInterfaces = true,
+  showVendor = true,
+  onDeviceClick,
+}: DeviceCardProps) {
+  const [isExpanded, setIsExpanded] = useState(true)
+
+  // Persist collapse state in localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(`device-expanded-${device.id}`)
+    if (stored !== null) {
+      setIsExpanded(stored === 'true')
+    }
+  }, [device.id])
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const newState = !isExpanded
+    setIsExpanded(newState)
+    localStorage.setItem(`device-expanded-${device.id}`, String(newState))
+  }
+
+  const openPorts = parseOpenPorts(device.openPorts)
+
+  // Infer device type from ports if not set
+  // Devices with management ports are likely network devices (switches/routers)
+  const managementPorts = [22, 23, 80, 443, 8080, 8443, 161, 8291, 8728]
+  const hasManagementPorts = openPorts.some(p => managementPorts.includes(p))
+  const hasRouterPorts = openPorts.includes(8291) || openPorts.includes(8728) // MikroTik specific
+  const inferredType = device.type || (hasRouterPorts ? 'router' : hasManagementPorts ? 'switch' : 'end-device')
+
+  // Use userType if set, otherwise use inferred type
+  const effectiveType = device.userType || inferredType
+
+  const DeviceIcon = deviceTypeIcons[effectiveType] || Monitor
+  const iconColor = deviceIconColors[effectiveType] || deviceIconColors['end-device']
+  const cardColor = deviceCardColors[effectiveType] || deviceCardColors['end-device']
+  const statusInfo = getStatusInfo(device)
+
+  // Filter out end devices if toggled off
+  const visibleChildren = showEndDevices
+    ? device.children
+    : device.children?.filter(c => c.type !== 'end-device') || []
+
+  // Group children by upstream interface for tree display
+  const childrenByInterface = new Map<string, TopologyDevice[]>()
+  for (const child of visibleChildren || []) {
+    const ifaceName = child.upstreamInterface || 'unknown'
+    if (!childrenByInterface.has(ifaceName)) {
+      childrenByInterface.set(ifaceName, [])
+    }
+    childrenByInterface.get(ifaceName)!.push(child)
+  }
+  const hasInterfaceBranches = childrenByInterface.size > 0
+
+  // Get interface info for PoE display
+  const getInterfaceInfo = (ifaceName: string): Interface | undefined => {
+    return device.interfaces?.find(i => i.name === ifaceName)
+  }
+
+  // Skip rendering end devices if toggled off
+  if (!showEndDevices && device.type === 'end-device') {
+    return null
+  }
+
+  // Check if this device was moved from another network
+  const wasMoved = (device as any).previousNetworkId && !device.nomad
+
+  // Web ports that should be clickable
+  const webPorts = new Set([80, 8080, 443, 8443])
+  const getWebUrl = (port: number) => {
+    if (!device.ip) return null
+    const protocol = port === 443 || port === 8443 ? 'https' : 'http'
+    return `${protocol}://${device.ip}${port === 80 || port === 443 ? '' : ':' + port}`
+  }
+
+  const displayName = device.hostname || device.ip || device.mac
+
+  return (
+    <div className="relative">
+      {/* Device Card Row */}
+      <div className="inline-flex items-center gap-2 flex-nowrap">
+        {/* Device Card */}
+        <div
+          onClick={() => onDeviceClick?.(device)}
+          className={`
+            shrink-0 inline-flex items-center gap-2 px-2 py-1.5 rounded border text-xs cursor-pointer
+            ${cardColor}
+            ${device.accessible ? 'ring-1 ring-cyan-500/30' : ''}
+            hover:opacity-80 transition-opacity
+          `}
+        >
+          {/* Expand/Collapse Button */}
+          {hasInterfaceBranches && (
+            <button
+              onClick={handleToggle}
+              className="shrink-0 p-0.5 -ml-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </button>
+          )}
+
+          {/* Device Icon */}
+          <div className={`shrink-0 p-1 rounded border ${iconColor}`}>
+            <DeviceIcon className="w-3 h-3" />
+          </div>
+
+          {/* Device Info */}
+          <div className="flex items-center gap-2 flex-nowrap">
+            {/* Hostname/IP */}
+            <span className="font-medium text-slate-900 dark:text-slate-100">
+              {displayName}
+            </span>
+
+            {/* IP Address Pill (for non-root devices - upstream interface is shown in tree branch) */}
+            {showInterfaces && device.ip && device.hostname && (
+              <span className="shrink-0 px-1 py-0.5 text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50">
+                {device.ip}
+              </span>
+            )}
+
+            {/* Vendor/Model Pill */}
+            {showVendor && (device.vendor || device.model) && (
+              <span className="shrink-0 h-5 inline-flex items-center rounded overflow-hidden text-[9px] font-medium bg-slate-100 dark:bg-slate-800 border border-slate-300/50 dark:border-slate-600/50">
+                {device.vendor && (
+                  <span className="px-[5px] flex items-center">
+                    <VendorLogo vendor={device.vendor} className="w-3 h-3" />
+                  </span>
+                )}
+                {device.vendor && device.model && (
+                  <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
+                )}
+                {device.model && (
+                  <span className="px-1 text-slate-500 dark:text-slate-500">
+                    {device.model}
+                  </span>
+                )}
+              </span>
+            )}
+
+            {/* Firmware Badge */}
+            {showFirmware && device.firmwareVersion && (
+              <span className="shrink-0 px-1 py-0.5 text-[9px] font-medium bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 rounded border border-cyan-300/50 dark:border-cyan-600/50">
+                {device.firmwareVersion}
+              </span>
+            )}
+
+            {/* Open Ports */}
+            {showPorts && openPorts.length > 0 && (
+              <span className="shrink-0 inline-flex items-center rounded overflow-hidden text-[9px] font-medium font-mono bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-700/25 dark:border-emerald-500/25">
+                {openPorts.slice(0, 6).map((port, idx) => {
+                  const webUrl = webPorts.has(port) ? getWebUrl(port) : null
+                  return webUrl ? (
+                    <a
+                      key={port}
+                      href={webUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className={`px-1 py-0.5 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-800/50 hover:text-emerald-900 dark:hover:text-emerald-200 transition-colors cursor-pointer ${
+                        idx > 0 ? 'border-l border-emerald-700/25 dark:border-emerald-500/25' : ''
+                      }`}
+                    >
+                      {port}
+                    </a>
+                  ) : (
+                    <span
+                      key={port}
+                      className={`px-1 py-0.5 text-emerald-700 dark:text-emerald-400 ${
+                        idx > 0 ? 'border-l border-emerald-700/25 dark:border-emerald-500/25' : ''
+                      }`}
+                    >
+                      {port}
+                    </span>
+                  )
+                })}
+                {openPorts.length > 6 && (
+                  <span className="px-1 py-0.5 text-emerald-600 dark:text-emerald-500 border-l border-emerald-700/25 dark:border-emerald-500/25">
+                    +{openPorts.length - 6}
+                  </span>
+                )}
+              </span>
+            )}
+
+            {/* Status Badge (No credentials / Unreachable) */}
+            {statusInfo && (
+              <span className={`shrink-0 flex items-center gap-1 px-1 py-0.5 text-[9px] font-medium rounded ${statusInfo.color}`}>
+                <AlertTriangle className="w-2.5 h-2.5" />
+                {statusInfo.label}
+              </span>
+            )}
+
+            {/* Moved Badge */}
+            {wasMoved && (
+              <span
+                className="shrink-0 flex items-center gap-1 px-1 py-0.5 text-[9px] font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded cursor-help"
+                title={`Previously seen in: ${(device as any).previousNetworkName || 'another network'}`}
+              >
+                <ArrowRightLeft className="w-2.5 h-2.5" />
+                Moved
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Location Comment (to the right of card) */}
+        {device.comment && (
+          <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 whitespace-nowrap">
+            <MapPin className="w-3 h-3 shrink-0 text-red-500" />
+            {device.comment}
+          </span>
+        )}
+      </div>
+
+      {/* Interfaces & Children - grouped by interface (sorted alphabetically) */}
+      {hasInterfaceBranches && isExpanded && (
+        <div className="mt-1 ml-3 pl-3">
+          {(() => {
+            const sortedInterfaces = Array.from(childrenByInterface.entries())
+              .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }))
+            return sortedInterfaces.map(([ifaceName, children], idx) => {
+            const isLastInterface = idx === sortedInterfaces.length - 1
+            const ifaceInfo = getInterfaceInfo(ifaceName)
+            const showVirtualSwitch = needsVirtualSwitch(ifaceName, children)
+
+            return (
+              <div key={ifaceName} className="relative">
+                {/* Tree connector: vertical line + horizontal branch */}
+                <div
+                  className={`absolute -ml-3 w-[2px] bg-slate-300 dark:bg-slate-600 ${
+                    isLastInterface ? 'top-0 h-3' : 'top-0 bottom-0'
+                  }`}
+                />
+                <div className="absolute -ml-3 top-3 w-3 h-[2px] bg-slate-300 dark:bg-slate-600" />
+
+                {/* Interface Label */}
+                <div className="flex items-center gap-1.5 mb-1 pt-[2px]">
+                  <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1 rounded">
+                    {ifaceName}
+                  </span>
+                  {ifaceInfo?.poeWatts && (
+                    <span
+                      className="flex items-center gap-0.5 text-[10px] font-mono text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1 rounded cursor-help"
+                      title={`PoE${ifaceInfo.poeStandard ? ` ${ifaceInfo.poeStandard.toUpperCase()}` : ''}: ${ifaceInfo.poeWatts}W`}
+                    >
+                      <Zap className="w-2.5 h-2.5" />
+                      {ifaceInfo.poeWatts}W
+                    </span>
+                  )}
+                  {ifaceInfo?.bridge && (
+                    <span className="text-[10px] font-mono text-violet-500 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-1 rounded">
+                      {ifaceInfo.bridge}
+                    </span>
+                  )}
+                  {ifaceInfo?.vlan && (
+                    <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-1 rounded">
+                      VLAN {ifaceInfo.vlan}
+                    </span>
+                  )}
+                  {ifaceInfo?.ip && (
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                      {ifaceInfo.ip}
+                    </span>
+                  )}
+                </div>
+
+                {/* Child Devices */}
+                <div className="space-y-1 ml-1 pb-1">
+                  {showVirtualSwitch ? (
+                    /* Virtual switch placeholder - inferred when multiple inaccessible devices on one interface */
+                    <div className="relative">
+                      <div className="inline-flex items-center gap-2 px-2 py-1.5 rounded border border-dashed border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 text-xs">
+                        <div className="shrink-0 p-1 rounded border border-amber-500/30 bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                          <HelpCircle className="w-3 h-3" />
+                        </div>
+                        <span className="font-medium text-amber-700 dark:text-amber-400">
+                          Unknown switch(es)
+                        </span>
+                      </div>
+                      <div className="mt-1 ml-4 pl-3 border-l border-dashed border-amber-400/50 space-y-1">
+                        {children.map((child) => (
+                          <DeviceCard
+                            key={child.id}
+                            device={child}
+                            level={level + 1}
+                            showEndDevices={showEndDevices}
+                            showFirmware={showFirmware}
+                            showPorts={showPorts}
+                            showInterfaces={showInterfaces}
+                            showVendor={showVendor}
+                            onDeviceClick={onDeviceClick}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    children.map((child) => (
+                      <DeviceCard
+                        key={child.id}
+                        device={child}
+                        level={level + 1}
+                        showEndDevices={showEndDevices}
+                        showFirmware={showFirmware}
+                        showPorts={showPorts}
+                        showInterfaces={showInterfaces}
+                        showVendor={showVendor}
+                        onDeviceClick={onDeviceClick}
+                      />
+                    ))
+                  )}
+                </div>
+
+                {/* Hidden end devices indicator */}
+                {!showEndDevices && device.children && device.children.length > (visibleChildren?.length || 0) && (
+                  <div className="ml-1 text-[10px] text-slate-400 dark:text-slate-500 italic pb-1">
+                    +{device.children.length - (visibleChildren?.length || 0)} hidden
+                  </div>
+                )}
+              </div>
+            )
+          })})()}
+        </div>
+      )}
+    </div>
+  )
+}
