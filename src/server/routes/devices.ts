@@ -1,36 +1,63 @@
 import { Hono } from 'hono'
 import { Client } from 'ssh2'
 import { db } from '../db/client'
-import { devices, interfaces, credentials, matchedDevices } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { devices, interfaces, credentials, matchedDevices, deviceImages, scanLogs, scans } from '../db/schema'
+import { eq, desc, like, or } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { requireAdmin } from '../middleware/auth'
 
 export const devicesRoutes = new Hono()
 
-// List devices (optionally filtered by networkId)
+// Helper to pick only specified fields from an object
+function pickFields<T extends Record<string, unknown>>(obj: T, fields: string[]): Partial<T> {
+  const result: Partial<T> = {}
+  for (const field of fields) {
+    if (field in obj) {
+      result[field as keyof T] = obj[field as keyof T]
+    }
+  }
+  return result
+}
+
+// List devices (optionally filtered by networkId and fields)
+// Query params:
+//   - networkId: filter by network
+//   - fields: comma-separated list of fields to return (e.g., "id,vendor,model,mac")
 devicesRoutes.get('/', async (c) => {
   const networkId = c.req.query('networkId')
+  const fieldsParam = c.req.query('fields')
+  const fields = fieldsParam ? fieldsParam.split(',').map(f => f.trim()) : null
 
+  let deviceList
   if (networkId) {
-    const networkDevices = await db.select()
+    deviceList = await db.select()
       .from(devices)
       .where(eq(devices.networkId, networkId))
       .orderBy(devices.hostname)
-
-    return c.json(networkDevices)
+  } else {
+    deviceList = await db.select()
+      .from(devices)
+      .orderBy(devices.hostname)
   }
 
-  const allDevices = await db.select()
-    .from(devices)
-    .orderBy(devices.hostname)
+  // If fields are specified, return only those fields
+  if (fields && fields.length > 0) {
+    return c.json(deviceList.map(d => pickFields(d, fields)))
+  }
 
-  return c.json(allDevices)
+  return c.json(deviceList)
 })
 
 // Get single device with interfaces and matched credential
+// Query params:
+//   - fields: comma-separated list of fields to return (e.g., "id,vendor,model")
+//   - include: comma-separated list of relations to include (e.g., "interfaces,credential")
 devicesRoutes.get('/:id', async (c) => {
   const id = c.req.param('id')
+  const fieldsParam = c.req.query('fields')
+  const includeParam = c.req.query('include')
+  const fields = fieldsParam ? fieldsParam.split(',').map(f => f.trim()) : null
+  const include = includeParam ? includeParam.split(',').map(f => f.trim()) : ['interfaces', 'credential']
 
   const device = await db.query.devices.findFirst({
     where: eq(devices.id, id),
@@ -40,28 +67,38 @@ devicesRoutes.get('/:id', async (c) => {
     return c.json({ error: 'Device not found' }, 404)
   }
 
-  const deviceInterfaces = await db.select()
-    .from(interfaces)
-    .where(eq(interfaces.deviceId, id))
-    .orderBy(interfaces.name)
+  // Build result object
+  let result: Record<string, unknown> = fields ? pickFields(device, fields) : { ...device }
 
-  // Get matched credential for this device (by MAC)
-  let workingCredential: { username: string } | null = null
-  if (device.mac) {
-    const matched = await db.query.matchedDevices.findFirst({
-      where: eq(matchedDevices.mac, device.mac),
-    })
-    if (matched?.credentialId) {
-      const cred = await db.query.credentials.findFirst({
-        where: eq(credentials.id, matched.credentialId),
-      })
-      if (cred) {
-        workingCredential = { username: cred.username }
-      }
-    }
+  // Only fetch interfaces if requested
+  if (include.includes('interfaces')) {
+    const deviceInterfaces = await db.select()
+      .from(interfaces)
+      .where(eq(interfaces.deviceId, id))
+      .orderBy(interfaces.name)
+    result.interfaces = deviceInterfaces
   }
 
-  return c.json({ ...device, interfaces: deviceInterfaces, workingCredential })
+  // Only fetch credential if requested
+  if (include.includes('credential')) {
+    let workingCredential: { username: string } | null = null
+    if (device.mac) {
+      const matched = await db.query.matchedDevices.findFirst({
+        where: eq(matchedDevices.mac, device.mac),
+      })
+      if (matched?.credentialId) {
+        const cred = await db.query.credentials.findFirst({
+          where: eq(credentials.id, matched.credentialId),
+        })
+        if (cred) {
+          workingCredential = { username: cred.username }
+        }
+      }
+    }
+    result.workingCredential = workingCredential
+  }
+
+  return c.json(result)
 })
 
 // Update device comment
@@ -104,6 +141,25 @@ devicesRoutes.patch('/:id/nomad', async (c) => {
   return c.json({ nomad: !existing.nomad })
 })
 
+// Toggle device skipLogin status (don't attempt SSH login during scan)
+devicesRoutes.patch('/:id/skip-login', async (c) => {
+  const id = c.req.param('id')
+
+  const existing = await db.query.devices.findFirst({
+    where: eq(devices.id, id),
+  })
+
+  if (!existing) {
+    return c.json({ error: 'Device not found' }, 404)
+  }
+
+  await db.update(devices)
+    .set({ skipLogin: !existing.skipLogin })
+    .where(eq(devices.id, id))
+
+  return c.json({ skipLogin: !existing.skipLogin })
+})
+
 // Update device user type
 devicesRoutes.patch('/:id/type', async (c) => {
   const id = c.req.param('id')
@@ -118,7 +174,7 @@ devicesRoutes.patch('/:id/type', async (c) => {
     return c.json({ error: 'Device not found' }, 404)
   }
 
-  const validTypes = ['router', 'switch', 'access-point', 'server', 'computer', 'phone', 'tv', 'tablet', 'printer', 'camera', 'iot', null]
+  const validTypes = ['router', 'switch', 'access-point', 'server', 'computer', 'phone', 'desktop-phone', 'tv', 'tablet', 'printer', 'camera', 'iot', null]
   if (!validTypes.includes(userType)) {
     return c.json({ error: 'Invalid device type' }, 400)
   }
@@ -128,6 +184,48 @@ devicesRoutes.patch('/:id/type', async (c) => {
     .where(eq(devices.id, id))
 
   return c.json({ success: true, userType })
+})
+
+// Update device location
+devicesRoutes.patch('/:id/location', async (c) => {
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  const { locationId } = body
+
+  const existing = await db.query.devices.findFirst({
+    where: eq(devices.id, id),
+  })
+
+  if (!existing) {
+    return c.json({ error: 'Device not found' }, 404)
+  }
+
+  await db.update(devices)
+    .set({ locationId: locationId || null })
+    .where(eq(devices.id, id))
+
+  return c.json({ success: true, locationId: locationId || null })
+})
+
+// Update device asset tag
+devicesRoutes.patch('/:id/asset-tag', async (c) => {
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  const { assetTag } = body
+
+  const existing = await db.query.devices.findFirst({
+    where: eq(devices.id, id),
+  })
+
+  if (!existing) {
+    return c.json({ error: 'Device not found' }, 404)
+  }
+
+  await db.update(devices)
+    .set({ assetTag: assetTag || null })
+    .where(eq(devices.id, id))
+
+  return c.json({ success: true, assetTag: assetTag || null })
 })
 
 // Delete device (admin only)
@@ -229,4 +327,107 @@ devicesRoutes.post('/:id/test-credentials', requireAdmin, async (c) => {
   }
 
   return c.json({ success: false, error: result.error }, 400)
+})
+
+// Get device image
+devicesRoutes.get('/:id/image', async (c) => {
+  const id = c.req.param('id')
+
+  const image = await db.query.deviceImages.findFirst({
+    where: eq(deviceImages.deviceId, id),
+  })
+
+  if (!image) {
+    return c.json({ error: 'No image found' }, 404)
+  }
+
+  return c.json({
+    id: image.id,
+    data: image.data,
+    mimeType: image.mimeType,
+    createdAt: image.createdAt
+  })
+})
+
+// Upload device image
+devicesRoutes.post('/:id/image', async (c) => {
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  const { data, mimeType } = body
+
+  if (!data || !mimeType) {
+    return c.json({ error: 'Image data and mimeType required' }, 400)
+  }
+
+  const existing = await db.query.devices.findFirst({
+    where: eq(devices.id, id),
+  })
+
+  if (!existing) {
+    return c.json({ error: 'Device not found' }, 404)
+  }
+
+  // Delete existing image if any
+  await db.delete(deviceImages).where(eq(deviceImages.deviceId, id))
+
+  // Insert new image
+  const imageId = nanoid()
+  await db.insert(deviceImages).values({
+    id: imageId,
+    deviceId: id,
+    data,
+    mimeType,
+    createdAt: new Date().toISOString(),
+  })
+
+  return c.json({ success: true, id: imageId })
+})
+
+// Delete device image
+devicesRoutes.delete('/:id/image', async (c) => {
+  const id = c.req.param('id')
+
+  const result = await db.delete(deviceImages).where(eq(deviceImages.deviceId, id))
+
+  return c.json({ success: true })
+})
+
+// Get device-related logs from all scans
+devicesRoutes.get('/:id/logs', async (c) => {
+  const id = c.req.param('id')
+
+  const device = await db.query.devices.findFirst({
+    where: eq(devices.id, id),
+  })
+
+  if (!device) {
+    return c.json({ error: 'Device not found' }, 404)
+  }
+
+  // Build search patterns based on device identifiers
+  const patterns: string[] = []
+  if (device.ip) patterns.push(`%${device.ip}%`)
+  if (device.mac) patterns.push(`%${device.mac}%`)
+  if (device.hostname) patterns.push(`%${device.hostname}%`)
+
+  if (patterns.length === 0) {
+    return c.json({ logs: [] })
+  }
+
+  // Search for logs that mention any of the device's identifiers
+  const conditions = patterns.map(pattern => like(scanLogs.message, pattern))
+
+  const logs = await db.select({
+    id: scanLogs.id,
+    timestamp: scanLogs.timestamp,
+    level: scanLogs.level,
+    message: scanLogs.message,
+    scanId: scanLogs.scanId,
+  })
+    .from(scanLogs)
+    .where(or(...conditions))
+    .orderBy(desc(scanLogs.id))
+    .limit(100)
+
+  return c.json({ logs })
 })

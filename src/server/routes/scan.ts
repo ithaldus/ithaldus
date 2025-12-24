@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { db } from '../db/client'
-import { networks, scans, devices, interfaces, dhcpLeases } from '../db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { networks, scans, devices, interfaces, dhcpLeases, scanLogs } from '../db/schema'
+import { eq, desc, gt, and } from 'drizzle-orm'
 import { requireAdmin } from '../middleware/auth'
 import { NetworkScanner, type LogMessage, type DiscoveredDevice } from '../services/scanner'
 import { wsManager } from '../services/websocket'
@@ -15,6 +15,7 @@ const activeScans = new Map<string, {
   logs: LogMessage[]
   devices: DiscoveredDevice[]
   scanner?: NetworkScanner
+  scanId?: string  // Database scan record ID for persisting logs
 }>()
 
 // Get scan status
@@ -50,9 +51,18 @@ scanRoutes.get('/:networkId/status', async (c) => {
     })
   }
 
+  // Get log count from database for the last scan
+  let logCount = 0
+  if (lastScan) {
+    const logCountResult = await db.select({ count: scanLogs.id })
+      .from(scanLogs)
+      .where(eq(scanLogs.scanId, lastScan.id))
+    logCount = logCountResult.length
+  }
+
   return c.json({
     status: lastScan?.status === 'completed' ? 'idle' : (lastScan?.status || 'idle'),
-    logCount: 0,
+    logCount,
     deviceCount: lastScan?.deviceCount || 0,
   })
 })
@@ -63,15 +73,44 @@ scanRoutes.get('/:networkId/logs', async (c) => {
   const afterIndex = parseInt(c.req.query('after') || '0')
 
   const scanState = activeScans.get(networkId)
-  if (!scanState) {
-    return c.json({ logs: [], status: 'idle' })
+  if (scanState) {
+    // Active scan in memory - return from memory
+    const newLogs = scanState.logs.slice(afterIndex)
+    return c.json({
+      logs: newLogs,
+      status: scanState.status,
+      nextIndex: scanState.logs.length,
+    })
   }
 
-  const newLogs = scanState.logs.slice(afterIndex)
+  // No active scan - fetch logs from database for the most recent scan
+  const lastScan = await db.query.scans.findFirst({
+    where: eq(scans.networkId, networkId),
+    orderBy: desc(scans.startedAt),
+  })
+
+  if (!lastScan) {
+    return c.json({ logs: [], status: 'idle', nextIndex: 0 })
+  }
+
+  // Fetch logs from database with offset support
+  const dbLogs = await db.select()
+    .from(scanLogs)
+    .where(eq(scanLogs.scanId, lastScan.id))
+    .orderBy(scanLogs.id)
+    .offset(afterIndex)
+
+  // Transform to LogMessage format
+  const logs = dbLogs.map(log => ({
+    timestamp: log.timestamp,
+    level: log.level as 'info' | 'success' | 'warn' | 'error',
+    message: log.message,
+  }))
+
   return c.json({
-    logs: newLogs,
-    status: scanState.status,
-    nextIndex: scanState.logs.length,
+    logs,
+    status: lastScan.status === 'running' ? 'running' : 'idle',
+    nextIndex: afterIndex + dbLogs.length,
   })
 })
 
@@ -128,10 +167,31 @@ scanRoutes.post('/:networkId/start', requireAdmin, async (c) => {
 
   // Create scanner
   const scanner = new NetworkScanner(networkId, {
-    onLog: (message) => {
+    onLog: async (message) => {
       scanState.logs.push(message)
       // Broadcast log via WebSocket
       wsManager.broadcastLog(networkId, message)
+
+      // Persist log to database (async, non-blocking)
+      // First, get scanId if we don't have it yet
+      if (!scanState.scanId) {
+        const runningScan = await db.query.scans.findFirst({
+          where: and(eq(scans.networkId, networkId), eq(scans.status, 'running')),
+          orderBy: desc(scans.startedAt),
+        })
+        if (runningScan) {
+          scanState.scanId = runningScan.id
+        }
+      }
+
+      if (scanState.scanId) {
+        db.insert(scanLogs).values({
+          scanId: scanState.scanId,
+          timestamp: message.timestamp,
+          level: message.level,
+          message: message.message,
+        }).catch(err => console.error('Failed to persist scan log:', err))
+      }
     },
     onDeviceDiscovered: async (device) => {
       scanState.devices.push(device)

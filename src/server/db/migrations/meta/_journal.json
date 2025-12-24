@@ -22,6 +22,48 @@
       "when": 1766404489724,
       "tag": "0002_careful_alex_power",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1766430951666,
+      "tag": "0003_pink_anita_blake",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1766511426352,
+      "tag": "0004_lean_doctor_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1766528288454,
+      "tag": "0005_brave_kang",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1766528839647,
+      "tag": "0006_lively_chronomancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1766530745970,
+      "tag": "0007_moaning_jane_foster",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1766531058408,
+      "tag": "0008_thankful_rockslide",
+      "breakpoints": true
     }
   ]
 }

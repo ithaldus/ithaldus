@@ -6,28 +6,34 @@ import { eq } from 'drizzle-orm'
 async function seed() {
   console.log('Seeding database...')
 
-  // Check if admin user already exists
-  const existingAdmin = await db.query.users.findFirst({
-    where: eq(users.role, 'admin'),
-  })
+  // Users to seed
+  const usersToSeed = [
+    {
+      email: 'henno.taht@torva.edu.ee',
+      name: 'Henno Täht',
+      role: 'admin' as const,
+    },
+  ]
 
-  if (existingAdmin) {
-    console.log('Admin user already exists:', existingAdmin.email)
-    return
+  for (const userData of usersToSeed) {
+    const existing = await db.query.users.findFirst({
+      where: eq(users.email, userData.email),
+    })
+
+    if (existing) {
+      console.log('User already exists:', userData.email)
+      continue
+    }
+
+    await db.insert(users).values({
+      id: nanoid(),
+      ...userData,
+      createdAt: new Date().toISOString(),
+    })
+
+    console.log('Created user:', userData.email)
   }
 
-  // Create default admin user
-  const adminUser = {
-    id: nanoid(),
-    email: 'admin@example.com',
-    name: 'Admin User',
-    role: 'admin' as const,
-    createdAt: new Date().toISOString(),
-  }
-
-  await db.insert(users).values(adminUser)
-
-  console.log('Created admin user:', adminUser.email)
   console.log('Database seeding complete!')
 }
 

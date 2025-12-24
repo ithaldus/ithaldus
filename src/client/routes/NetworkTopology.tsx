@@ -9,10 +9,15 @@ import {
   ChevronRight,
   Clock,
   Radar,
+  Loader2,
+  MapPin,
 } from 'lucide-react'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 import { DeviceCard } from '../components/topology/DeviceCard'
 import { DebugConsole } from '../components/topology/DebugConsole'
 import { DeviceModal } from '../components/topology/DeviceModal'
+import { Tooltip } from '../components/ui/Tooltip'
 
 type ScanStatus = 'idle' | 'running' | 'completed' | 'error'
 
@@ -40,6 +45,8 @@ export function NetworkTopology() {
   const [consoleWidth, setConsoleWidth] = useState(400)
   const [selectedDevice, setSelectedDevice] = useState<TopologyDevice | null>(null)
   const [lastScannedAt, setLastScannedAt] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const topologyRef = useRef<HTMLDivElement>(null)
   const [visibility, setVisibility] = useState<VisibilityToggles>(() => {
     const stored = localStorage.getItem('topology-visibility')
     if (stored) {
@@ -278,6 +285,25 @@ export function NetworkTopology() {
     }
   }
 
+  function handleSkipLoginToggle(deviceId: string) {
+    // Update device in tree
+    function updateDevice(devices: TopologyDevice[]): TopologyDevice[] {
+      return devices.map(d => {
+        if (d.id === deviceId) {
+          return { ...d, skipLogin: !d.skipLogin }
+        }
+        if (d.children) {
+          return { ...d, children: updateDevice(d.children) }
+        }
+        return d
+      })
+    }
+    setDevices(updateDevice(devices))
+    if (selectedDevice?.id === deviceId) {
+      setSelectedDevice({ ...selectedDevice, skipLogin: !selectedDevice.skipLogin })
+    }
+  }
+
   function handleTypeChange(deviceId: string, userType: string | null) {
     // Update device in tree
     function updateDevice(devices: TopologyDevice[]): TopologyDevice[] {
@@ -297,6 +323,44 @@ export function NetworkTopology() {
     }
   }
 
+  function handleLocationChange(deviceId: string, locationId: string | null) {
+    // Update device in tree
+    function updateDevice(devices: TopologyDevice[]): TopologyDevice[] {
+      return devices.map(d => {
+        if (d.id === deviceId) {
+          return { ...d, locationId }
+        }
+        if (d.children) {
+          return { ...d, children: updateDevice(d.children) }
+        }
+        return d
+      })
+    }
+    setDevices(updateDevice(devices))
+    if (selectedDevice?.id === deviceId) {
+      setSelectedDevice({ ...selectedDevice, locationId })
+    }
+  }
+
+  function handleAssetTagChange(deviceId: string, assetTag: string | null) {
+    // Update device in tree
+    function updateDevice(devices: TopologyDevice[]): TopologyDevice[] {
+      return devices.map(d => {
+        if (d.id === deviceId) {
+          return { ...d, assetTag }
+        }
+        if (d.children) {
+          return { ...d, children: updateDevice(d.children) }
+        }
+        return d
+      })
+    }
+    setDevices(updateDevice(devices))
+    if (selectedDevice?.id === deviceId) {
+      setSelectedDevice({ ...selectedDevice, assetTag })
+    }
+  }
+
   function formatLastScanned(date: string | null): string {
     if (!date) return 'Never'
     const d = new Date(date)
@@ -312,6 +376,59 @@ export function NetworkTopology() {
 
   function toggleVisibility(key: keyof VisibilityToggles) {
     setVisibility(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  async function exportPDF() {
+    if (!topologyRef.current || !network) return
+
+    setExporting(true)
+    try {
+      // Capture the topology container
+      const canvas = await html2canvas(topologyRef.current, {
+        backgroundColor: '#0f172a', // dark mode background
+        scale: 2, // Higher quality
+        useCORS: true,
+        logging: false,
+      })
+
+      // Calculate PDF dimensions based on canvas aspect ratio
+      const imgWidth = 297 // A4 landscape width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      // Create PDF in landscape orientation
+      const pdf = new jsPDF({
+        orientation: imgHeight > imgWidth ? 'portrait' : 'landscape',
+        unit: 'mm',
+        format: [imgWidth, Math.max(imgHeight, 210)], // At least A4 height
+      })
+
+      // Add title
+      pdf.setFontSize(16)
+      pdf.setTextColor(0, 180, 216) // Cyan color
+      pdf.text(`${network.name} - Network Topology`, 14, 15)
+
+      // Add metadata
+      pdf.setFontSize(10)
+      pdf.setTextColor(128, 128, 128)
+      const now = new Date().toLocaleString()
+      pdf.text(`Exported: ${now}`, 14, 22)
+      if (lastScannedAt) {
+        pdf.text(`Last scanned: ${formatLastScanned(lastScannedAt)}`, 14, 28)
+      }
+
+      // Add the topology image
+      const imgData = canvas.toDataURL('image/png')
+      pdf.addImage(imgData, 'PNG', 7, 35, imgWidth - 14, imgHeight - 35)
+
+      // Save the PDF
+      const filename = `${network.name.replace(/[^a-z0-9]/gi, '_')}_topology_${new Date().toISOString().split('T')[0]}.pdf`
+      pdf.save(filename)
+    } catch (err) {
+      console.error('Failed to export PDF:', err)
+      alert('Failed to export PDF. Please try again.')
+    } finally {
+      setExporting(false)
+    }
   }
 
   if (loading) {
@@ -354,6 +471,14 @@ export function NetworkTopology() {
           <span className="text-slate-400 font-mono text-xs ml-2">
             {network.rootIp}
           </span>
+          <span className="text-slate-400 mx-2">·</span>
+          <Link
+            to={`/networks/${networkId}/locations`}
+            className="flex items-center gap-1 text-violet-500 hover:text-violet-400 transition-colors"
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            <span className="text-xs font-medium">Locations</span>
+          </Link>
         </div>
 
         <div className="flex items-center gap-3">
@@ -366,39 +491,43 @@ export function NetworkTopology() {
           )}
 
           {/* Visibility Toggle Pill */}
-          <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 overflow-hidden">
+          <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-slate-700 overflow-hidden">
             {[
               { key: 'endDevices' as const, letter: 'E', tooltip: 'End Devices — Show or hide non-network devices like computers, phones, printers, and IoT devices' },
               { key: 'firmware' as const, letter: 'F', tooltip: 'Firmware — Show or hide firmware version information on device cards' },
               { key: 'ports' as const, letter: 'P', tooltip: 'Ports — Show or hide open management ports (SSH, HTTP, SNMP, etc.) on device cards' },
               { key: 'interfaces' as const, letter: 'I', tooltip: 'Interfaces — Show or hide network interface details and bridge membership' },
               { key: 'vendor' as const, letter: 'V', tooltip: 'Vendor — Show or hide vendor/manufacturer logos and names' },
-            ].map(({ key, letter, tooltip }, index, arr) => (
-              <button
-                key={key}
-                onClick={() => toggleVisibility(key)}
-                title={tooltip}
-                className={`
-                  px-2.5 py-2 text-xs font-medium transition-colors
-                  ${index < arr.length - 1 ? 'border-r border-slate-200 dark:border-slate-700' : ''}
-                  ${visibility[key]
-                    ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
-                    : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-600 dark:hover:text-slate-300'
-                  }
-                `}
-              >
-                {letter}
-              </button>
+            ].map(({ key, letter, tooltip }) => (
+              <Tooltip key={key} content={tooltip}>
+                <button
+                  onClick={() => toggleVisibility(key)}
+                  className={`
+                    px-2.5 py-2 text-xs font-medium transition-colors
+                    ${visibility[key]
+                      ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
+                      : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-600 dark:hover:text-slate-300'
+                    }
+                  `}
+                >
+                  {letter}
+                </button>
+              </Tooltip>
             ))}
           </div>
 
           {/* Export PDF */}
           <button
-            onClick={() => {/* TODO: Implement PDF export */}}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm transition-colors"
+            onClick={exportPDF}
+            disabled={exporting || devices.length === 0}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors"
           >
-            <FileDown className="w-4 h-4" />
-            Export
+            {exporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <FileDown className="w-4 h-4" />
+            )}
+            {exporting ? 'Exporting...' : 'Export'}
           </button>
 
           {/* Start/Stop Scan */}
@@ -427,7 +556,7 @@ export function NetworkTopology() {
       </div>
 
       {/* Topology View */}
-      <div className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+      <div ref={topologyRef} className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
         {devices.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-4">
@@ -473,11 +602,15 @@ export function NetworkTopology() {
       {selectedDevice && (
         <DeviceModal
           device={selectedDevice}
+          networkId={networkId}
           isAdmin={isAdmin}
           onClose={() => setSelectedDevice(null)}
           onCommentUpdate={handleCommentUpdate}
           onNomadToggle={handleNomadToggle}
+          onSkipLoginToggle={handleSkipLoginToggle}
           onTypeChange={handleTypeChange}
+          onLocationChange={handleLocationChange}
+          onAssetTagChange={handleAssetTagChange}
         />
       )}
     </div>

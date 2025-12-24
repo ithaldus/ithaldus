@@ -8,12 +8,14 @@ type ExtendedCredential = Credential & { matchedDevices?: MatchedDevice[] }
 interface CredentialCardProps {
   credential: ExtendedCredential
   allCredentials: ExtendedCredential[]
+  showAllPasswords?: boolean
   onEdit?: (id: string, username: string, password: string) => void
   onDelete?: (id: string) => void
 }
 
-export function CredentialCard({ credential, allCredentials, onEdit, onDelete }: CredentialCardProps) {
-  const [showPassword, setShowPassword] = useState(false)
+export function CredentialCard({ credential, allCredentials, showAllPasswords = false, onEdit, onDelete }: CredentialCardProps) {
+  const [showPasswordLocal, setShowPasswordLocal] = useState(false)
+  const showPassword = showAllPasswords || showPasswordLocal
   const [isEditing, setIsEditing] = useState(false)
   const [editUsername, setEditUsername] = useState(credential.username)
   const [editPassword, setEditPassword] = useState(credential.password)
@@ -99,7 +101,7 @@ export function CredentialCard({ credential, allCredentials, onEdit, onDelete }:
                   {showPassword ? credential.password : '••••••••'}
                 </span>
                 <button
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowPasswordLocal(!showPasswordLocal)}
                   className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >

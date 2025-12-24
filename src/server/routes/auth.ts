@@ -89,12 +89,24 @@ authRoutes.get('/login', async (c) => {
     return c.json({ error: 'Microsoft OAuth not configured' }, 500)
   }
 
+  // Generate state for CSRF protection
+  const state = nanoid(32)
+  setCookie(c, 'oauth_state', state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Lax',
+    maxAge: 600, // 10 minutes
+    path: '/',
+  })
+
   const authUrl = new URL(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`)
   authUrl.searchParams.set('client_id', clientId)
   authUrl.searchParams.set('response_type', 'code')
   authUrl.searchParams.set('redirect_uri', redirectUri)
   authUrl.searchParams.set('scope', 'openid profile email')
   authUrl.searchParams.set('response_mode', 'query')
+  authUrl.searchParams.set('state', state)
+  authUrl.searchParams.set('prompt', 'select_account') // Allow switching accounts
 
   return c.redirect(authUrl.toString())
 })
@@ -103,6 +115,11 @@ authRoutes.get('/login', async (c) => {
 authRoutes.get('/callback', async (c) => {
   const code = c.req.query('code')
   const error = c.req.query('error')
+  const state = c.req.query('state')
+  const storedState = getCookie(c, 'oauth_state')
+
+  // Clear the state cookie immediately
+  deleteCookie(c, 'oauth_state')
 
   if (error) {
     return c.redirect('/login?error=oauth_error')
@@ -110,6 +127,11 @@ authRoutes.get('/callback', async (c) => {
 
   if (!code) {
     return c.redirect('/login?error=no_code')
+  }
+
+  // Verify state to prevent CSRF attacks
+  if (!state || !storedState || state !== storedState) {
+    return c.redirect('/login?error=invalid_state')
   }
 
   const clientId = process.env.MICROSOFT_CLIENT_ID

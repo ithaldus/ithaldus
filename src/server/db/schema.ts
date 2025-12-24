@@ -33,6 +33,16 @@ export const networks = sqliteTable('networks', {
   isOnline: integer('is_online', { mode: 'boolean' }),
 })
 
+// Locations table (physical locations within a network)
+export const locations = sqliteTable('locations', {
+  id: text('id').primaryKey(),
+  networkId: text('network_id').notNull().references(() => networks.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  index('idx_locations_network').on(table.networkId),
+])
+
 // Credentials table
 export const credentials = sqliteTable('credentials', {
   id: text('id').primaryKey(),
@@ -77,6 +87,7 @@ export const devices = sqliteTable('devices', {
   ip: text('ip'),
   vendor: text('vendor'),
   model: text('model'),
+  serialNumber: text('serial_number'),
   firmwareVersion: text('firmware_version'),
   type: text('type', { enum: ['router', 'switch', 'access-point', 'end-device'] }),
   accessible: integer('accessible', { mode: 'boolean' }),
@@ -84,13 +95,17 @@ export const devices = sqliteTable('devices', {
   driver: text('driver'),
   // Metadata (user-managed)
   comment: text('comment'),
+  locationId: text('location_id').references(() => locations.id, { onDelete: 'set null' }),
+  assetTag: text('asset_tag'),
   nomad: integer('nomad', { mode: 'boolean' }).notNull().default(false),
-  userType: text('user_type', { enum: ['router', 'switch', 'access-point', 'server', 'computer', 'phone', 'tv', 'tablet', 'printer', 'camera', 'iot'] }),
+  skipLogin: integer('skip_login', { mode: 'boolean' }).notNull().default(false),
+  userType: text('user_type', { enum: ['router', 'switch', 'access-point', 'server', 'computer', 'phone', 'desktop-phone', 'tv', 'tablet', 'printer', 'camera', 'iot'] }),
   lastSeenAt: text('last_seen_at').notNull(),
 }, (table) => [
   index('idx_devices_mac').on(table.mac),
   index('idx_devices_network').on(table.networkId),
   index('idx_devices_parent').on(table.parentInterfaceId),
+  index('idx_devices_location').on(table.locationId),
 ])
 
 // Scans table (scan history per network)
@@ -103,6 +118,18 @@ export const scans = sqliteTable('scans', {
   rootIp: text('root_ip').notNull(),
   deviceCount: integer('device_count'),
 })
+
+// Scan logs table (persisted log messages)
+export const scanLogs = sqliteTable('scan_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  scanId: text('scan_id').notNull().references(() => scans.id, { onDelete: 'cascade' }),
+  timestamp: text('timestamp').notNull(),
+  level: text('level', { enum: ['info', 'success', 'warn', 'error'] }).notNull(),
+  message: text('message').notNull(),
+  device: text('device'),  // Optional device hostname/IP for context
+}, (table) => [
+  index('idx_scan_logs_scan').on(table.scanId),
+])
 
 // DHCP leases table (stores leases from root device for hostname resolution)
 export const dhcpLeases = sqliteTable('dhcp_leases', {
@@ -117,6 +144,17 @@ export const dhcpLeases = sqliteTable('dhcp_leases', {
   index('idx_dhcp_leases_mac').on(table.mac),
 ])
 
+// Device images table (stores device photos)
+export const deviceImages = sqliteTable('device_images', {
+  id: text('id').primaryKey(),
+  deviceId: text('device_id').notNull().references(() => devices.id, { onDelete: 'cascade' }),
+  data: text('data').notNull(),  // Base64-encoded image data
+  mimeType: text('mime_type').notNull(),  // e.g., 'image/jpeg', 'image/png'
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  index('idx_device_images_device').on(table.deviceId),
+])
+
 // Type exports for use in application
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -124,6 +162,8 @@ export type Session = typeof sessions.$inferSelect
 export type NewSession = typeof sessions.$inferInsert
 export type Network = typeof networks.$inferSelect
 export type NewNetwork = typeof networks.$inferInsert
+export type Location = typeof locations.$inferSelect
+export type NewLocation = typeof locations.$inferInsert
 export type Credential = typeof credentials.$inferSelect
 export type NewCredential = typeof credentials.$inferInsert
 export type MatchedDevice = typeof matchedDevices.$inferSelect
@@ -136,3 +176,7 @@ export type Scan = typeof scans.$inferSelect
 export type NewScan = typeof scans.$inferInsert
 export type DhcpLease = typeof dhcpLeases.$inferSelect
 export type NewDhcpLease = typeof dhcpLeases.$inferInsert
+export type ScanLog = typeof scanLogs.$inferSelect
+export type NewScanLog = typeof scanLogs.$inferInsert
+export type DeviceImage = typeof deviceImages.$inferSelect
+export type NewDeviceImage = typeof deviceImages.$inferInsert

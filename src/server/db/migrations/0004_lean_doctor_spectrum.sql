@@ -1,0 +1,1 @@
+ALTER TABLE `devices` ADD `serial_number` text;

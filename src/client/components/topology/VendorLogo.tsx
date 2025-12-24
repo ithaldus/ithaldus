@@ -17,13 +17,15 @@ const vendorLogos: Record<string, React.ReactNode> = {
     </svg>
   ),
   ruckus: (
-    // Ruckus signal bars
-    <svg viewBox="0 0 39 20" fill="currentColor" className="h-full w-auto">
-      <rect x="0" y="12" width="3" height="8" rx="1.5" />
-      <rect x="9" y="6" width="3" height="14" rx="1.5" />
-      <rect x="18" y="0" width="3" height="20" rx="1.5" />
-      <rect x="27" y="6" width="3" height="14" rx="1.5" />
-      <rect x="36" y="12" width="3" height="8" rx="1.5" />
+    // Ruckus Networks official logo from Brandfetch - dog + signal bars
+    <svg viewBox="0 16 112 74" className="h-full w-auto">
+      <path fill="#231f20" d="M82.14,37.07l-1.24-1.58-6.75,2.88-2.84-1.93-4.55.98-4.99,2.23-1.29,2.88,2.4,2.83,1.83.54,4.85-5.04-4.29,7-3.3-1.07-.76-1.11-5.54,6.86-17.24,4.54c-.6,0-1.49.02-1.49.02-15.97-6.84-6.79-16.01-6.7-16.12-.11.06-13.1,6.62,1.58,18.71l-2.75,3.12-1.95,8.82-4.94,3.92-5.41,11.75h5.13s.84-1.98.84-1.98l-1.99-.49,3.24-5.64c1.69-.9,7.72-3.33,8.91-4.15l8.02-10.09,8.98,2.83,1.26-5.58.44.93.69,7.96-3.8,17.01h5.37v-1.73l-2.01-.85,6.53-14.66s9.93-6.33,9.92-6.39c-.03-.16,4.82-15.09,4.82-15.09l6-.51,1.76-2.41-7.11.02,8.25-6.08.08-3.32Z"/>
+      <polygon fill="#231f20" points="60.07 71.78 66.6 67.64 59.54 84.1 61.55 84.87 61.55 86.53 56.82 86.53 60.07 71.78"/>
+      <path fill="#231f20" d="M43.59,75.49l-7.47,3.79-2.75,4.86,2.09.58-.84,1.79h-4.6s3.58-9.52,3.58-9.52c.35-.21,4.13-3.6,4.13-3.6l.32-2.14,3.5-4.39,5.19,1.65-3.14,6.98Z"/>
+      <polygon fill="#f47920" points="71.87 56.11 56.9 50.48 58.39 48.61 72.51 53.68 71.87 56.11"/>
+      <polygon fill="#f47920" points="87.12 36.89 87.12 46.47 91.7 46.47 91.7 33.59 87.12 36.89"/>
+      <polygon fill="#f47920" points="96.94 29.83 96.94 46.47 101.52 46.47 101.52 26.53 96.94 29.83"/>
+      <polygon fill="#f47920" points="107 22.59 107 46.47 111.58 46.47 111.58 19.29 107 22.59"/>
     </svg>
   ),
   zyxel: (
@@ -143,10 +145,9 @@ const vendorLogos: Record<string, React.ReactNode> = {
     </svg>
   ),
   msi: (
-    // MSI shield/dragon simplified
-    <svg viewBox="4 2 16 22" fill="currentColor" className="h-full w-auto">
-      <path d="M12 2L4 6v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V6l-8-4zm0 2.18l6 3V12c0 4.5-3.12 8.73-6 9.93-2.88-1.2-6-5.43-6-9.93V7.18l6-3z" />
-      <path d="M9 8l1.5 3L12 9l1.5 2 1.5-3v6h-1.5v-3l-1.5 2-1.5-2v3H9V8z" />
+    // MSI wordmark logo
+    <svg viewBox="0 0 60 20" fill="currentColor" className="h-full w-auto">
+      <text x="30" y="15" textAnchor="middle" fontSize="14" fontWeight="bold" fontFamily="Arial, sans-serif">MSI</text>
     </svg>
   ),
   xiaomi: (
@@ -221,9 +222,13 @@ const vendorLogos: Record<string, React.ReactNode> = {
     </svg>
   ),
   canon: (
-    // Canon simplified
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-full w-auto">
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z" />
+    // Canon official logo from Brandfetch
+    <svg viewBox="0 0 800 167.3" fill="#CC0000" className="h-full w-auto">
+      <path d="M130.6,151c-37.2,0-67.3-30.2-67.3-67.4c0-37.2,30.1-67.3,67.3-67.3c13.1,0,25.4,3.7,35.7,10.2l-35.7,57.1 l67.2-38.8c-7.3-11.6-17.8-21.7-30.4-29.3C151.3,6,128.9,0,104.1,0C68.7,0,37.7,12.8,20.4,32.1C7.6,46.3,0,64.2,0,83.7 c0,19.5,7.6,37.4,20.4,51.6c17.3,19.3,47.9,32,82.7,32c34.8,0,65.3-12.8,82.7-32c0.9-1.1,1.9-2.1,2.7-3.2l-2.6-9.8 C173.7,139.6,153.5,151,130.6,151" />
+      <path d="M353.4,163.3L325.2,58.1c-4.5-17-20-29.5-38.4-29.5c-4.8,0-9.4,0.9-13.6,2.4l-60.7,22.1h62.4l10.7,39.8 c-10.4-8.9-23.8-14.3-38.6-14.3c-29.3,0-53,19.6-53,43.9c0,24.2,23.7,43.9,53,43.9c21.1,0,39.8-10.3,51.3-26.2l6.2,23.1H353.4 M267.4,146.9c-13.5,0-24.5-10.9-24.5-24.5c0-13.5,11-24.5,24.5-24.5s24.5,11,24.5,24.5C291.9,136,280.9,146.9,267.4,146.9z" />
+      <path d="M468.4,28.6c-3.7,0-7.2,0.8-10.3,2.3l-39,18.2c-1.9-11.6-12-20.4-24.2-20.4c-3.7,0-7.2,0.8-10.4,2.3 l-47.6,22.2h33.5v110.2h49v-98c0-6.8,5.5-12.3,12.2-12.3c6.7,0,12.2,5.5,12.2,12.3v98h49V53.1C492.8,39.5,481.9,28.6,468.4,28.6" />
+      <path d="M775.5,28.6c-3.7,0-7.2,0.8-10.4,2.3L726.2,49c-1.9-11.6-12-20.4-24.2-20.4c-3.7,0-7.2,0.8-10.4,2.3 l-47.6,22.2h33.5v110.2h49v-98c0-6.8,5.5-12.3,12.3-12.3c6.8,0,12.2,5.5,12.2,12.3v98h49V53.1C800,39.5,789,28.6,775.5,28.6" />
+      <path d="M652,98c0,38.3-31,69.4-69.3,69.4c-38.3,0-69.4-31.1-69.4-69.4c0-38.3,31.1-69.4,69.4-69.4 C621,28.6,652,59.7,652,98 M585.5,49.6c-2.2-8.2-10.6-13-18.7-10.8c-8.2,2.2-13,10.6-10.8,18.7l23.8,88.7 c2.2,8.2,10.6,13,18.7,10.9c8.2-2.2,13-10.6,10.8-18.8L585.5,49.6L585.5,49.6z" />
     </svg>
   ),
   vmware: (
@@ -238,13 +243,67 @@ const vendorLogos: Record<string, React.ReactNode> = {
       <path d="M12 2c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1s1-.45 1-1V3c0-.55-.45-1-1-1zm0 14c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1s1-.45 1-1v-4c0-.55-.45-1-1-1zm10-4c0-.55-.45-1-1-1h-4c-.55 0-1 .45-1 1s.45 1 1 1h4c.55 0 1-.45 1-1zM8 12c0-.55-.45-1-1-1H3c-.55 0-1 .45-1 1s.45 1 1 1h4c.55 0 1-.45 1-1zm11.07-5.07l-2.83 2.83c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l2.83-2.83c.39-.39.39-1.02 0-1.41-.39-.39-1.02-.39-1.41 0zM7.76 16.17l-2.83 2.83c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l2.83-2.83c.39-.39.39-1.02 0-1.41-.39-.39-1.02-.39-1.41 0zm11.31 2.83l-2.83-2.83c-.39-.39-1.02-.39-1.41 0-.39.39-.39 1.02 0 1.41l2.83 2.83c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41zM6.34 7.76L3.51 4.93c-.39-.39-1.02-.39-1.41 0-.39.39-.39 1.02 0 1.41l2.83 2.83c.39.39 1.02.39 1.41 0 .39-.39.39-1.02 0-1.41z" />
     </svg>
   ),
+  '3com': (
+    // 3Com simplified - stylized 3
+    <svg viewBox="0 0 24 24" fill="currentColor" className="h-full w-auto">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm2 14c0 1.1-.9 2-2 2h-2c-1.1 0-2-.9-2-2v-1h2v1h2v-2h-2v-2h2v-2h-2v1H8v-1c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v1c0 .55-.22 1.05-.59 1.41.37.36.59.86.59 1.41v1.18z" />
+    </svg>
+  ),
+  gigabyte: (
+    // Gigabyte official logo from Brandfetch
+    <svg viewBox="0 0 312.802 39.851" fill="#005DAA" className="h-full w-auto">
+      <polygon points="300.199,1.064 297.884,1.064 297.884,0.128 303.576,0.128 303.576,1.064 301.265,1.064 301.265,7.552 300.199,7.552" />
+      <polygon points="304.65,0.128 306.412,0.128 308.753,6.286 311.046,0.128 312.802,0.128 312.802,7.552 311.736,7.552 311.736,1.13 311.718,1.13 309.257,7.552 308.201,7.552 305.744,1.13 305.722,1.13 305.722,7.552 304.65,7.552" />
+      <rect x="46.272" width="10.603" height="39.625" />
+      <path d="M119.531,0.033h13.006l15.344,39.818h-11.635l-2.969-8.495h-14.945l-3.142,8.495h-10.781L119.531,0.033 M126.032,8.247h-0.111l-5.138,15.576h9.983L126.032,8.247" />
+      <path d="M153.044,0.028h18.317c7.412,0,12.949,3.249,12.949,10.094c0,5.028-2.566,7.826-7.015,9.304v0.111 c5.297,1.091,8.042,3.94,8.042,8.795c0,9.526-8.387,11.518-15.516,11.518h-16.777V0.028 M163.652,32.33h3.146 c3.877,0,7.926-0.577,7.926-4.624c0-4.342-4.164-4.735-7.811-4.735h-3.262V32.33 M163.652,15.779h2.97 c3.482,0,7.072-0.856,7.072-4.225c0-3.653-3.417-3.987-6.953-3.987h-3.089V15.779" />
+      <polyline points="199.702,24.852 184.988,0.028 197.193,0.028 205.012,16.004 212.713,0.028 224.927,0.028 210.314,24.852 210.314,39.851 199.702,39.851 199.702,24.852" />
+      <polyline points="239.101,7.901 229.294,7.901 229.294,0.028 259.529,0.028 259.529,7.901 249.722,7.901 249.722,39.851 239.101,39.851 239.101,7.901" />
+      <polyline points="264.58,0.028 292.65,0.028 292.65,7.567 275.187,7.567 275.187,15.779 291.675,15.779 291.675,23.308 275.187,23.308 275.187,32.33 293.273,32.33 293.273,39.851 264.58,39.851 264.58,0.028" />
+      <path d="M22.176,8.747c-7.059,0.587-10.913,5.221-10.913,11.218c0,5.831,5.403,10.732,10.621,10.732l1.146-0.012 h1.929c0,0,1.279,0,1.288-1.247V16.923h10.896c0,7.064-0.026,22.928-0.026,22.928s-10.754-0.009-16.998-0.009 C8.377,39.842,0,30.142,0,19.965C0,8.957,9.112-0.237,20.458,0.17l16.299,0.051l-0.008,8.525H22.176" />
+      <path d="M85.229,8.747C78.167,9.333,74.32,13.967,74.32,19.965c0,5.831,5.395,10.732,10.617,10.732l1.142-0.012 h1.934c0,0,1.27,0,1.279-1.247V16.923h10.878c0,7.064-0.018,22.928-0.018,22.928s-10.745-0.009-16.985-0.009 c-11.736,0-20.104-9.7-20.104-19.877c0-11.008,9.103-20.202,20.454-19.794l16.272,0.051l-0.004,8.525H85.229" />
+    </svg>
+  ),
+  kyocera: (
+    // Kyocera official logo - red KYOCERA wordmark
+    <svg viewBox="0 0 200 40" className="h-full w-auto">
+      <text x="100" y="28" textAnchor="middle" fill="#E4002B" fontSize="24" fontWeight="bold" fontFamily="Arial, sans-serif">KYOCERA</text>
+    </svg>
+  ),
+  microchip: (
+    // Microchip Technology - red stylized M logo
+    <svg viewBox="0 0 100 60" className="h-full w-auto">
+      <path fill="#CC0000" d="M10,50 L25,10 L40,35 L50,10 L60,35 L75,10 L90,50 L75,50 L65,30 L55,50 L45,50 L35,30 L25,50 Z" />
+    </svg>
+  ),
+  tuya: (
+    // Tuya Smart - orange circle with lightning bolt
+    <svg viewBox="0 0 24 24" className="h-full w-auto">
+      <circle cx="12" cy="12" r="11" fill="#FF6A00" />
+      <path d="M13 4L7 13h4l-2 7 8-10h-5l3-6z" fill="white" />
+    </svg>
+  ),
+  trendnet: (
+    // TRENDnet - blue globe with T
+    <svg viewBox="0 0 24 24" className="h-full w-auto">
+      <circle cx="12" cy="12" r="10" fill="#0066B3" />
+      <path d="M7 8h10v2h-4v8h-2v-8H7V8z" fill="white" />
+    </svg>
+  ),
+  asrock: (
+    // ASRock - green and black stylized logo
+    <svg viewBox="0 0 100 40" className="h-full w-auto">
+      <rect x="0" y="0" width="100" height="40" rx="4" fill="#1B9E46" />
+      <text x="50" y="27" textAnchor="middle" fill="white" fontSize="16" fontWeight="bold" fontFamily="Arial, sans-serif">ASRock</text>
+    </svg>
+  ),
 }
 
 // Normalize vendor name for lookup
 function normalizeVendor(vendor: string): string {
   const normalized = vendor.toLowerCase().replace(/[^a-z0-9]/g, '')
   // Handle common variations
-  if (normalized.includes('mikrotik')) return 'mikrotik'
+  if (normalized.includes('mikrotik') || normalized.includes('routerboard')) return 'mikrotik'
   if (normalized.includes('ubiquiti') || normalized.includes('unifi')) return 'ubiquiti'
   if (normalized.includes('ruckus')) return 'ruckus'
   if (normalized.includes('zyxel')) return 'zyxel'
@@ -254,7 +313,7 @@ function normalizeVendor(vendor: string): string {
   if (normalized.includes('netgear')) return 'netgear'
   if (normalized.includes('tplink') || normalized.includes('tp-link')) return 'tplink'
   if (normalized.includes('dlink') || normalized.includes('d-link')) return 'dlink'
-  if (normalized.includes('hewlett') || normalized === 'hp') return 'hp'
+  if (normalized.includes('hewlett') || normalized === 'hp' || normalized.includes('hpinc')) return 'hp'
   if (normalized.includes('apple')) return 'apple'
   if (normalized.includes('inteno')) return 'inteno'
   if (normalized.includes('dell')) return 'dell'
@@ -266,6 +325,22 @@ function normalizeVendor(vendor: string): string {
   if (normalized.includes('xiaomi') || normalized.includes('redmi')) return 'xiaomi'
   if (normalized.includes('fujitsu')) return 'fujitsu'
   if (normalized.includes('raspberry') || normalized.includes('rpi')) return 'raspberry'
+  if (normalized.includes('intel')) return 'intel'
+  if (normalized.includes('google')) return 'google'
+  if (normalized.includes('amazon')) return 'amazon'
+  if (normalized.includes('asus') || normalized.includes('asustek')) return 'asus'
+  if (normalized.includes('lg') && normalized.includes('elec')) return 'lg'
+  if (normalized.includes('brother')) return 'brother'
+  if (normalized.includes('canon')) return 'canon'
+  if (normalized.includes('vmware')) return 'vmware'
+  if (normalized.includes('huawei')) return 'huawei'
+  if (normalized.includes('3com')) return '3com'
+  if (normalized.includes('gigabyte')) return 'gigabyte'
+  if (normalized.includes('kyocera')) return 'kyocera'
+  if (normalized.includes('microchip')) return 'microchip'
+  if (normalized.includes('tuya')) return 'tuya'
+  if (normalized.includes('trendnet')) return 'trendnet'
+  if (normalized.includes('asrock')) return 'asrock'
   return normalized
 }
 
@@ -274,8 +349,8 @@ export function VendorLogo({ vendor, className = '' }: VendorLogoProps) {
   const logo = vendorLogos[normalizedVendor]
 
   return (
-    <span className={`relative group/vendor ${className}`}>
-      <span className="flex items-center justify-center h-2.5 text-slate-600 dark:text-slate-400">
+    <span className={`relative group/vendor flex items-center overflow-hidden ${className}`}>
+      <span className="flex items-center justify-center h-full w-full text-slate-600 dark:text-slate-400">
         {logo || (
           // Fallback: first letter of vendor
           <span className="text-[9px] font-bold uppercase">{vendor.charAt(0)}</span>

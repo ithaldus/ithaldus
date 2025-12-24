@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { api, type Credential, type Network, type MatchedDevice } from '../lib/api'
-import { Plus, Upload, Key, Globe } from 'lucide-react'
+import { Plus, Upload, Key, Globe, Eye, EyeOff } from 'lucide-react'
 import { CredentialCard } from '../components/credentials/CredentialCard'
 
 type ExtendedCredential = Credential & { matchedDevices?: MatchedDevice[] }
@@ -14,6 +14,7 @@ export function Credentials() {
   const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [showBulkImport, setShowBulkImport] = useState(false)
+  const [showAllPasswords, setShowAllPasswords] = useState(false)
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [bulkText, setBulkText] = useState('')
@@ -215,43 +216,58 @@ export function Credentials() {
           )}
         </div>
 
-        {/* Action Buttons (admin only) */}
-        {isAdmin && (
-          <div className="flex gap-2 mb-6">
-            <button
-              onClick={() => {
-                setShowAddForm(true)
-                setShowBulkImport(false)
-              }}
-              className={`
-                flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors
-                ${showAddForm
-                  ? 'bg-cyan-500 text-white'
-                  : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-cyan-500 dark:hover:border-cyan-500'
-                }
-              `}
-            >
-              <Plus className="w-4 h-4" />
-              Add Credential
-            </button>
-            <button
-              onClick={() => {
-                setShowBulkImport(true)
-                setShowAddForm(false)
-              }}
-              className={`
-                flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors
-                ${showBulkImport
-                  ? 'bg-cyan-500 text-white'
-                  : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-cyan-500 dark:hover:border-cyan-500'
-                }
-              `}
-            >
-              <Upload className="w-4 h-4" />
-              Bulk Import
-            </button>
-          </div>
-        )}
+        {/* Action Buttons */}
+        <div className="flex gap-2 mb-6">
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => {
+                  setShowAddForm(true)
+                  setShowBulkImport(false)
+                }}
+                className={`
+                  flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors
+                  ${showAddForm
+                    ? 'bg-cyan-500 text-white'
+                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-cyan-500 dark:hover:border-cyan-500'
+                  }
+                `}
+              >
+                <Plus className="w-4 h-4" />
+                Add Credential
+              </button>
+              <button
+                onClick={() => {
+                  setShowBulkImport(true)
+                  setShowAddForm(false)
+                }}
+                className={`
+                  flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors
+                  ${showBulkImport
+                    ? 'bg-cyan-500 text-white'
+                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-cyan-500 dark:hover:border-cyan-500'
+                  }
+                `}
+              >
+                <Upload className="w-4 h-4" />
+                Bulk Import
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => setShowAllPasswords(!showAllPasswords)}
+            className={`
+              flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors
+              ${showAllPasswords
+                ? 'bg-amber-500 text-white'
+                : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-amber-500 dark:hover:border-amber-500'
+              }
+            `}
+          >
+            {showAllPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            {showAllPasswords ? 'Hide Passwords' : 'Show Passwords'}
+          </button>
+        </div>
 
         {/* Add Form */}
         {showAddForm && isAdmin && (
@@ -350,6 +366,7 @@ export function Credentials() {
                 key={credential.id}
                 credential={credential}
                 allCredentials={filteredCredentials}
+                showAllPasswords={showAllPasswords}
                 onEdit={isAdmin ? handleEdit : undefined}
                 onDelete={isAdmin ? handleDelete : undefined}
               />

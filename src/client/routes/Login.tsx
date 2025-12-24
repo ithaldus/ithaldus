@@ -47,6 +47,7 @@ export function Login() {
     config_error: 'Authentication is not configured. Contact administrator.',
     no_code: 'Authentication was cancelled.',
     callback_error: 'An error occurred during authentication.',
+    invalid_state: 'Security validation failed. Please try again.',
   }
 
   const hasError = !!error

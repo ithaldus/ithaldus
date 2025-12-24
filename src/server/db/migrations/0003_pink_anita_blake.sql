@@ -1,0 +1,1 @@
+ALTER TABLE `devices` ADD `skip_login` integer DEFAULT false NOT NULL;

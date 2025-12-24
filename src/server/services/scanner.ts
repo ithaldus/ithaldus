@@ -4,8 +4,15 @@ import { db } from '../db/client'
 import { devices, interfaces, networks, scans, credentials, dhcpLeases, matchedDevices } from '../db/schema'
 import { eq, isNull, or, and } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
+import {
+  sshExec,
+  mikrotikRouterOsDriver,
+  zyxelDriver,
+  type DeviceInfo,
+  type LogLevel,
+} from './drivers'
 
-export type LogLevel = 'info' | 'success' | 'warn' | 'error'
+export type { LogLevel }
 
 export interface LogMessage {
   timestamp: string
@@ -28,6 +35,7 @@ export interface DiscoveredDevice {
   type: 'router' | 'switch' | 'access-point' | 'end-device'
   vendor: string | null
   model: string | null
+  serialNumber: string | null
   firmwareVersion: string | null
   accessible: boolean
   openPorts: number[]
@@ -47,38 +55,6 @@ export interface DiscoveredInterface {
   poeStandard: string | null
 }
 
-interface DhcpLeaseInfo {
-  mac: string
-  ip: string | null
-  hostname: string | null
-}
-
-interface DeviceInfo {
-  hostname: string | null
-  model: string | null
-  version: string | null
-  interfaces: InterfaceInfo[]
-  neighbors: NeighborInfo[]
-  dhcpLeases: DhcpLeaseInfo[]
-  ownUpstreamInterface: string | null  // The device's own physical upstream port
-}
-
-interface InterfaceInfo {
-  name: string
-  mac: string | null
-  ip: string | null
-  bridge: string | null
-  vlan: string | null
-}
-
-interface NeighborInfo {
-  mac: string
-  ip: string | null
-  hostname: string | null
-  interface: string
-  type: 'dhcp' | 'arp' | 'bridge-host'
-}
-
 // Common SSH ports to check
 const SSH_PORTS = [22]
 const MANAGEMENT_PORTS = [22, 23, 80, 443, 8291, 8728, 161]
@@ -88,8 +64,8 @@ function normalizeVendorName(vendor: string): string {
   const lower = vendor.toLowerCase()
 
   // Network equipment vendors - normalize to standard names
-  if (lower.includes('mikrotik')) return 'MikroTik'
-  if (lower.includes('ubiquiti')) return 'Ubiquiti'
+  if (lower.includes('mikrotik') || lower.includes('routerboard')) return 'MikroTik'
+  if (lower.includes('ubiquiti') || lower.includes('ubnt')) return 'Ubiquiti'
   if (lower.includes('ruckus')) return 'Ruckus'
   if (lower.includes('zyxel')) return 'Zyxel'
   if (lower.includes('cisco')) return 'Cisco'
@@ -100,6 +76,12 @@ function normalizeVendorName(vendor: string): string {
   if (lower.includes('d-link')) return 'D-Link'
   if (lower.includes('huawei')) return 'Huawei'
   if (lower.includes('inteno')) return 'Inteno'
+  if (lower.includes('3com')) return '3Com'
+  if (lower.includes('fortinet')) return 'Fortinet'
+  if (lower.includes('palo alto')) return 'Palo Alto'
+  if (lower.includes('sonicwall')) return 'SonicWall'
+  if (lower.includes('watchguard')) return 'WatchGuard'
+  if (lower.includes('draytek')) return 'DrayTek'
 
   // Consumer device vendors
   if (lower.includes('apple')) return 'Apple'
@@ -128,16 +110,66 @@ function normalizeVendorName(vendor: string): string {
   if (lower.includes('qualcomm')) return 'Qualcomm'
   if (lower.includes('espressif')) return 'Espressif'
   if (lower.includes('texas instruments')) return 'Texas Instruments'
+  if (lower.includes('giga-byte') || lower.includes('gigabyte')) return 'Gigabyte'
+  if (lower.includes('micro-star') || lower.includes('msi')) return 'MSI'
+  if (lower.includes('asrock')) return 'ASRock'
+  if (lower.includes('supermicro')) return 'Supermicro'
+  if (lower.includes('synology')) return 'Synology'
+  if (lower.includes('qnap')) return 'QNAP'
+  if (lower.includes('hikvision')) return 'Hikvision'
+  if (lower.includes('dahua')) return 'Dahua'
+  if (lower.includes('axis')) return 'Axis'
+  if (lower.includes('logitech')) return 'Logitech'
+  if (lower.includes('toshiba')) return 'Toshiba'
+  if (lower.includes('panasonic')) return 'Panasonic'
+  if (lower.includes('sharp')) return 'Sharp'
+  if (lower.includes('philips')) return 'Philips'
+  if (lower.includes('netapp')) return 'NetApp'
+  if (lower.includes('emc ') || lower === 'emc') return 'Dell EMC'
+  if (lower.includes('hpe ') || lower.includes('hewlett packard enterprise')) return 'HPE'
+  if (lower.includes('ibm')) return 'IBM'
+  if (lower.includes('motorola')) return 'Motorola'
+  if (lower.includes('nokia')) return 'Nokia'
+  if (lower.includes('ericsson')) return 'Ericsson'
+  if (lower.includes('humax')) return 'Humax'
+  if (lower.includes('bose')) return 'Bose'
+  if (lower.includes('sonos')) return 'Sonos'
+  if (lower.includes('roku')) return 'Roku'
+  if (lower.includes('ring ') || lower === 'ring') return 'Ring'
+  if (lower.includes('nest ') || lower === 'nest') return 'Nest'
+  if (lower.includes('ecobee')) return 'Ecobee'
+  if (lower.includes('honeywell')) return 'Honeywell'
+  if (lower.includes('schneider')) return 'Schneider Electric'
+  if (lower.includes('siemens')) return 'Siemens'
+  if (lower.includes('abb')) return 'ABB'
 
   // Return original if no match (strip ", Inc." etc. for cleaner display)
   return vendor
-    .replace(/,?\s*(inc\.?|corp\.?|corporation|ltd\.?|limited|co\.?|llc|gmbh|s\.?a\.?)$/i, '')
+    .replace(/,?\s*(inc\.?|corp\.?|corporation|ltd\.?|limited|co\.?|llc|gmbh|s\.?a\.?|intl|international|technology|technologies|electronics?)$/gi, '')
     .trim()
+}
+
+// Known MAC OUI prefixes that may be missing or incorrect in the mac-oui-lookup database
+// Format: { prefix (uppercase, no colons) -> normalized vendor name }
+const ouiOverrides: Record<string, string> = {
+  'EC58EA': 'Ruckus',  // Ruckus Wireless - registered 2018, may be missing from older databases
+  'B4E62D': 'Ruckus',  // Ruckus Wireless
+  '70D931': 'Ruckus',  // Ruckus Wireless
+  '00241D': 'Ruckus',  // Ruckus Wireless
+  '58B633': 'Ruckus',  // Ruckus Wireless
+  '5C5B35': 'Ruckus',  // Ruckus Wireless
+  '74910B': 'Routerboard.com',  // Routerboard.com (MikroTik)
 }
 
 // Detect vendor from MAC OUI using IEEE database (~50K entries)
 function detectVendorFromMac(mac: string): string | null {
   if (!mac || mac.startsWith('UNKNOWN-')) return null
+
+  // Check our override list first (for known incorrect/missing entries)
+  const prefix = mac.replace(/[:-]/g, '').substring(0, 6).toUpperCase()
+  if (ouiOverrides[prefix]) {
+    return normalizeVendorName(ouiOverrides[prefix])
+  }
 
   const vendor = getVendor(mac)
   if (!vendor) return null
@@ -245,441 +277,6 @@ function detectDeviceType(info: DeviceInfo, vendor: string | null): 'router' | '
   }
 
   return 'end-device'
-}
-
-// Execute SSH command with timeout
-async function sshExec(client: Client, command: string, timeout = 10000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error('Command timeout'))
-    }, timeout)
-
-    client.exec(command, (err, stream) => {
-      if (err) {
-        clearTimeout(timer)
-        reject(err)
-        return
-      }
-
-      let output = ''
-      stream.on('data', (data: Buffer) => {
-        output += data.toString()
-      })
-      stream.stderr.on('data', (data: Buffer) => {
-        output += data.toString()
-      })
-      stream.on('close', () => {
-        clearTimeout(timer)
-        resolve(output)
-      })
-    })
-  })
-}
-
-// Get device info from MikroTik RouterOS
-async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: string) => void): Promise<DeviceInfo> {
-  // First, get DHCP leases to know which IPs to ping
-  const dhcpLeasesRaw = await sshExec(client, '/ip dhcp-server lease print terse').catch(() => '')
-
-  // Extract IPs from active (bound) DHCP leases only - skip static leases for offline devices
-  const leaseIps: string[] = []
-  const leaseLines = dhcpLeasesRaw.split('\n').filter(l => l.includes('address='))
-  for (const line of leaseLines) {
-    // Only ping leases with status=bound (currently active)
-    // Skip waiting/expired leases as they're likely offline
-    if (!line.includes('status=bound')) {
-      continue
-    }
-    const ipMatch = line.match(/address=(\d+\.\d+\.\d+\.\d+)/)
-    if (ipMatch) {
-      leaseIps.push(ipMatch[1])
-    }
-  }
-
-  // Ping all DHCP lease IPs (1 packet each, in batches to avoid overload)
-  if (leaseIps.length > 0 && log) {
-    log('info', `Pinging ${leaseIps.length} DHCP lease IPs to discover physical ports...`)
-  }
-
-  // Ping in batches of 20 to avoid overwhelming the router
-  const BATCH_SIZE = 20
-  for (let i = 0; i < leaseIps.length; i += BATCH_SIZE) {
-    const batch = leaseIps.slice(i, i + BATCH_SIZE)
-    // Use ping with count=1 and timeout=100ms for quick discovery
-    // Run all pings in parallel within the batch
-    await Promise.all(
-      batch.map(ip =>
-        sshExec(client, `/ping ${ip} count=1 interval=100ms`, 2000).catch(() => '')
-      )
-    )
-  }
-
-  // Small delay to let bridge host table update
-  await new Promise(resolve => setTimeout(resolve, 500))
-
-  // Now fetch all the data including refreshed ARP and bridge host tables
-  const [identity, resource, addressList, interfaceList, arpTable, bridgeHosts, defaultRoute, bridgePorts, dhcpServers] = await Promise.all([
-    sshExec(client, '/system identity print').catch(() => ''),
-    sshExec(client, '/system resource print').catch(() => ''),
-    sshExec(client, '/ip address print terse').catch(() => ''),
-    sshExec(client, '/interface print terse').catch(() => ''),
-    sshExec(client, '/ip arp print terse').catch(() => ''),
-    sshExec(client, '/interface bridge host print terse').catch(() => ''),
-    sshExec(client, '/ip route print terse where dst-address=0.0.0.0/0 active=yes').catch(() => ''),
-    sshExec(client, '/interface bridge port print terse').catch(() => ''),  // Bridge port membership
-    sshExec(client, '/ip dhcp-server print terse').catch(() => ''),  // DHCP server configuration
-  ])
-
-  // Use the already-fetched DHCP leases
-  const dhcpLeases = dhcpLeasesRaw
-
-  // Parse identity
-  const hostnameMatch = identity.match(/name:\s*(\S+)/)
-  const hostname = hostnameMatch ? hostnameMatch[1] : null
-
-  // Parse resource for model/version
-  const modelMatch = resource.match(/board-name:\s*(.+?)(?:\r?\n|$)/)
-  const versionMatch = resource.match(/version:\s*(\S+)/)
-  const model = modelMatch ? modelMatch[1].trim() : null
-  const version = versionMatch ? `RouterOS ${versionMatch[1]}` : null
-
-  // Parse bridge port membership to know which physical ports belong to which bridge
-  // Format: "0    interface=ether1 bridge=bridge ..."
-  const bridgePortMap: Map<string, string> = new Map()  // interface name -> bridge name
-  const bridgePortLines = bridgePorts.split('\n').filter(l => l.includes('interface=') && l.includes('bridge='))
-  for (const line of bridgePortLines) {
-    const ifMatch = line.match(/interface=(\S+)/)
-    const brMatch = line.match(/bridge=(\S+)/)
-    if (ifMatch && brMatch) {
-      bridgePortMap.set(ifMatch[1], brMatch[1])
-    }
-  }
-
-  // Parse DHCP server configuration to map server names to interfaces
-  // Format: "0   name=dhcp1 interface=main-bridge address-pool=pool1 ..."
-  const dhcpServerToInterface: Map<string, string> = new Map()
-  const dhcpServerLines = dhcpServers.split('\n').filter(l => l.includes('name=') && l.includes('interface='))
-  for (const line of dhcpServerLines) {
-    const nameMatch = line.match(/name=(\S+)/)
-    const ifMatch = line.match(/interface=(\S+)/)
-    if (nameMatch && ifMatch) {
-      dhcpServerToInterface.set(nameMatch[1], ifMatch[1])
-    }
-  }
-
-  // Parse interfaces - keep physical ports and bridges (bridges are needed as fallback for unmapped devices)
-  const interfaces: InterfaceInfo[] = []
-  const bridgeInterfaces: Set<string> = new Set()  // Track bridge interface names
-  const interfaceLines = interfaceList.split('\n').filter(l => l.trim())
-  for (const line of interfaceLines) {
-    const nameMatch = line.match(/name=(\S+)/)
-    const macMatch = line.match(/mac-address=(\S+)/)
-    const typeMatch = line.match(/type=(\S+)/)
-    if (nameMatch) {
-      const name = nameMatch[1]
-      const ifType = typeMatch ? typeMatch[1] : ''
-
-      // Track bridge interfaces for neighbor mapping
-      if (ifType === 'bridge') {
-        bridgeInterfaces.add(name)
-      }
-
-      // Skip VLAN interfaces (they're virtual)
-      if (ifType === 'vlan') {
-        continue
-      }
-
-      // Find IP for this interface
-      const ipLine = addressList.split('\n').find(l => l.includes(`interface=${name}`))
-      const ipMatch = ipLine?.match(/address=(\d+\.\d+\.\d+\.\d+)/)
-
-      // Get the bridge this interface belongs to (if any)
-      const bridgeName = bridgePortMap.get(name) || null
-
-      interfaces.push({
-        name,
-        mac: macMatch ? macMatch[1] : null,
-        ip: ipMatch ? ipMatch[1] : null,
-        bridge: bridgeName,
-        vlan: null,
-      })
-    }
-  }
-
-  // Parse neighbors from DHCP leases, ARP, and bridge hosts
-  const neighbors: NeighborInfo[] = []
-  const parsedDhcpLeases: DhcpLeaseInfo[] = []
-
-  // Build a MAC -> physical port map from bridge host table first
-  // (We'll refine this after parsing bridge hosts, but need it for DHCP too)
-  const tempMacToPort: Map<string, string> = new Map()
-  const bridgeLinesForDhcp = bridgeHosts.split('\n').filter(l => l.includes('mac-address='))
-
-  for (const line of bridgeLinesForDhcp) {
-    const macMatch = line.match(/mac-address=(\S+)/)
-    const ifMatch = line.match(/on-interface=(\S+)/)
-    if (macMatch && ifMatch) {
-      const mac = macMatch[1].toUpperCase()
-      const port = ifMatch[1]
-      if (!bridgeInterfaces.has(port)) {
-        tempMacToPort.set(mac, port)
-      }
-    }
-  }
-
-  // DHCP leases - only process bound leases, ignore static unbound leases
-  const dhcpLeaseLines = dhcpLeases.split('\n').filter(l => l.includes('mac-address='))
-  for (const line of dhcpLeaseLines) {
-    // Skip unbound leases (static leases for offline devices)
-    if (!line.includes('status=bound')) {
-      continue
-    }
-    const macMatch = line.match(/mac-address=(\S+)/)
-    const ipMatch = line.match(/address=(\d+\.\d+\.\d+\.\d+)/)
-    const hostMatch = line.match(/host-name=(\S+)/)
-    const serverMatch = line.match(/server=(\S+)/)
-    if (macMatch) {
-      const mac = macMatch[1].toUpperCase()
-      const ip = ipMatch ? ipMatch[1] : null
-      const hostname = hostMatch ? hostMatch[1] : null
-
-      // Try to find physical port from bridge host table first
-      let interfaceName = 'unknown'
-      const physicalPort = tempMacToPort.get(mac)
-      if (physicalPort) {
-        // Best case: we know the physical port from bridge host table
-        interfaceName = physicalPort
-      } else if (serverMatch) {
-        // Fallback: resolve DHCP server name to its interface
-        const serverName = serverMatch[1]
-        const serverInterface = dhcpServerToInterface.get(serverName)
-        if (serverInterface) {
-          // DHCP server interface is typically a bridge - use it as fallback
-          interfaceName = serverInterface
-        } else {
-          // Last resort: use server name (won't match but at least preserves info)
-          interfaceName = serverName
-        }
-      }
-
-      neighbors.push({
-        mac,
-        ip,
-        hostname,
-        interface: interfaceName,
-        type: 'dhcp',
-      })
-
-      // Also store in dhcpLeases array for database persistence
-      parsedDhcpLeases.push({ mac, ip, hostname })
-    }
-  }
-
-  // Build a MAC -> physical port map from bridge host table
-  // This tells us which physical port each MAC was learned on
-  const macToPhysicalPort: Map<string, string> = new Map()
-  const bridgeLines = bridgeHosts.split('\n').filter(l => l.includes('mac-address='))
-  for (const line of bridgeLines) {
-    const macMatch = line.match(/mac-address=(\S+)/)
-    const ifMatch = line.match(/on-interface=(\S+)/)
-    if (macMatch && ifMatch) {
-      const mac = macMatch[1].toUpperCase()
-      const port = ifMatch[1]
-      // Only store if it's a physical port, not a bridge
-      if (!bridgeInterfaces.has(port)) {
-        macToPhysicalPort.set(mac, port)
-      }
-    }
-  }
-
-  // ARP table (add entries not already in DHCP)
-  const arpLines = arpTable.split('\n').filter(l => l.includes('mac-address='))
-  for (const line of arpLines) {
-    const macMatch = line.match(/mac-address=(\S+)/)
-    const ipMatch = line.match(/address=(\d+\.\d+\.\d+\.\d+)/)
-    const ifMatch = line.match(/interface=(\S+)/)
-    if (macMatch) {
-      const mac = macMatch[1].toUpperCase()
-      let interfaceName = ifMatch ? ifMatch[1] : 'unknown'
-
-      // If interface is a bridge, look up the actual physical port from bridge host table
-      if (bridgeInterfaces.has(interfaceName)) {
-        const physicalPort = macToPhysicalPort.get(mac)
-        if (physicalPort) {
-          interfaceName = physicalPort
-        }
-      }
-
-      if (!neighbors.find(n => n.mac === mac)) {
-        neighbors.push({
-          mac,
-          ip: ipMatch ? ipMatch[1] : null,
-          hostname: null,
-          interface: interfaceName,
-          type: 'arp',
-        })
-      }
-    }
-  }
-
-  // Bridge hosts (for switches) - only add those not already in neighbors
-  for (const line of bridgeLines) {
-    const macMatch = line.match(/mac-address=(\S+)/)
-    const ifMatch = line.match(/on-interface=(\S+)/)
-    if (macMatch && ifMatch) {
-      const mac = macMatch[1].toUpperCase()
-      const port = ifMatch[1]
-
-      // Skip if the port is a bridge (we only want physical ports)
-      if (bridgeInterfaces.has(port)) {
-        continue
-      }
-
-      // Add or update interface info
-      const existing = neighbors.find(n => n.mac === mac)
-      if (existing) {
-        // Update to physical port if current is a bridge or unknown
-        if (bridgeInterfaces.has(existing.interface) || existing.interface === 'unknown') {
-          existing.interface = port
-        }
-      } else {
-        neighbors.push({
-          mac,
-          ip: null,
-          hostname: null,
-          interface: port,
-          type: 'bridge-host',
-        })
-      }
-    }
-  }
-
-  // Detect own upstream interface using gateway MAC lookup
-  // Algorithm: gateway IP → gateway MAC (ARP) → bridge port that learned that MAC
-  let ownUpstreamInterface: string | null = null
-
-  // Parse default route to get gateway IP
-  // Format: "0   D dst-address=0.0.0.0/0 gateway=172.28.12.1%bridge ..."
-  const gatewayMatch = defaultRoute.match(/gateway=(\d+\.\d+\.\d+\.\d+)/)
-  if (gatewayMatch) {
-    const gatewayIp = gatewayMatch[1]
-
-    // Find gateway MAC in ARP table
-    // Format: "0   D address=172.28.12.1 mac-address=XX:XX:XX:XX:XX:XX interface=bridge"
-    const gatewayArpLine = arpTable.split('\n').find(l => l.includes(`address=${gatewayIp}`))
-    const gatewayMacMatch = gatewayArpLine?.match(/mac-address=(\S+)/)
-
-    if (gatewayMacMatch) {
-      const gatewayMac = gatewayMacMatch[1].toUpperCase()
-
-      // Find which bridge port learned the gateway MAC
-      // Format: "0    bridge=bridge mac-address=XX:XX:XX:XX:XX:XX on-interface=ether1 ..."
-      const bridgeHostLine = bridgeHosts.split('\n').find(l =>
-        l.toUpperCase().includes(`mac-address=${gatewayMac}`) ||
-        l.toUpperCase().includes(`MAC-ADDRESS=${gatewayMac}`)
-      )
-      const upstreamIfMatch = bridgeHostLine?.match(/on-interface=(\S+)/)
-
-      if (upstreamIfMatch) {
-        ownUpstreamInterface = upstreamIfMatch[1]
-      }
-    }
-  }
-
-  return { hostname, model, version, interfaces, neighbors, dhcpLeases: parsedDhcpLeases, ownUpstreamInterface }
-}
-
-// Get device info from Zyxel switches (GS1920 series, etc.)
-async function getZyxelInfo(client: Client): Promise<DeviceInfo> {
-  // Zyxel switches use a Cisco-like CLI
-  const [sysInfo, macTable, vlanInfo, portList] = await Promise.all([
-    sshExec(client, 'show system-information').catch(() => ''),
-    sshExec(client, 'show mac').catch(() => ''),
-    sshExec(client, 'show vlan').catch(() => ''),
-    sshExec(client, 'show interface *').catch(() => ''),
-  ])
-
-  // Parse system information for hostname, model, version
-  // Format varies but typically includes:
-  // System Name: GS1920
-  // Model Name: GS1920-24HPv2
-  // Firmware Version: V4.70
-  let hostname: string | null = null
-  let model: string | null = null
-  let version: string | null = null
-
-  const sysNameMatch = sysInfo.match(/System Name\s*[:\s]+(\S+)/i)
-  const modelMatch = sysInfo.match(/Model Name\s*[:\s]+(\S+)/i) || sysInfo.match(/Product Model\s*[:\s]+(\S+)/i)
-  const versionMatch = sysInfo.match(/Firmware Version\s*[:\s]+(\S+)/i) || sysInfo.match(/ZyNOS Version\s*[:\s]+(\S+)/i)
-
-  if (sysNameMatch) hostname = sysNameMatch[1]
-  if (modelMatch) model = modelMatch[1]
-  if (versionMatch) version = versionMatch[1]
-
-  // Parse interfaces from port list
-  // Typical format: Port 1, Port 2, etc.
-  const interfaces: InterfaceInfo[] = []
-
-  // Parse VLAN information to get interface assignments
-  // Also parse port list to get interface names
-  const portLines = portList.split('\n')
-  for (const line of portLines) {
-    // Match patterns like "Port 1", "GE1", etc.
-    const portMatch = line.match(/(?:Port\s+)?(\d+)(?:\s|$)/i)
-    if (portMatch) {
-      const portNum = portMatch[1]
-      // Try to find MAC address for this port
-      const macLine = macTable.split('\n').find(l =>
-        l.includes(`Port ${portNum}`) || l.match(new RegExp(`\\s${portNum}\\s`))
-      )
-      const macMatch = macLine?.match(/([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}/)
-
-      interfaces.push({
-        name: `Port ${portNum}`,
-        mac: macMatch ? macMatch[0].toUpperCase().replace(/-/g, ':') : null,
-        ip: null,
-        bridge: null,
-        vlan: null,
-      })
-    }
-  }
-
-  // Parse MAC address table for neighbors
-  // Format typically: VLAN  MAC Address        Port   Type
-  //                   1     00:11:22:33:44:55  1      Dynamic
-  const neighbors: NeighborInfo[] = []
-  const macLines = macTable.split('\n').filter(l => l.match(/[0-9A-Fa-f]{2}[:-][0-9A-Fa-f]{2}/))
-
-  for (const line of macLines) {
-    const macMatch = line.match(/([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}/)
-    const portMatch = line.match(/(?:Port\s+)?(\d+)/) || line.match(/\s(\d+)\s+(?:Dynamic|Static)/i)
-
-    if (macMatch) {
-      const mac = macMatch[0].toUpperCase().replace(/-/g, ':')
-      const portName = portMatch ? `Port ${portMatch[1]}` : 'unknown'
-
-      // Skip if this is the switch's own MAC
-      if (!interfaces.find(i => i.mac === mac)) {
-        neighbors.push({
-          mac,
-          ip: null,
-          hostname: null,
-          interface: portName,
-          type: 'bridge-host',
-        })
-      }
-    }
-  }
-
-  return {
-    hostname,
-    model,
-    version,
-    interfaces,
-    neighbors,
-    dhcpLeases: [],  // Zyxel switches typically don't run DHCP server
-    ownUpstreamInterface: null,  // Would need different detection for Zyxel
-  }
 }
 
 // Try to connect to device with given credentials (single attempt)
@@ -1177,6 +774,16 @@ export class NetworkScanner {
 
     this.log('info', `${ip}: Open ports: ${openPorts.join(', ')}`)
 
+    // Check if skipLogin is enabled for this device (by MAC)
+    let shouldSkipLogin = false
+    if (knownMac) {
+      const existingByMac = await db.select().from(devices).where(eq(devices.mac, knownMac)).get()
+      if (existingByMac?.skipLogin) {
+        shouldSkipLogin = true
+        this.log('info', `${ip}: Skipping SSH login (disabled in device settings)`)
+      }
+    }
+
     // Try to connect via SSH
     let connectedClient: Client | null = null
     let banner = ''
@@ -1203,59 +810,72 @@ export class NetworkScanner {
     // If jump host is supported and this is not the root device, use jump host exclusively
     const useJumpHostOnly = this.jumpHostSupported && this.jumpHostClient && !isRootDevice
 
-    if (useJumpHostOnly) {
+    // Helper to format try count as ordinal
+    const ordinal = (n: number) => {
+      const s = ['th', 'st', 'nd', 'rd']
+      const v = n % 100
+      return n + (s[(v - 20) % 10] || s[v] || s[0])
+    }
+
+    if (!shouldSkipLogin && useJumpHostOnly) {
       // Jump host supported - connect via tunnel (skip direct attempts)
       this.log('info', `${ip}: Connecting via jump host (${this.rootIp})...`)
 
+      let tryCount = 0
       for (const cred of credsToTry) {
+        tryCount++
         const result = await tryConnectViaJumpHost(this.jumpHostClient!, ip, cred.username, cred.password)
         if (result) {
           connectedClient = result.client
           banner = result.banner
           successfulCreds = cred
           usedJumpHost = true
-          this.log('success', `${ip}: SSH login via jump host successful with ${cred.username}`)
+          this.log('success', `${ip}: SSH login via jump host successful with ${cred.username} (${ordinal(tryCount)} try)`)
           break
         }
       }
 
       if (!connectedClient) {
-        this.log('warn', `${ip}: SSH via jump host failed - no valid credentials`)
+        this.log('warn', `${ip}: SSH via jump host failed - no valid credentials (tried ${tryCount})`)
       }
-    } else if (openPorts.includes(22)) {
+    } else if (!shouldSkipLogin && openPorts.includes(22)) {
       // No jump host or this is root device - try direct connection
+      let tryCount = 0
       for (const cred of credsToTry) {
+        tryCount++
         const result = await tryConnect(ip, cred.username, cred.password)
         if (result) {
           connectedClient = result.client
           banner = result.banner
           successfulCreds = cred
-          this.log('success', `${ip}: SSH login successful with ${cred.username}`)
+          this.log('success', `${ip}: SSH login successful with ${cred.username} (${ordinal(tryCount)} try)`)
           break
         }
       }
 
       if (!connectedClient) {
-        this.log('warn', `${ip}: SSH port open but no valid credentials`)
+        this.log('warn', `${ip}: SSH port open but no valid credentials (tried ${tryCount})`)
       }
-    } else if (!openPorts.includes(22) && this.jumpHostClient && !isRootDevice) {
+    } else if (!shouldSkipLogin && !openPorts.includes(22) && this.jumpHostClient && !isRootDevice) {
       // Port 22 not directly reachable, but we have a jump host - try via tunnel
       this.log('info', `${ip}: No direct SSH access, trying via jump host (${this.rootIp})...`)
 
+      let tryCount = 0
       for (const cred of credsToTry) {
+        tryCount++
         const result = await tryConnectViaJumpHost(this.jumpHostClient, ip, cred.username, cred.password)
         if (result) {
           connectedClient = result.client
           banner = result.banner
           successfulCreds = cred
           usedJumpHost = true
-          this.log('success', `${ip}: SSH login via jump host successful with ${cred.username}`)
+          this.log('success', `${ip}: SSH login via jump host successful with ${cred.username} (${ordinal(tryCount)} try)`)
           break
         }
       }
 
       if (!connectedClient) {
-        this.log('info', `${ip}: SSH via jump host also failed or no valid credentials`)
+        this.log('info', `${ip}: SSH via jump host also failed or no valid credentials (tried ${tryCount})`)
       }
     }
 
@@ -1265,45 +885,42 @@ export class NetworkScanner {
     if (connectedClient) {
       try {
         // Check if vendor can be determined from MAC OUI first
+        // IMPORTANT: Zyxel switches don't support SSH exec channel - they close the connection
+        // So we must detect Zyxel BEFORE trying any exec commands
         const macVendor = knownMac ? detectVendorFromMac(knownMac) : null
 
-        // Detect vendor and get device info
-        // Try MikroTik first (most common in this network)
-        const testOutput = await sshExec(connectedClient, '/system resource print').catch(() => '')
-        vendorInfo = detectVendor(banner, testOutput)
-
-        if (vendorInfo.driver === 'mikrotik-routeros') {
-          deviceInfo = await getMikrotikInfo(connectedClient, (level, msg) => this.log(level, `${ip}: ${msg}`))
-          this.log('info', `${ip}: Detected ${vendorInfo.vendor} ${deviceInfo.model || 'device'}`)
-
-          // Save DHCP leases to database for hostname resolution
-          if (deviceInfo.dhcpLeases.length > 0) {
-            this.log('info', `${ip}: Saving ${deviceInfo.dhcpLeases.length} DHCP leases`)
-            const now = new Date().toISOString()
-            for (const lease of deviceInfo.dhcpLeases) {
-              await db.insert(dhcpLeases).values({
-                id: nanoid(),
-                networkId: this.networkId,
-                mac: lease.mac,
-                ip: lease.ip,
-                hostname: lease.hostname,
-                lastSeenAt: now,
-              }).catch(() => {}) // Ignore duplicates
-            }
-          }
-        } else if (vendorInfo.driver === 'zyxel' || vendorInfo.vendor === 'Zyxel' || macVendor === 'Zyxel') {
-          // Zyxel switch driver - detected by banner, output, or MAC OUI
-          deviceInfo = await getZyxelInfo(connectedClient)
+        if (macVendor === 'Zyxel' || banner.toLowerCase().includes('zyxel')) {
+          // Zyxel detected from MAC or banner - use shell-based driver directly
+          // Do NOT call sshExec as it will close the connection
+          this.log('info', `${ip}: Zyxel detected from ${macVendor === 'Zyxel' ? 'MAC OUI' : 'banner'}, using shell mode`)
+          deviceInfo = await zyxelDriver.getDeviceInfo(connectedClient, (level, msg) => this.log(level, `${ip}: ${msg}`))
           vendorInfo = { vendor: 'Zyxel', driver: 'zyxel' }
           this.log('info', `${ip}: Detected Zyxel ${deviceInfo.model || 'switch'}`)
         } else {
-          // Try Zyxel detection if vendor wasn't detected but might be Zyxel
-          // Check by trying a Zyxel-specific command
-          const zyxelTest = await sshExec(connectedClient, 'show system-information').catch(() => '')
-          if (zyxelTest.toLowerCase().includes('zyxel') || zyxelTest.includes('Model Name') || zyxelTest.includes('Firmware Version')) {
-            deviceInfo = await getZyxelInfo(connectedClient)
-            vendorInfo = { vendor: 'Zyxel', driver: 'zyxel' }
-            this.log('info', `${ip}: Detected Zyxel ${deviceInfo.model || 'switch'}`)
+          // Not Zyxel - safe to use exec channel for detection
+          // Try MikroTik first (most common in this network)
+          const testOutput = await sshExec(connectedClient, '/system resource print').catch(() => '')
+          vendorInfo = detectVendor(banner, testOutput)
+
+          if (vendorInfo.driver === 'mikrotik-routeros') {
+            deviceInfo = await mikrotikRouterOsDriver.getDeviceInfo(connectedClient, (level, msg) => this.log(level, `${ip}: ${msg}`))
+            this.log('info', `${ip}: Detected ${vendorInfo.vendor} ${deviceInfo.model || 'device'}`)
+
+            // Save DHCP leases to database for hostname resolution
+            if (deviceInfo.dhcpLeases.length > 0) {
+              this.log('info', `${ip}: Saving ${deviceInfo.dhcpLeases.length} DHCP leases`)
+              const now = new Date().toISOString()
+              for (const lease of deviceInfo.dhcpLeases) {
+                await db.insert(dhcpLeases).values({
+                  id: nanoid(),
+                  networkId: this.networkId,
+                  mac: lease.mac,
+                  ip: lease.ip,
+                  hostname: lease.hostname,
+                  lastSeenAt: now,
+                }).catch(() => {}) // Ignore duplicates
+              }
+            }
           } else {
             // Generic device info gathering
             const hostnameOutput = await sshExec(connectedClient, 'hostname').catch(() => '')
@@ -1365,8 +982,21 @@ export class NetworkScanner {
 
     const deviceType = deviceInfo ? detectDeviceType(deviceInfo, vendor) : 'end-device'
 
-    // Use device's own detected upstream interface if available, otherwise fall back to parent's interface name
-    const actualUpstreamInterface = deviceInfo?.ownUpstreamInterface || upstreamInterface
+    // Use device's own detected upstream interface if available
+    // Priority: 1) Bridge-based detection (ownUpstreamInterface)
+    //           2) Interface with the IP we connected to (for non-bridged setups like combo ports)
+    //           3) Parent's interface name (fallback)
+    let actualUpstreamInterface = deviceInfo?.ownUpstreamInterface
+    if (!actualUpstreamInterface && deviceInfo) {
+      // Find the interface that has the IP we used to connect
+      const ipInterface = deviceInfo.interfaces.find(i => i.ip === ip)
+      if (ipInterface) {
+        actualUpstreamInterface = ipInterface.name
+      }
+    }
+    if (!actualUpstreamInterface) {
+      actualUpstreamInterface = upstreamInterface
+    }
 
     // Create device record
     const newDevice: DiscoveredDevice = {
@@ -1377,6 +1007,7 @@ export class NetworkScanner {
       type: deviceType,
       vendor,
       model: deviceInfo?.model || null,
+      serialNumber: deviceInfo?.serialNumber || null,
       firmwareVersion: deviceInfo?.version || null,
       accessible: !!connectedClient,
       openPorts,
@@ -1400,6 +1031,7 @@ export class NetworkScanner {
           ip,
           vendor: newDevice.vendor,
           model: newDevice.model,
+          serialNumber: newDevice.serialNumber,
           firmwareVersion: newDevice.firmwareVersion,
           type: deviceType,
           accessible: newDevice.accessible,
@@ -1424,6 +1056,7 @@ export class NetworkScanner {
         ip,
         vendor: newDevice.vendor,
         model: newDevice.model,
+        serialNumber: newDevice.serialNumber,
         firmwareVersion: newDevice.firmwareVersion,
         type: deviceType,
         accessible: newDevice.accessible,
@@ -1459,13 +1092,14 @@ export class NetworkScanner {
       this.log('info', `${ip}: Login with root credentials (not recorded in matched devices)`)
     }
 
-    // Save interfaces
+    // Save interfaces (use the correct device ID - either existing or new)
+    const actualDeviceId = existingDevice ? existingDevice.id : deviceId
     if (deviceInfo) {
       for (const iface of deviceInfo.interfaces) {
         const ifaceId = nanoid()
         await db.insert(interfaces).values({
           id: ifaceId,
-          deviceId,
+          deviceId: actualDeviceId,
           name: iface.name,
           ip: iface.ip,
           bridge: iface.bridge,

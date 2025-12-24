@@ -76,10 +76,20 @@ export const api = {
 
   // Devices
   devices: {
-    list: (networkId?: string) =>
-      request<Device[]>(`/devices${networkId ? `?networkId=${networkId}` : ''}`),
-    get: (id: string) =>
-      request<Device & { interfaces: Interface[]; workingCredential: { username: string } | null }>(`/devices/${id}`),
+    list: (options?: { networkId?: string; fields?: string[] }) => {
+      const params = new URLSearchParams()
+      if (options?.networkId) params.set('networkId', options.networkId)
+      if (options?.fields?.length) params.set('fields', options.fields.join(','))
+      const query = params.toString()
+      return request<Partial<Device>[]>(`/devices${query ? `?${query}` : ''}`)
+    },
+    get: (id: string, options?: { fields?: string[]; include?: ('interfaces' | 'credential')[] }) => {
+      const params = new URLSearchParams()
+      if (options?.fields?.length) params.set('fields', options.fields.join(','))
+      if (options?.include?.length) params.set('include', options.include.join(','))
+      const query = params.toString()
+      return request<Partial<Device> & { interfaces?: Interface[]; workingCredential?: { username: string } | null }>(`/devices/${id}${query ? `?${query}` : ''}`)
+    },
     updateComment: (id: string, comment: string) =>
       request<{ success: boolean }>(`/devices/${id}/comment`, {
         method: 'PATCH',
@@ -87,10 +97,22 @@ export const api = {
       }),
     toggleNomad: (id: string) =>
       request<{ nomad: boolean }>(`/devices/${id}/nomad`, { method: 'PATCH' }),
+    toggleSkipLogin: (id: string) =>
+      request<{ skipLogin: boolean }>(`/devices/${id}/skip-login`, { method: 'PATCH' }),
     updateType: (id: string, userType: string | null) =>
       request<{ success: boolean; userType: string | null }>(`/devices/${id}/type`, {
         method: 'PATCH',
         body: JSON.stringify({ userType }),
+      }),
+    updateLocation: (id: string, locationId: string | null) =>
+      request<{ success: boolean; locationId: string | null }>(`/devices/${id}/location`, {
+        method: 'PATCH',
+        body: JSON.stringify({ locationId }),
+      }),
+    updateAssetTag: (id: string, assetTag: string | null) =>
+      request<{ success: boolean; assetTag: string | null }>(`/devices/${id}/asset-tag`, {
+        method: 'PATCH',
+        body: JSON.stringify({ assetTag }),
       }),
     delete: (id: string) =>
       request<{ success: boolean }>(`/devices/${id}`, { method: 'DELETE' }),
@@ -99,6 +121,37 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ username, password }),
       }),
+    getImage: (id: string) =>
+      request<DeviceImage>(`/devices/${id}/image`).catch(() => null),
+    uploadImage: (id: string, data: string, mimeType: string) =>
+      request<{ success: boolean; id: string }>(`/devices/${id}/image`, {
+        method: 'POST',
+        body: JSON.stringify({ data, mimeType }),
+      }),
+    deleteImage: (id: string) =>
+      request<{ success: boolean }>(`/devices/${id}/image`, { method: 'DELETE' }),
+    getLogs: (id: string) =>
+      request<{ logs: DeviceLog[] }>(`/devices/${id}/logs`),
+  },
+
+  // Locations
+  locations: {
+    list: (networkId: string) =>
+      request<Location[]>(`/locations/${networkId}`),
+    get: (networkId: string, locationId: string) =>
+      request<Location & { devices: Device[] }>(`/locations/${networkId}/${locationId}`),
+    create: (networkId: string, name: string) =>
+      request<Location>(`/locations/${networkId}`, {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
+    update: (networkId: string, locationId: string, name: string) =>
+      request<Location>(`/locations/${networkId}/${locationId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name }),
+      }),
+    delete: (networkId: string, locationId: string) =>
+      request<{ success: boolean }>(`/locations/${networkId}/${locationId}`, { method: 'DELETE' }),
   },
 
   // Scan
@@ -162,7 +215,7 @@ export interface MatchedDevice {
   vendor: string | null
 }
 
-export type UserDeviceType = 'router' | 'switch' | 'access-point' | 'server' | 'computer' | 'phone' | 'tv' | 'tablet' | 'printer' | 'camera' | 'iot'
+export type UserDeviceType = 'router' | 'switch' | 'access-point' | 'server' | 'computer' | 'phone' | 'desktop-phone' | 'tv' | 'tablet' | 'printer' | 'camera' | 'iot'
 
 export interface Device {
   id: string
@@ -174,6 +227,7 @@ export interface Device {
   ip: string | null
   vendor: string | null
   model: string | null
+  serialNumber: string | null
   firmwareVersion: string | null
   type: 'router' | 'switch' | 'access-point' | 'end-device' | null
   userType: UserDeviceType | null
@@ -181,8 +235,19 @@ export interface Device {
   openPorts: string | null
   driver: string | null
   comment: string | null
+  locationId: string | null
+  assetTag: string | null
   nomad: boolean
+  skipLogin: boolean
   lastSeenAt: string
+}
+
+export interface Location {
+  id: string
+  networkId: string
+  name: string
+  createdAt: string
+  deviceCount?: number
 }
 
 export interface Interface {
@@ -194,6 +259,21 @@ export interface Interface {
   vlan: string | null
   poeWatts: number | null
   poeStandard: string | null
+}
+
+export interface DeviceImage {
+  id: string
+  data: string
+  mimeType: string
+  createdAt: string
+}
+
+export interface DeviceLog {
+  id: number
+  timestamp: string
+  level: 'info' | 'success' | 'warn' | 'error'
+  message: string
+  scanId: string
 }
 
 export interface LogMessage {

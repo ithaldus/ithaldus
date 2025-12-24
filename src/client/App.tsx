@@ -4,6 +4,7 @@ import { Shell } from './components/shell/Shell'
 import { Login } from './routes/Login'
 import { Networks } from './routes/Networks'
 import { NetworkTopology } from './routes/NetworkTopology'
+import { Locations } from './routes/Locations'
 import { Credentials } from './routes/Credentials'
 import { Users } from './routes/Users'
 
@@ -49,6 +50,7 @@ export function App() {
                   <Route path="/" element={<Navigate to="/networks" replace />} />
                   <Route path="/networks" element={<Networks />} />
                   <Route path="/networks/:networkId" element={<NetworkTopology />} />
+                  <Route path="/networks/:networkId/locations" element={<Locations />} />
                   <Route path="/credentials" element={<Credentials />} />
                   <Route
                     path="/users"

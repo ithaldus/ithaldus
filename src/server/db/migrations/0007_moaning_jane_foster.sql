@@ -1,0 +1,1 @@
+ALTER TABLE `devices` ADD `asset_tag` text;

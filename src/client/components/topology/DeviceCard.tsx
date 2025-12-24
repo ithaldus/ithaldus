@@ -13,6 +13,7 @@ import {
   ArrowRightLeft,
   Server,
   Smartphone,
+  Phone,
   Tv,
   Tablet,
   Printer,
@@ -41,6 +42,7 @@ const deviceTypeIcons: Record<string, typeof Router> = {
   server: Server,
   computer: Monitor,
   phone: Smartphone,
+  'desktop-phone': Phone,
   tv: Tv,
   tablet: Tablet,
   printer: Printer,
@@ -217,10 +219,31 @@ export function DeviceCard({
             </button>
           )}
 
-          {/* Device Icon */}
-          <div className={`shrink-0 p-1 rounded border ${iconColor}`}>
-            <DeviceIcon className="w-3 h-3" />
-          </div>
+          {/* Combined Device Type + Vendor + Model Pill */}
+          <span className="shrink-0 h-[22px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
+            {/* Device Type Icon */}
+            <span className={`px-1.5 flex items-center justify-center h-full ${iconColor}`}>
+              <DeviceIcon className="w-3 h-3" />
+            </span>
+            {/* Vendor Logo (if available) */}
+            {showVendor && device.vendor && (
+              <>
+                <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
+                <span className="px-[5px] flex items-center h-full bg-slate-100 dark:bg-slate-800">
+                  <VendorLogo vendor={device.vendor} className="h-3" />
+                </span>
+              </>
+            )}
+            {/* Model Name (if available) */}
+            {showVendor && device.model && (
+              <>
+                <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
+                <span className="px-1.5 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                  {device.model}
+                </span>
+              </>
+            )}
+          </span>
 
           {/* Device Info */}
           <div className="flex items-center gap-2 flex-nowrap">
@@ -236,29 +259,30 @@ export function DeviceCard({
               </span>
             )}
 
-            {/* Vendor/Model Pill */}
-            {showVendor && (device.vendor || device.model) && (
-              <span className="shrink-0 h-5 inline-flex items-center rounded overflow-hidden text-[9px] font-medium bg-slate-100 dark:bg-slate-800 border border-slate-300/50 dark:border-slate-600/50">
-                {device.vendor && (
-                  <span className="px-[5px] flex items-center">
-                    <VendorLogo vendor={device.vendor} className="w-3 h-3" />
-                  </span>
-                )}
-                {device.vendor && device.model && (
-                  <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
-                )}
-                {device.model && (
-                  <span className="px-1 text-slate-500 dark:text-slate-500">
-                    {device.model}
-                  </span>
-                )}
-              </span>
-            )}
-
             {/* Firmware Badge */}
             {showFirmware && device.firmwareVersion && (
               <span className="shrink-0 px-1 py-0.5 text-[9px] font-medium bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 rounded border border-cyan-300/50 dark:border-cyan-600/50">
                 {device.firmwareVersion}
+              </span>
+            )}
+
+            {/* Serial Number Badge - Two-part pill */}
+            {device.serialNumber && (
+              <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
+                <span className="px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                  SN
+                </span>
+                <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
+                <span className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
+                  {device.serialNumber}
+                </span>
+              </span>
+            )}
+
+            {/* Asset Tag Badge */}
+            {device.assetTag && (
+              <span className="shrink-0 px-1 py-0.5 text-[9px] font-medium font-mono bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded border border-amber-300/50 dark:border-amber-600/50">
+                {device.assetTag}
               </span>
             )}
 
