@@ -491,7 +491,7 @@ export function NetworkTopology() {
           )}
 
           {/* Visibility Toggle Pill */}
-          <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76] overflow-hidden">
+          <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76] overflow-hidden">
             {[
               { key: 'endDevices' as const, label: 'End', tooltip: 'End Devices — Show or hide non-network devices like computers, phones, printers, and IoT devices' },
               { key: 'firmware' as const, label: 'FW', tooltip: 'Firmware — Show or hide firmware version information on device cards' },
