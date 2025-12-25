@@ -167,11 +167,11 @@ devicesRoutes.patch('/:id/skip-login', async (c) => {
   return c.json({ skipLogin: !existing.skipLogin })
 })
 
-// Update device user type
+// Update device type
 devicesRoutes.patch('/:id/type', async (c) => {
   const id = c.req.param('id')
   const body = await c.req.json()
-  const { userType } = body
+  const { type } = body
 
   const existing = await db.query.devices.findFirst({
     where: eq(devices.id, id),
@@ -181,16 +181,16 @@ devicesRoutes.patch('/:id/type', async (c) => {
     return c.json({ error: 'Device not found' }, 404)
   }
 
-  const validTypes = ['router', 'switch', 'access-point', 'server', 'computer', 'phone', 'desktop-phone', 'tv', 'tablet', 'printer', 'camera', 'iot', null]
-  if (!validTypes.includes(userType)) {
+  const validTypes = ['router', 'switch', 'access-point', 'end-device', 'server', 'computer', 'phone', 'desktop-phone', 'tv', 'tablet', 'printer', 'camera', 'iot']
+  if (!validTypes.includes(type)) {
     return c.json({ error: 'Invalid device type' }, 400)
   }
 
   await db.update(devices)
-    .set({ userType: userType || null })
+    .set({ type })
     .where(eq(devices.id, id))
 
-  return c.json({ success: true, userType })
+  return c.json({ success: true, type })
 })
 
 // Update device location

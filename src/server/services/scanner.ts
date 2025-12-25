@@ -281,6 +281,70 @@ function detectDeviceType(info: DeviceInfo, vendor: string | null): 'router' | '
   return 'end-device'
 }
 
+// Device type definitions - extended types beyond network devices
+type ExtendedDeviceType = 'router' | 'switch' | 'access-point' | 'end-device' | 'iot' | 'printer' | 'camera' | 'tv' | 'phone' | 'desktop-phone' | 'server' | 'computer' | 'tablet'
+
+// Detect device type based on vendor and hostname (for devices without SSH access)
+function detectTypeFromVendor(vendor: string | null, hostname: string | null): ExtendedDeviceType | null {
+  if (!vendor) return null
+
+  const vendorLower = vendor.toLowerCase()
+  const hostnameLower = (hostname || '').toLowerCase()
+
+  // IoT devices
+  if (vendorLower.includes('tuya') || vendorLower.includes('espressif') || vendorLower.includes('shenzhen')) {
+    return 'iot'
+  }
+
+  // Network equipment
+  if (vendorLower.includes('ubiquiti')) return 'access-point'
+  if (vendorLower.includes('ruckus')) return 'access-point'
+  if (vendorLower.includes('mikrotik')) return 'router'
+  if (vendorLower.includes('zyxel')) return 'switch'
+  if (vendorLower.includes('tp-link') || vendorLower.includes('tplink')) return 'router'
+  if (vendorLower.includes('netgear')) return 'router'
+  if (vendorLower.includes('d-link') || vendorLower.includes('dlink')) return 'router'
+
+  // Cisco - check hostname for SPA phones
+  if (vendorLower.includes('cisco')) {
+    if (hostnameLower.startsWith('spa')) return 'desktop-phone'
+    return 'switch'
+  }
+
+  // Printers
+  if (vendorLower.includes('kyocera')) return 'printer'
+  if (vendorLower.includes('canon')) return 'printer'
+  if (vendorLower.includes('epson')) return 'printer'
+  if (vendorLower.includes('brother')) return 'printer'
+  if (vendorLower.includes('xerox')) return 'printer'
+  if (vendorLower.includes('lexmark')) return 'printer'
+  if (vendorLower.includes('ricoh')) return 'printer'
+  if (vendorLower.includes('hp') || vendorLower.includes('hewlett')) {
+    if (hostnameLower.startsWith('hp') || hostnameLower.includes('printer') || hostnameLower.includes('laserjet') || hostnameLower.includes('officejet')) {
+      return 'printer'
+    }
+  }
+
+  // TVs and displays
+  if (vendorLower.includes('samsung') && hostnameLower === 'samsung') return 'tv'
+  if (vendorLower.includes('lg') && (hostnameLower.includes('tv') || hostnameLower.includes('webos'))) return 'tv'
+  if (vendorLower.includes('sony') && hostnameLower.includes('bravia')) return 'tv'
+
+  // Phones
+  if (vendorLower.includes('apple')) {
+    if (hostnameLower.includes('iphone')) return 'phone'
+    if (hostnameLower.includes('ipad')) return 'tablet'
+  }
+  if (vendorLower.includes('samsung') && hostnameLower.includes('galaxy')) return 'phone'
+
+  // Computers
+  if (vendorLower.includes('dell') || vendorLower.includes('lenovo') || vendorLower.includes('asus') || vendorLower.includes('acer')) {
+    return 'computer'
+  }
+
+  return null
+}
+
 // Try to connect to device with given credentials (single attempt)
 async function tryConnectOnce(
   ip: string,
@@ -644,7 +708,7 @@ export class NetworkScanner {
 
       // Clear existing interfaces (they change with topology) and DHCP leases
       // Note: We do NOT delete devices - they persist by MAC address to preserve
-      // user-managed fields like comment, nomad, and userType
+      // user-managed fields like comment, nomad, and type
       const existingDevices = await db.select({ id: devices.id })
         .from(devices)
         .where(eq(devices.networkId, this.networkId))
@@ -758,13 +822,16 @@ export class NetworkScanner {
       // Try to detect vendor from MAC OUI
       const vendor = detectVendorFromMac(deviceMac)
 
+      // Detect device type from vendor
+      const vendorType = detectTypeFromVendor(vendor, hostname)
+
       // Create device record
       const newDevice: DiscoveredDevice = {
         id: deviceId,
         mac: deviceMac,
         hostname,
         ip,
-        type: 'end-device',
+        type: vendorType || 'end-device',
         vendor,
         model: null,
         firmwareVersion: null,
@@ -776,7 +843,7 @@ export class NetworkScanner {
         interfaces: [],
       }
 
-      // Save to database - upsert by MAC, preserving user fields (comment, nomad, userType)
+      // Save to database - upsert by MAC, preserving user fields (comment, nomad, type)
       const existingDevice = await db.select().from(devices).where(eq(devices.mac, deviceMac)).get()
 
       if (existingDevice) {
@@ -789,7 +856,7 @@ export class NetworkScanner {
             hostname,
             ip,
             vendor,
-            // Don't update: comment, nomad, userType (user-managed)
+            // Don't update: comment, nomad, type (user-managed)
             lastSeenAt: new Date().toISOString(),
           })
           .where(eq(devices.mac, deviceMac))
@@ -809,13 +876,13 @@ export class NetworkScanner {
           vendor,
           model: null,
           firmwareVersion: null,
-          type: 'end-device',
+          type: newDevice.type,
           accessible: false,
           openPorts: '[]',
           driver: null,
           lastSeenAt: new Date().toISOString(),
         })
-        this.log('success', `${ip}: Added as end-device (MAC: ${deviceMac}${hostname ? ', hostname: ' + hostname : ''})`)
+        this.log('success', `${ip}: Added as ${newDevice.type} (MAC: ${deviceMac}${hostname ? ', hostname: ' + hostname : ''})`)
       }
 
       this.deviceCount++
@@ -1037,7 +1104,18 @@ export class NetworkScanner {
       snmpInfo = await this.getSnmpInfo(ip)
     }
 
-    const deviceType = deviceInfo ? detectDeviceType(deviceInfo, vendor) : 'end-device'
+    // Determine hostname for type detection (combine all sources)
+    const hostnameForDetection = deviceInfo?.hostname || snmpInfo?.hostname || this.getMdnsHostname(ip)
+
+    // Determine device type - prioritize SSH-based detection, then vendor-based
+    let deviceType: string
+    if (deviceInfo) {
+      deviceType = detectDeviceType(deviceInfo, vendor)
+    } else {
+      // Try vendor-based detection for devices without SSH access
+      const vendorType = detectTypeFromVendor(vendor, hostnameForDetection)
+      deviceType = vendorType || 'end-device'
+    }
 
     // Use device's own detected upstream interface if available
     // Priority: 1) Bridge-based detection (ownUpstreamInterface)
@@ -1074,11 +1152,11 @@ export class NetworkScanner {
       interfaces: [],
     }
 
-    // Save device to database - upsert by MAC, preserving user fields (comment, nomad, userType)
+    // Save device to database - upsert by MAC, preserving user fields (comment, nomad, type)
     const existingDevice = await db.select().from(devices).where(eq(devices.mac, deviceMac)).get()
 
     if (existingDevice) {
-      // Update existing device, preserve user fields
+      // Update existing device, preserve user-managed fields (comment, nomad, type)
       await db.update(devices)
         .set({
           parentInterfaceId,
@@ -1090,11 +1168,10 @@ export class NetworkScanner {
           model: newDevice.model,
           serialNumber: newDevice.serialNumber,
           firmwareVersion: newDevice.firmwareVersion,
-          type: deviceType,
+          // Don't update type - only set on first discovery, user can change via UI
           accessible: newDevice.accessible,
           openPorts: JSON.stringify(openPorts),
           driver: newDevice.driver,
-          // Don't update: comment, nomad, userType (user-managed)
           lastSeenAt: new Date().toISOString(),
         })
         .where(eq(devices.mac, deviceMac))
@@ -1235,13 +1312,16 @@ export class NetworkScanner {
           // Try to detect vendor from MAC OUI
           const endDeviceVendor = detectVendorFromMac(neighbor.mac)
 
+          // Detect device type from vendor
+          const endDeviceType = detectTypeFromVendor(endDeviceVendor, hostname) || 'end-device'
+
           // Create device record
           const endDevice: DiscoveredDevice = {
             id: endDeviceId,
             mac: neighbor.mac,
             hostname,
             ip: neighborIp,
-            type: 'end-device',
+            type: endDeviceType,
             vendor: endDeviceVendor,
             model: null,
             firmwareVersion: null,
@@ -1253,7 +1333,7 @@ export class NetworkScanner {
             interfaces: [],
           }
 
-          // Save to database - upsert by MAC, preserving user fields (comment, nomad, userType)
+          // Save to database - upsert by MAC, preserving user fields (comment, nomad, type)
           const existingBridgeDevice = await db.select().from(devices).where(eq(devices.mac, neighbor.mac)).get()
 
           if (existingBridgeDevice) {
@@ -1266,7 +1346,7 @@ export class NetworkScanner {
                 hostname,
                 ip: neighborIp,
                 vendor: endDeviceVendor,
-                // Don't update: comment, nomad, userType (user-managed)
+                // Don't update: comment, nomad, type (user-managed)
                 lastSeenAt: new Date().toISOString(),
               })
               .where(eq(devices.mac, neighbor.mac))
@@ -1286,13 +1366,13 @@ export class NetworkScanner {
               vendor: endDeviceVendor,
               model: null,
               firmwareVersion: null,
-              type: 'end-device',
+              type: endDevice.type,
               accessible: false,
               openPorts: '[]',
               driver: null,
               lastSeenAt: new Date().toISOString(),
             })
-            this.log('success', `${ip}: Added bridge host as end-device on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
+            this.log('success', `${ip}: Added bridge host as ${endDevice.type} on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
           }
 
           this.deviceCount++

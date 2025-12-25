@@ -427,6 +427,63 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     }
   }
 
+  // Second pass: refresh MACs for devices that couldn't be resolved to physical ports
+  // This helps with devices that haven't communicated recently and their MAC aged out
+  const unresolvedNeighbors = neighbors.filter(n =>
+    n.ip && bridgeInterfaces.has(n.interface)
+  )
+
+  if (unresolvedNeighbors.length > 0) {
+    // Limit to 30 IPs to avoid long delays
+    const ipsToRefresh = unresolvedNeighbors.slice(0, 30).map(n => n.ip!)
+
+    if (log) {
+      log('info', `Pinging ${ipsToRefresh.length} unresolved devices to refresh MAC table...`)
+    }
+
+    // Ping each IP to generate traffic and refresh MAC table
+    // Run pings in parallel with short timeout
+    const pingPromises = ipsToRefresh.map(ip =>
+      sshExec(client, `/ping ${ip} count=1`, 3000).catch(() => '')
+    )
+    await Promise.all(pingPromises)
+
+    // Short delay for MAC table to update
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    // Re-fetch bridge host table
+    const bridgeHostsRefresh = await sshExec(client, '/interface bridge host print terse').catch(() => '')
+
+    // Try to resolve MACs that we couldn't before
+    let resolvedCount = 0
+    const refreshLines = bridgeHostsRefresh.split('\n').filter(l => l.includes('mac-address='))
+    for (const line of refreshLines) {
+      const macMatch = line.match(/mac-address=(\S+)/)
+      const onIfMatch = line.match(/on-interface=(\S+)/)
+      const localMatch = line.match(/local=(\S+)/)
+
+      // Skip router's own MACs
+      if (localMatch && localMatch[1] === 'true') continue
+      if (!macMatch || !onIfMatch) continue
+
+      const mac = macMatch[1].toUpperCase()
+      const physicalPort = resolvePhysicalPort(onIfMatch[1])
+
+      // Only update if we found a non-bridge physical port
+      if (!bridgeInterfaces.has(physicalPort)) {
+        const neighbor = neighbors.find(n => n.mac === mac)
+        if (neighbor && bridgeInterfaces.has(neighbor.interface)) {
+          neighbor.interface = physicalPort
+          resolvedCount++
+        }
+      }
+    }
+
+    if (log && resolvedCount > 0) {
+      log('success', `Resolved ${resolvedCount} MAC addresses to physical ports`)
+    }
+  }
+
   // Detect own upstream interface using gateway MAC lookup
   // Algorithm: gateway IP → gateway MAC (ARP) → bridge port that learned that MAC
   let ownUpstreamInterface: string | null = null

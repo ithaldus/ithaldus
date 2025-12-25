@@ -89,7 +89,7 @@ export const devices = sqliteTable('devices', {
   model: text('model'),
   serialNumber: text('serial_number'),
   firmwareVersion: text('firmware_version'),
-  type: text('type', { enum: ['router', 'switch', 'access-point', 'end-device'] }),
+  type: text('type', { enum: ['router', 'switch', 'access-point', 'end-device', 'server', 'computer', 'phone', 'desktop-phone', 'tv', 'tablet', 'printer', 'camera', 'iot'] }),
   accessible: integer('accessible', { mode: 'boolean' }),
   openPorts: text('open_ports'),
   driver: text('driver'),
@@ -99,7 +99,6 @@ export const devices = sqliteTable('devices', {
   assetTag: text('asset_tag'),
   nomad: integer('nomad', { mode: 'boolean' }).notNull().default(false),
   skipLogin: integer('skip_login', { mode: 'boolean' }).notNull().default(false),
-  userType: text('user_type', { enum: ['router', 'switch', 'access-point', 'server', 'computer', 'phone', 'desktop-phone', 'tv', 'tablet', 'printer', 'camera', 'iot'] }),
   lastSeenAt: text('last_seen_at').notNull(),
 }, (table) => [
   index('idx_devices_mac').on(table.mac),

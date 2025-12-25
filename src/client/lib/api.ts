@@ -99,10 +99,10 @@ export const api = {
       request<{ nomad: boolean }>(`/devices/${id}/nomad`, { method: 'PATCH' }),
     toggleSkipLogin: (id: string) =>
       request<{ skipLogin: boolean }>(`/devices/${id}/skip-login`, { method: 'PATCH' }),
-    updateType: (id: string, userType: string | null) =>
-      request<{ success: boolean; userType: string | null }>(`/devices/${id}/type`, {
+    updateType: (id: string, type: string) =>
+      request<{ success: boolean; type: string }>(`/devices/${id}/type`, {
         method: 'PATCH',
-        body: JSON.stringify({ userType }),
+        body: JSON.stringify({ type }),
       }),
     updateLocation: (id: string, locationId: string | null) =>
       request<{ success: boolean; locationId: string | null }>(`/devices/${id}/location`, {
@@ -215,7 +215,7 @@ export interface MatchedDevice {
   vendor: string | null
 }
 
-export type UserDeviceType = 'router' | 'switch' | 'access-point' | 'server' | 'computer' | 'phone' | 'desktop-phone' | 'tv' | 'tablet' | 'printer' | 'camera' | 'iot'
+export type DeviceType = 'router' | 'switch' | 'access-point' | 'end-device' | 'server' | 'computer' | 'phone' | 'desktop-phone' | 'tv' | 'tablet' | 'printer' | 'camera' | 'iot'
 
 export interface Device {
   id: string
@@ -229,8 +229,7 @@ export interface Device {
   model: string | null
   serialNumber: string | null
   firmwareVersion: string | null
-  type: 'router' | 'switch' | 'access-point' | 'end-device' | null
-  userType: UserDeviceType | null
+  type: DeviceType | null
   accessible: boolean | null
   openPorts: string | null
   driver: string | null

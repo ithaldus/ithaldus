@@ -17,7 +17,7 @@ import {
   Tv,
   Tablet,
   Printer,
-  Camera,
+  Cctv,
   Cpu,
   Tag,
 } from 'lucide-react'
@@ -48,7 +48,7 @@ const deviceTypeIcons: Record<string, typeof Router> = {
   tv: Tv,
   tablet: Tablet,
   printer: Printer,
-  camera: Camera,
+  camera: Cctv,
   iot: Cpu,
 }
 
@@ -165,41 +165,8 @@ export function DeviceCard({
 
   const openPorts = parseOpenPorts(device.openPorts)
 
-  // Infer device type from vendor
-  const vendorLower = device.vendor?.toLowerCase() || ''
-  const hostnameLower = device.hostname?.toLowerCase() || ''
-  const getVendorType = (): string | null => {
-    if (vendorLower.includes('cisco')) {
-      // Cisco SPA series are IP phones
-      if (hostnameLower.startsWith('spa')) return 'desktop-phone'
-      return 'switch'
-    }
-    if (vendorLower.includes('tuya')) return 'iot'
-    if (vendorLower.includes('ubiquiti')) return 'access-point'
-    if (vendorLower.includes('ruckus')) return 'access-point'
-    if (vendorLower.includes('mikrotik')) return 'router'
-    if (vendorLower.includes('kyocera')) return 'printer'
-    if (vendorLower.includes('hp') || vendorLower.includes('hewlett')) {
-      // HP devices with hostname starting with HP are printers
-      if (hostnameLower.startsWith('hp')) return 'printer'
-    }
-    if (vendorLower.includes('samsung')) {
-      // Samsung devices with hostname "Samsung" are TVs
-      if (hostnameLower === 'samsung') return 'tv'
-    }
-    return null
-  }
-
-  // Infer device type from ports if not set
-  // Devices with management ports are likely network devices (switches/routers)
-  const managementPorts = [22, 23, 80, 443, 8080, 8443, 161, 8291, 8728]
-  const hasManagementPorts = openPorts.some(p => managementPorts.includes(p))
-  const hasRouterPorts = openPorts.includes(8291) || openPorts.includes(8728) // MikroTik specific
-  const vendorType = getVendorType()
-  const inferredType = device.type || vendorType || (hasRouterPorts ? 'router' : hasManagementPorts ? 'switch' : 'end-device')
-
-  // Use userType if set, otherwise use inferred type
-  const effectiveType = device.userType || inferredType
+  // Use device type from database (fallback to end-device if not set)
+  const effectiveType = device.type || 'end-device'
 
   const DeviceIcon = deviceTypeIcons[effectiveType] || Monitor
   const iconColor = deviceIconColors[effectiveType] || deviceIconColors['end-device']

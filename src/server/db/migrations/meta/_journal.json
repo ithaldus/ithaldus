@@ -64,6 +64,13 @@
       "when": 1766531058408,
       "tag": "0008_thankful_rockslide",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1766692529388,
+      "tag": "0009_dusty_taskmaster",
+      "breakpoints": true
     }
   ]
 }

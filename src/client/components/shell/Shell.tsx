@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin, Router } from 'lucide-react'
+import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { api, type Network as NetworkType } from '../../lib/api'
 
@@ -151,7 +151,7 @@ export function Shell({ children }: ShellProps) {
                       }`
                     }
                   >
-                    <Router className="w-3.5 h-3.5 flex-shrink-0" />
+                    <Network className="w-3.5 h-3.5 flex-shrink-0" />
                     <span className="truncate">{currentNetwork.name}</span>
                   </NavLink>
 

@@ -20,6 +20,7 @@ import {
   Tablet,
   Printer,
   Camera,
+  Cctv,
   Cpu,
   ChevronDown,
   ShieldOff,
@@ -30,11 +31,10 @@ import {
   ChevronUp,
 } from 'lucide-react'
 import { VendorLogo } from './VendorLogo'
-import { api, type TopologyDevice, type Interface, type UserDeviceType, type Location, type DeviceImage, type DeviceLog } from '../../lib/api'
+import { api, type TopologyDevice, type Interface, type DeviceType, type Location, type DeviceImage, type DeviceLog } from '../../lib/api'
 
 // Device type options for the dropdown
-const deviceTypeOptions: { value: UserDeviceType | 'auto'; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { value: 'auto', label: 'Auto-detect', icon: Monitor },
+const deviceTypeOptions: { value: DeviceType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: 'router', label: 'Router', icon: Router },
   { value: 'switch', label: 'Switch', icon: Network },
   { value: 'access-point', label: 'Access Point', icon: Wifi },
@@ -45,8 +45,9 @@ const deviceTypeOptions: { value: UserDeviceType | 'auto'; label: string; icon: 
   { value: 'tv', label: 'TV', icon: Tv },
   { value: 'tablet', label: 'Tablet', icon: Tablet },
   { value: 'printer', label: 'Printer', icon: Printer },
-  { value: 'camera', label: 'Camera', icon: Camera },
+  { value: 'camera', label: 'Camera', icon: Cctv },
   { value: 'iot', label: 'IoT Device', icon: Cpu },
+  { value: 'end-device', label: 'Other', icon: Monitor },
 ]
 
 interface DeviceModalProps {
@@ -57,7 +58,7 @@ interface DeviceModalProps {
   onCommentUpdate?: (deviceId: string, comment: string) => void
   onNomadToggle?: (deviceId: string) => void
   onSkipLoginToggle?: (deviceId: string) => void
-  onTypeChange?: (deviceId: string, userType: UserDeviceType | null) => void
+  onTypeChange?: (deviceId: string, type: DeviceType) => void
   onLocationChange?: (deviceId: string, locationId: string | null) => void
   onAssetTagChange?: (deviceId: string, assetTag: string | null) => void
   onImageChange?: (deviceId: string, hasImage: boolean) => void
@@ -115,7 +116,7 @@ export function DeviceModal({
   const [testError, setTestError] = useState('')
   const [workingCredential, setWorkingCredential] = useState<{ username: string } | null>(null)
   const [loadingCredential, setLoadingCredential] = useState(false)
-  const [userType, setUserType] = useState<UserDeviceType | 'auto'>(device.userType || 'auto')
+  const [deviceType, setDeviceType] = useState<DeviceType>(device.type || 'end-device')
   const [isSavingType, setIsSavingType] = useState(false)
   const [locations, setLocations] = useState<Location[]>([])
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(device.locationId || null)
@@ -193,7 +194,8 @@ export function DeviceModal({
     fetchLogs()
   }, [device.id])
 
-  const DeviceIcon = deviceTypeIcons[device.type || 'end-device'] || Monitor
+  // Get icon for the current device type
+  const DeviceIcon = deviceTypeOptions.find(opt => opt.value === deviceType)?.icon || Monitor
   const openPorts = parseOpenPorts(device.openPorts)
   const needsCredentials = !device.accessible && openPorts.includes(22)
 
@@ -252,17 +254,16 @@ export function DeviceModal({
     }
   }
 
-  const handleTypeChange = async (newType: UserDeviceType | 'auto') => {
-    setUserType(newType)
+  const handleTypeChange = async (newType: DeviceType) => {
+    setDeviceType(newType)
     setIsSavingType(true)
     try {
-      const typeValue = newType === 'auto' ? null : newType
-      await api.devices.updateType(device.id, typeValue)
-      onTypeChange?.(device.id, typeValue)
+      await api.devices.updateType(device.id, newType)
+      onTypeChange?.(device.id, newType)
     } catch (err) {
       console.error('Failed to save device type:', err)
       // Revert on error
-      setUserType(device.userType || 'auto')
+      setDeviceType(device.type || 'end-device')
     } finally {
       setIsSavingType(false)
     }
@@ -495,14 +496,14 @@ export function DeviceModal({
               </label>
               <div className="mt-1 relative">
                 <select
-                  value={userType}
-                  onChange={(e) => handleTypeChange(e.target.value as UserDeviceType | 'auto')}
+                  value={deviceType}
+                  onChange={(e) => handleTypeChange(e.target.value as DeviceType)}
                   disabled={isSavingType}
                   className="appearance-none w-full px-3 py-1.5 pr-8 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent cursor-pointer disabled:opacity-50"
                 >
                   {deviceTypeOptions.map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.label}{option.value === 'auto' && device.type ? ` (${device.type.replace('-', ' ')})` : ''}
+                      {option.label}
                     </option>
                   ))}
                 </select>

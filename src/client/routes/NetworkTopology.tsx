@@ -308,12 +308,12 @@ export function NetworkTopology() {
     }
   }
 
-  function handleTypeChange(deviceId: string, userType: string | null) {
+  function handleTypeChange(deviceId: string, type: string) {
     // Update device in tree
     function updateDevice(devices: TopologyDevice[]): TopologyDevice[] {
       return devices.map(d => {
         if (d.id === deviceId) {
-          return { ...d, userType: userType as any }
+          return { ...d, type: type as any }
         }
         if (d.children) {
           return { ...d, children: updateDevice(d.children) }
@@ -323,7 +323,7 @@ export function NetworkTopology() {
     }
     setDevices(updateDevice(devices))
     if (selectedDevice?.id === deviceId) {
-      setSelectedDevice({ ...selectedDevice, userType: userType as any })
+      setSelectedDevice({ ...selectedDevice, type: type as any })
     }
   }
 
