@@ -406,7 +406,7 @@ export function DeviceCard({
 
       {/* Interfaces & Children - grouped by interface (sorted alphabetically) */}
       {hasInterfaceBranches && isExpanded && (
-        <div className="mt-1 ml-3 pl-3">
+        <div className="mt-1 ml-6 pl-4">
           {(() => {
             const sortedInterfaces = Array.from(childrenByInterface.entries())
               .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }))
@@ -419,11 +419,11 @@ export function DeviceCard({
               <div key={ifaceName} className="relative">
                 {/* Tree connector: vertical line + horizontal branch */}
                 <div
-                  className={`absolute -ml-3 w-[2px] bg-slate-300 dark:bg-slate-600 ${
+                  className={`absolute -ml-4 w-[2px] bg-slate-300 dark:bg-slate-600 ${
                     isLastInterface ? 'top-0 h-3' : 'top-0 bottom-0'
                   }`}
                 />
-                <div className="absolute -ml-3 top-3 w-3 h-[2px] bg-slate-300 dark:bg-slate-600" />
+                <div className="absolute -ml-4 top-3 w-4 h-[2px] bg-slate-300 dark:bg-slate-600" />
 
                 {/* Interface Label */}
                 {(() => {
@@ -489,7 +489,7 @@ export function DeviceCard({
 
                 {/* Child Devices - only render if interface is not collapsed */}
                 {!collapsedInterfaces.has(ifaceName) && (
-                  <div className="space-y-1 ml-1 pb-1">
+                  <div className="space-y-1 ml-3 pb-1">
                     {showVirtualSwitch ? (
                       /* Virtual switch placeholder - inferred when multiple inaccessible devices on one interface */
                       <div className="relative">
@@ -537,7 +537,7 @@ export function DeviceCard({
 
                 {/* Hidden end devices indicator */}
                 {!showEndDevices && device.children && device.children.length > (visibleChildren?.length || 0) && (
-                  <div className="ml-1 text-[10px] text-slate-400 dark:text-slate-500 italic pb-1">
+                  <div className="ml-3 text-[10px] text-slate-400 dark:text-slate-500 italic pb-1">
                     +{device.children.length - (visibleChildren?.length || 0)} hidden
                   </div>
                 )}
