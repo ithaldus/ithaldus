@@ -5,9 +5,10 @@ interface TooltipProps {
   children: ReactNode
   position?: 'top' | 'bottom' | 'left' | 'right'
   className?: string
+  instant?: boolean
 }
 
-export function Tooltip({ content, children, position = 'bottom', className = '' }: TooltipProps) {
+export function Tooltip({ content, children, position = 'bottom', className = '', instant = false }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false)
 
   const positionClasses = {
@@ -18,10 +19,10 @@ export function Tooltip({ content, children, position = 'bottom', className = ''
   }
 
   const arrowClasses = {
-    top: 'top-full left-1/2 -translate-x-1/2 border-t-slate-900 border-x-transparent border-b-transparent',
-    bottom: 'bottom-full left-1/2 -translate-x-1/2 border-b-slate-900 border-x-transparent border-t-transparent',
-    left: 'left-full top-1/2 -translate-y-1/2 border-l-slate-900 border-y-transparent border-r-transparent',
-    right: 'right-full top-1/2 -translate-y-1/2 border-r-slate-900 border-y-transparent border-l-transparent',
+    top: 'top-full left-1/2 -translate-x-1/2 border-t-black border-x-transparent border-b-transparent',
+    bottom: 'bottom-full left-1/2 -translate-x-1/2 border-b-black border-x-transparent border-t-transparent',
+    left: 'left-full top-1/2 -translate-y-1/2 border-l-black border-y-transparent border-r-transparent',
+    right: 'right-full top-1/2 -translate-y-1/2 border-r-black border-y-transparent border-l-transparent',
   }
 
   return (
@@ -33,14 +34,14 @@ export function Tooltip({ content, children, position = 'bottom', className = ''
       {children}
       {isVisible && (
         <div
-          className={`absolute z-50 ${positionClasses[position]} pointer-events-none`}
+          className={`absolute z-50 ${positionClasses[position]} pointer-events-none animate-in fade-in zoom-in-95 duration-100`}
           role="tooltip"
         >
-          <div className="bg-slate-900 text-white text-xs px-2.5 py-1.5 rounded-md shadow-lg max-w-xs whitespace-normal text-center">
+          <div className="bg-black text-white text-xs px-3 py-2 rounded-lg shadow-xl max-w-xs whitespace-normal text-center font-medium">
             {content}
           </div>
           <div
-            className={`absolute w-0 h-0 border-4 ${arrowClasses[position]}`}
+            className={`absolute w-0 h-0 border-[6px] ${arrowClasses[position]}`}
           />
         </div>
       )}
