@@ -162,8 +162,13 @@ export function DeviceCard({
 
   // Infer device type from vendor
   const vendorLower = device.vendor?.toLowerCase() || ''
+  const hostnameLower = device.hostname?.toLowerCase() || ''
   const getVendorType = (): string | null => {
-    if (vendorLower.includes('cisco')) return 'switch'
+    if (vendorLower.includes('cisco')) {
+      // Cisco SPA series are IP phones
+      if (hostnameLower.startsWith('spa')) return 'desktop-phone'
+      return 'switch'
+    }
     if (vendorLower.includes('tuya')) return 'iot'
     if (vendorLower.includes('ubiquiti') || vendorLower.includes('mikrotik')) return 'router'
     return null
