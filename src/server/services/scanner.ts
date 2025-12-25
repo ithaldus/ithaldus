@@ -11,6 +11,7 @@ import {
   type DeviceInfo,
   type LogLevel,
 } from './drivers'
+import { scanMdns, type MdnsDevice } from './mdns'
 
 export type { LogLevel }
 
@@ -515,6 +516,7 @@ export class NetworkScanner {
   private jumpHostClient: Client | null = null  // Root device connection for jump host tunneling
   private jumpHostSupported: boolean = false  // True if root device supports TCP forwarding (forwardOut)
   private rootIp: string = ''  // Store root IP for jump host reference
+  private mdnsDevices: Map<string, MdnsDevice> = new Map()  // IP -> mDNS device info
 
   constructor(networkId: string, callbacks: ScanCallbacks) {
     this.networkId = networkId
@@ -533,6 +535,12 @@ export class NetworkScanner {
 
   isAborted() {
     return this.aborted
+  }
+
+  // Get hostname from mDNS cache for an IP
+  private getMdnsHostname(ip: string): string | null {
+    const device = this.mdnsDevices.get(ip)
+    return device?.hostname || null
   }
 
   private log(level: LogLevel, message: string) {
@@ -593,6 +601,22 @@ export class NetworkScanner {
       }
 
       this.log('info', `Loaded ${this.credentialsList.length} credentials to try`)
+
+      // Run mDNS scan in parallel to discover hostnames from Bonjour/Avahi devices
+      this.log('info', 'Scanning for mDNS/Bonjour devices...')
+      try {
+        this.mdnsDevices = await scanMdns(5000)
+        if (this.mdnsDevices.size > 0) {
+          this.log('success', `mDNS: Found ${this.mdnsDevices.size} devices with hostnames`)
+          for (const [ip, device] of this.mdnsDevices) {
+            this.log('info', `  ${ip}: ${device.hostname}${device.services.length ? ' (' + device.services.join(', ') + ')' : ''}`)
+          }
+        } else {
+          this.log('info', 'mDNS: No devices found')
+        }
+      } catch (err) {
+        this.log('warn', `mDNS scan failed: ${err}`)
+      }
 
       // Check if aborted before clearing data
       if (this.aborted) {
@@ -702,6 +726,15 @@ export class NetworkScanner {
       })
       if (lease?.hostname) {
         hostname = lease.hostname
+      }
+
+      // Fall back to mDNS hostname if DHCP didn't provide one
+      if (!hostname && ip) {
+        const mdnsHostname = this.getMdnsHostname(ip)
+        if (mdnsHostname) {
+          hostname = mdnsHostname
+          this.log('info', `${ip}: Using mDNS hostname: ${mdnsHostname}`)
+        }
       }
 
       // Try to detect vendor from MAC OUI
@@ -1155,11 +1188,24 @@ export class NetworkScanner {
 
           // Try to look up hostname from DHCP leases
           let hostname: string | null = null
+          let neighborIp: string | null = null
           const lease = await db.query.dhcpLeases.findFirst({
             where: eq(dhcpLeases.mac, neighbor.mac),
           })
           if (lease?.hostname) {
             hostname = lease.hostname
+          }
+          if (lease?.ip) {
+            neighborIp = lease.ip
+          }
+
+          // Fall back to mDNS hostname if DHCP didn't provide one
+          if (!hostname && neighborIp) {
+            const mdnsHostname = this.getMdnsHostname(neighborIp)
+            if (mdnsHostname) {
+              hostname = mdnsHostname
+              this.log('info', `${neighbor.mac}: Using mDNS hostname: ${mdnsHostname}`)
+            }
           }
 
           // Try to detect vendor from MAC OUI
@@ -1170,7 +1216,7 @@ export class NetworkScanner {
             id: endDeviceId,
             mac: neighbor.mac,
             hostname,
-            ip: null,
+            ip: neighborIp,
             type: 'end-device',
             vendor: endDeviceVendor,
             model: null,
@@ -1194,6 +1240,7 @@ export class NetworkScanner {
                 networkId: this.networkId,
                 upstreamInterface: neighbor.interface,
                 hostname,
+                ip: neighborIp,
                 vendor: endDeviceVendor,
                 // Don't update: comment, nomad, userType (user-managed)
                 lastSeenAt: new Date().toISOString(),
@@ -1211,7 +1258,7 @@ export class NetworkScanner {
               networkId: this.networkId,
               upstreamInterface: neighbor.interface,
               hostname,
-              ip: null,
+              ip: neighborIp,
               vendor: endDeviceVendor,
               model: null,
               firmwareVersion: null,
