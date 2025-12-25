@@ -20,7 +20,6 @@ import {
   Camera,
   Cpu,
 } from 'lucide-react'
-import { VendorLogo } from './VendorLogo'
 import type { TopologyDevice, Interface } from '../../lib/api'
 
 interface DeviceCardProps {
@@ -108,6 +107,12 @@ function needsVirtualSwitch(interfaceName: string, children: TopologyDevice[]): 
   return children.every((child) => !child.accessible)
 }
 
+// Check if an interface is a virtual/bridge interface that should be collapsed by default
+function isVirtualInterface(ifaceName: string): boolean {
+  const name = ifaceName.toLowerCase()
+  return name.startsWith('bridge') || name.startsWith('vlan') || name.startsWith('bond')
+}
+
 export function DeviceCard({
   device,
   level = 0,
@@ -119,6 +124,8 @@ export function DeviceCard({
   onDeviceClick,
 }: DeviceCardProps) {
   const [isExpanded, setIsExpanded] = useState(true)
+  const [collapsedInterfaces, setCollapsedInterfaces] = useState<Set<string>>(new Set())
+  const [interfacesInitialized, setInterfacesInitialized] = useState(false)
 
   // Persist collapse state in localStorage
   useEffect(() => {
@@ -133,6 +140,22 @@ export function DeviceCard({
     const newState = !isExpanded
     setIsExpanded(newState)
     localStorage.setItem(`device-expanded-${device.id}`, String(newState))
+  }
+
+  // Toggle individual interface collapse
+  const handleInterfaceToggle = (ifaceName: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setCollapsedInterfaces(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(ifaceName)) {
+        newSet.delete(ifaceName)
+      } else {
+        newSet.add(ifaceName)
+      }
+      // Persist to localStorage
+      localStorage.setItem(`device-${device.id}-collapsed-interfaces`, JSON.stringify([...newSet]))
+      return newSet
+    })
   }
 
   const openPorts = parseOpenPorts(device.openPorts)
@@ -167,6 +190,34 @@ export function DeviceCard({
     childrenByInterface.get(ifaceName)!.push(child)
   }
   const hasInterfaceBranches = childrenByInterface.size > 0
+
+  // Initialize collapsed state: virtual interfaces (bridges, vlans) start collapsed
+  useEffect(() => {
+    if (interfacesInitialized || childrenByInterface.size === 0) return
+
+    // Check localStorage for saved state
+    const storedStr = localStorage.getItem(`device-${device.id}-collapsed-interfaces`)
+    if (storedStr) {
+      try {
+        const stored = JSON.parse(storedStr) as string[]
+        setCollapsedInterfaces(new Set(stored))
+        setInterfacesInitialized(true)
+        return
+      } catch { /* ignore parse errors */ }
+    }
+
+    // Default: collapse virtual interfaces (bridges, vlans, bonds)
+    const defaultCollapsed = new Set<string>()
+    for (const ifaceName of childrenByInterface.keys()) {
+      if (isVirtualInterface(ifaceName)) {
+        defaultCollapsed.add(ifaceName)
+      }
+    }
+    if (defaultCollapsed.size > 0) {
+      setCollapsedInterfaces(defaultCollapsed)
+    }
+    setInterfacesInitialized(true)
+  }, [device.id, childrenByInterface.size, interfacesInitialized])
 
   // Get interface info for PoE display
   const getInterfaceInfo = (ifaceName: string): Interface | undefined => {
@@ -225,12 +276,12 @@ export function DeviceCard({
             <span className={`px-1.5 flex items-center justify-center h-full ${iconColor}`}>
               <DeviceIcon className="w-3 h-3" />
             </span>
-            {/* Vendor Logo (if available) */}
+            {/* Vendor Name (text for Cmd+F searchability) */}
             {showVendor && device.vendor && (
               <>
                 <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
-                <span className="px-[5px] flex items-center h-full bg-slate-100 dark:bg-slate-800">
-                  <VendorLogo vendor={device.vendor} className="h-3" />
+                <span className="px-1.5 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                  {device.vendor}
                 </span>
               </>
             )}
@@ -375,81 +426,114 @@ export function DeviceCard({
                 <div className="absolute -ml-3 top-3 w-3 h-[2px] bg-slate-300 dark:bg-slate-600" />
 
                 {/* Interface Label */}
-                <div className="flex items-center gap-1.5 mb-1 pt-[2px]">
-                  <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1 rounded">
-                    {ifaceName}
-                  </span>
-                  {ifaceInfo?.poeWatts && (
-                    <span
-                      className="flex items-center gap-0.5 text-[10px] font-mono text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1 rounded cursor-help"
-                      title={`PoE${ifaceInfo.poeStandard ? ` ${ifaceInfo.poeStandard.toUpperCase()}` : ''}: ${ifaceInfo.poeWatts}W`}
-                    >
-                      <Zap className="w-2.5 h-2.5" />
-                      {ifaceInfo.poeWatts}W
-                    </span>
-                  )}
-                  {ifaceInfo?.bridge && (
-                    <span className="text-[10px] font-mono text-violet-500 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-1 rounded">
-                      {ifaceInfo.bridge}
-                    </span>
-                  )}
-                  {ifaceInfo?.vlan && (
-                    <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-1 rounded">
-                      VLAN {ifaceInfo.vlan}
-                    </span>
-                  )}
-                  {ifaceInfo?.ip && (
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                      {ifaceInfo.ip}
-                    </span>
-                  )}
-                </div>
+                {(() => {
+                  const isCollapsed = collapsedInterfaces.has(ifaceName)
+                  const isVirtual = isVirtualInterface(ifaceName)
+                  const childCount = children.length
 
-                {/* Child Devices */}
-                <div className="space-y-1 ml-1 pb-1">
-                  {showVirtualSwitch ? (
-                    /* Virtual switch placeholder - inferred when multiple inaccessible devices on one interface */
-                    <div className="relative">
-                      <div className="inline-flex items-center gap-2 px-2 py-1.5 rounded border border-dashed border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 text-xs">
-                        <div className="shrink-0 p-1 rounded border border-amber-500/30 bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                          <HelpCircle className="w-3 h-3" />
-                        </div>
-                        <span className="font-medium text-amber-700 dark:text-amber-400">
-                          Unknown switch(es)
+                  return (
+                    <div className="flex items-center gap-1.5 mb-1 pt-[2px]">
+                      {/* Expand/Collapse button for virtual interfaces or interfaces with many children */}
+                      {(isVirtual || childCount > 3) && (
+                        <button
+                          onClick={(e) => handleInterfaceToggle(ifaceName, e)}
+                          className="shrink-0 p-0.5 -ml-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                        >
+                          {isCollapsed ? (
+                            <ChevronRight className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          )}
+                        </button>
+                      )}
+                      <span className={`text-[10px] font-mono px-1 rounded ${
+                        isVirtual
+                          ? 'text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30'
+                          : 'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800'
+                      }`}>
+                        {ifaceName}
+                      </span>
+                      {/* Collapsed child count */}
+                      {isCollapsed && childCount > 0 && (
+                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full">
+                          {childCount} device{childCount !== 1 ? 's' : ''}
                         </span>
-                      </div>
-                      <div className="mt-1 ml-4 pl-3 border-l border-dashed border-amber-400/50 space-y-1">
-                        {children.map((child) => (
-                          <DeviceCard
-                            key={child.id}
-                            device={child}
-                            level={level + 1}
-                            showEndDevices={showEndDevices}
-                            showFirmware={showFirmware}
-                            showPorts={showPorts}
-                            showInterfaces={showInterfaces}
-                            showVendor={showVendor}
-                            onDeviceClick={onDeviceClick}
-                          />
-                        ))}
-                      </div>
+                      )}
+                      {ifaceInfo?.poeWatts && (
+                        <span
+                          className="flex items-center gap-0.5 text-[10px] font-mono text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1 rounded cursor-help"
+                          title={`PoE${ifaceInfo.poeStandard ? ` ${ifaceInfo.poeStandard.toUpperCase()}` : ''}: ${ifaceInfo.poeWatts}W`}
+                        >
+                          <Zap className="w-2.5 h-2.5" />
+                          {ifaceInfo.poeWatts}W
+                        </span>
+                      )}
+                      {ifaceInfo?.bridge && (
+                        <span className="text-[10px] font-mono text-violet-500 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-1 rounded">
+                          {ifaceInfo.bridge}
+                        </span>
+                      )}
+                      {ifaceInfo?.vlan && (
+                        <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-1 rounded">
+                          VLAN {ifaceInfo.vlan}
+                        </span>
+                      )}
+                      {ifaceInfo?.ip && (
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                          {ifaceInfo.ip}
+                        </span>
+                      )}
                     </div>
-                  ) : (
-                    children.map((child) => (
-                      <DeviceCard
-                        key={child.id}
-                        device={child}
-                        level={level + 1}
-                        showEndDevices={showEndDevices}
-                        showFirmware={showFirmware}
-                        showPorts={showPorts}
-                        showInterfaces={showInterfaces}
-                        showVendor={showVendor}
-                        onDeviceClick={onDeviceClick}
-                      />
-                    ))
-                  )}
-                </div>
+                  )
+                })()}
+
+                {/* Child Devices - only render if interface is not collapsed */}
+                {!collapsedInterfaces.has(ifaceName) && (
+                  <div className="space-y-1 ml-1 pb-1">
+                    {showVirtualSwitch ? (
+                      /* Virtual switch placeholder - inferred when multiple inaccessible devices on one interface */
+                      <div className="relative">
+                        <div className="inline-flex items-center gap-2 px-2 py-1.5 rounded border border-dashed border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 text-xs">
+                          <div className="shrink-0 p-1 rounded border border-amber-500/30 bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                            <HelpCircle className="w-3 h-3" />
+                          </div>
+                          <span className="font-medium text-amber-700 dark:text-amber-400">
+                            Unknown switch(es)
+                          </span>
+                        </div>
+                        <div className="mt-1 ml-4 pl-3 border-l border-dashed border-amber-400/50 space-y-1">
+                          {children.map((child) => (
+                            <DeviceCard
+                              key={child.id}
+                              device={child}
+                              level={level + 1}
+                              showEndDevices={showEndDevices}
+                              showFirmware={showFirmware}
+                              showPorts={showPorts}
+                              showInterfaces={showInterfaces}
+                              showVendor={showVendor}
+                              onDeviceClick={onDeviceClick}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      children.map((child) => (
+                        <DeviceCard
+                          key={child.id}
+                          device={child}
+                          level={level + 1}
+                          showEndDevices={showEndDevices}
+                          showFirmware={showFirmware}
+                          showPorts={showPorts}
+                          showInterfaces={showInterfaces}
+                          showVendor={showVendor}
+                          onDeviceClick={onDeviceClick}
+                        />
+                      ))
+                    )}
+                  </div>
+                )}
 
                 {/* Hidden end devices indicator */}
                 {!showEndDevices && device.children && device.children.length > (visibleChildren?.length || 0) && (
