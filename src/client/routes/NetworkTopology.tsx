@@ -388,12 +388,21 @@ export function NetworkTopology() {
     setVisibility(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
+  // Network devices are infrastructure devices (routers, switches, APs)
+  // Everything else is an "end device" that can be filtered out
+  const networkDeviceTypes = new Set(['router', 'switch', 'access-point'])
+  const isEndDevice = (type: string | null | undefined): boolean => {
+    if (!type) return true  // Unknown devices are treated as end devices
+    return !networkDeviceTypes.has(type)
+  }
+
   // Count visible devices recursively (respects showEndDevices filter)
   function countDevices(deviceList: TopologyDevice[], showEnd: boolean): number {
     let count = 0
     for (const device of deviceList) {
       // Skip end devices if filter is off
-      if (!showEnd && device.type === 'end-device') {
+      // End devices = everything except routers, switches, and access points
+      if (!showEnd && isEndDevice(device.type)) {
         continue
       }
       count++

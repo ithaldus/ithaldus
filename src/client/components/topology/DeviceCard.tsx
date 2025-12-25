@@ -61,6 +61,15 @@ const deviceIconColors: Record<string, string> = {
   'end-device': 'bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-500/30',
 }
 
+// Network devices are infrastructure devices (routers, switches, APs)
+// Everything else is an "end device" that can be filtered out
+const networkDeviceTypes = new Set(['router', 'switch', 'access-point'])
+
+function isEndDevice(type: string | null | undefined): boolean {
+  if (!type) return true  // Unknown devices are treated as end devices
+  return !networkDeviceTypes.has(type)
+}
+
 const deviceCardColors: Record<string, string> = {
   router: 'bg-cyan-50 dark:bg-cyan-950/50 border-cyan-200 dark:border-cyan-800',
   switch: 'bg-cyan-50 dark:bg-cyan-950/50 border-cyan-200 dark:border-cyan-800',
@@ -186,9 +195,10 @@ export function DeviceCard({
   const statusInfo = getStatusInfo(device)
 
   // Filter out end devices if toggled off
+  // End devices = everything except routers, switches, and access points
   const visibleChildren = showEndDevices
     ? device.children
-    : device.children?.filter(c => c.type !== 'end-device') || []
+    : device.children?.filter(c => !isEndDevice(c.type)) || []
 
   // Group children by upstream interface for tree display
   const childrenByInterface = new Map<string, TopologyDevice[]>()
@@ -235,7 +245,8 @@ export function DeviceCard({
   }
 
   // Skip rendering end devices if toggled off
-  if (!showEndDevices && device.type === 'end-device') {
+  // End devices = everything except routers, switches, and access points
+  if (!showEndDevices && isEndDevice(device.type)) {
     return null
   }
 
