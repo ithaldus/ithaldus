@@ -424,6 +424,9 @@ export function DeviceCard({
               </span>
             )}
           </div>
+
+          {/* End spacer for visual balance with chevron space */}
+          <div className="shrink-0 w-5" />
         </div>
 
         {/* Location Comment (to the right of card) */}
