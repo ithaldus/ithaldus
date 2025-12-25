@@ -634,13 +634,13 @@ export function DeviceModal({
                   type="text"
                   value={assetTag}
                   onChange={(e) => setAssetTag(e.target.value)}
-                  placeholder="e.g., 234TVV"
-                  className="flex-1 px-2 py-1 text-sm font-mono rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="234TVV"
+                  className="w-24 px-2 py-1 text-sm font-mono rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                 />
                 <button
                   onClick={handleSaveAssetTag}
                   disabled={isSavingAssetTag || assetTag === (device.assetTag || '')}
-                  className="px-3 py-1 text-sm font-medium rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white disabled:text-slate-500 transition-colors"
+                  className="px-2 py-1 text-sm font-medium rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white disabled:text-slate-500 transition-colors"
                 >
                   {isSavingAssetTag ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
                 </button>
@@ -696,37 +696,43 @@ export function DeviceModal({
             </div>
           )}
 
-          {/* Interfaces (sorted alphabetically) */}
+          {/* Interfaces as compact pill strip */}
           {device.interfaces && device.interfaces.length > 0 && (
             <div>
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Interfaces ({device.interfaces.length})
               </label>
-              <div className="mt-2 space-y-1">
+              <div className="mt-2 flex flex-wrap gap-1">
                 {[...device.interfaces]
                   .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
-                  .slice(0, 8)
-                  .map((iface) => (
-                  <div key={iface.id} className="flex items-center gap-2 text-sm">
-                    <span className="font-mono text-slate-700 dark:text-slate-300">{iface.name}</span>
-                    {iface.ip && <span className="text-slate-500 font-mono text-xs">{iface.ip}</span>}
-                    {iface.bridge && (
-                      <span className="px-1.5 py-0.5 text-xs rounded bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
-                        {iface.bridge}
+                  .map((iface) => {
+                    // Color coding: red if PoE power applied, gray otherwise
+                    // (link status up/down not currently available in data)
+                    const hasPoe = iface.poeWatts && iface.poeWatts > 0
+                    const colorClass = hasPoe
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800'
+                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+
+                    // Build tooltip with additional info
+                    const tooltipParts: string[] = []
+                    if (iface.ip) tooltipParts.push(iface.ip)
+                    if (iface.bridge) tooltipParts.push(`bridge: ${iface.bridge}`)
+                    if (iface.vlan) tooltipParts.push(`VLAN ${iface.vlan}`)
+                    if (hasPoe) tooltipParts.push(`PoE: ${iface.poeWatts}W`)
+                    if (iface.comment) tooltipParts.push(iface.comment)
+                    const tooltip = tooltipParts.length > 0 ? tooltipParts.join(' • ') : undefined
+
+                    return (
+                      <span
+                        key={iface.id}
+                        title={tooltip}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono rounded border cursor-default ${colorClass}`}
+                      >
+                        {iface.name}
+                        {hasPoe && <span className="text-[9px]">⚡</span>}
                       </span>
-                    )}
-                    {iface.vlan && (
-                      <span className="px-1.5 py-0.5 text-xs rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                        VLAN {iface.vlan}
-                      </span>
-                    )}
-                  </div>
-                ))}
-                {device.interfaces.length > 8 && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    +{device.interfaces.length - 8} more interfaces
-                  </p>
-                )}
+                    )
+                  })}
               </div>
             </div>
           )}
