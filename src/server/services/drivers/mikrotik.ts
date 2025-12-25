@@ -134,6 +134,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
   // Format: "0   name=vlan1000 vlan-id=1000 interface=sfp20 ..."
   const vlanToParent: Map<string, string> = new Map()  // VLAN interface name -> parent interface
   const vlanToId: Map<string, string> = new Map()  // VLAN interface name -> VLAN ID
+  const parentToVlanIds: Map<string, string[]> = new Map()  // parent interface -> list of VLAN IDs on it
   const vlanInterfaceLines = vlanInterfaces.split('\n').filter(l => l.includes('name='))
   for (const line of vlanInterfaceLines) {
     const nameMatch = line.match(/name=(\S+)/)
@@ -143,6 +144,11 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
       vlanToParent.set(nameMatch[1], parentMatch[1])
       if (vlanIdMatch) {
         vlanToId.set(nameMatch[1], vlanIdMatch[1])
+        // Also track which VLANs are on each parent interface
+        const parentIface = parentMatch[1]
+        const existing = parentToVlanIds.get(parentIface) || []
+        existing.push(vlanIdMatch[1])
+        parentToVlanIds.set(parentIface, existing)
       }
     }
   }
@@ -234,16 +240,23 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
       // Get the bridge this interface belongs to (if any)
       const bridgeName = bridgePortMap.get(name) || null
 
-      // Get VLAN info: PVID (access VLAN) or tagged VLANs
+      // Get VLAN info from multiple sources:
+      // 1. Bridge VLAN filtering (PVID and tagged VLANs)
+      // 2. VLAN interfaces directly on this port (e.g., vlan1000 on sfp20)
       let vlan: string | null = null
       const pvid = bridgePortPvid.get(name)
-      const taggedVlans = portTaggedVlans.get(name)
-      if (pvid && taggedVlans && taggedVlans.length > 0) {
+      const taggedVlans = portTaggedVlans.get(name) || []
+      const vlanInterfaceIds = parentToVlanIds.get(name) || []
+
+      // Combine bridge tagged VLANs and VLAN interface IDs
+      const allTaggedVlans = [...new Set([...taggedVlans, ...vlanInterfaceIds])].sort((a, b) => parseInt(a) - parseInt(b))
+
+      if (pvid && allTaggedVlans.length > 0) {
         // Port has both PVID and tagged VLANs (hybrid)
-        vlan = `${pvid}+T:${taggedVlans.join(',')}`
-      } else if (taggedVlans && taggedVlans.length > 0) {
+        vlan = `${pvid}+T:${allTaggedVlans.join(',')}`
+      } else if (allTaggedVlans.length > 0) {
         // Trunk port with tagged VLANs only
-        vlan = `T:${taggedVlans.join(',')}`
+        vlan = `T:${allTaggedVlans.join(',')}`
       } else if (pvid) {
         // Access port with specific PVID
         vlan = pvid
