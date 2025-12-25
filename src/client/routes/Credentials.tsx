@@ -120,6 +120,18 @@ export function Credentials() {
     }
   }
 
+  async function handleMove(id: string, newNetworkId: string | null) {
+    try {
+      await api.credentials.update(id, { networkId: newNetworkId ?? undefined })
+      // Remove from current list since it moved to another network
+      setCredentials(credentials.filter((c) => c.id !== id))
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        alert(err.message)
+      }
+    }
+  }
+
   const totalDevices = filteredCredentials.reduce(
     (sum, cred) => sum + (cred.matchedDevices?.length || 0),
     0
@@ -366,9 +378,11 @@ export function Credentials() {
                 key={credential.id}
                 credential={credential}
                 allCredentials={filteredCredentials}
+                networks={networks}
                 showAllPasswords={showAllPasswords}
                 onEdit={isAdmin ? handleEdit : undefined}
                 onDelete={isAdmin ? handleDelete : undefined}
+                onMove={isAdmin ? handleMove : undefined}
               />
             ))}
           </div>

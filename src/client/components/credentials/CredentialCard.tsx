@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Eye, EyeOff, Pencil, Trash2, Router, Check, X, Network } from 'lucide-react'
-import type { Credential, MatchedDevice } from '../../lib/api'
+import { Eye, EyeOff, Pencil, Trash2, Router, Check, X, Network, ArrowRightLeft, Globe, ChevronDown } from 'lucide-react'
+import type { Credential, MatchedDevice, Network as NetworkType } from '../../lib/api'
 import { VendorLogo } from '../topology/VendorLogo'
 
 type ExtendedCredential = Credential & { matchedDevices?: MatchedDevice[] }
@@ -8,14 +8,17 @@ type ExtendedCredential = Credential & { matchedDevices?: MatchedDevice[] }
 interface CredentialCardProps {
   credential: ExtendedCredential
   allCredentials: ExtendedCredential[]
+  networks?: NetworkType[]
   showAllPasswords?: boolean
   onEdit?: (id: string, username: string, password: string) => void
   onDelete?: (id: string) => void
+  onMove?: (id: string, networkId: string | null) => void
 }
 
-export function CredentialCard({ credential, allCredentials, showAllPasswords = false, onEdit, onDelete }: CredentialCardProps) {
+export function CredentialCard({ credential, allCredentials, networks = [], showAllPasswords = false, onEdit, onDelete, onMove }: CredentialCardProps) {
   const [showPasswordLocal, setShowPasswordLocal] = useState(false)
   const showPassword = showAllPasswords || showPasswordLocal
+  const [showMoveMenu, setShowMoveMenu] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editUsername, setEditUsername] = useState(credential.username)
   const [editPassword, setEditPassword] = useState(credential.password)
@@ -123,6 +126,65 @@ export function CredentialCard({ credential, allCredentials, showAllPasswords = 
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {/* Move button with dropdown */}
+              {onMove && networks.length > 0 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowMoveMenu(!showMoveMenu)}
+                    className="p-2 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                    title="Move to another network"
+                  >
+                    <ArrowRightLeft className="w-4 h-4" />
+                  </button>
+                  {showMoveMenu && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowMoveMenu(false)}
+                      />
+                      <div className="absolute right-0 top-full mt-1 z-20 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden">
+                        <div className="py-1">
+                          <button
+                            onClick={() => {
+                              onMove(credential.id, null)
+                              setShowMoveMenu(false)
+                            }}
+                            disabled={credential.networkId === null}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors ${
+                              credential.networkId === null
+                                ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400'
+                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            <Globe className="w-4 h-4" />
+                            Global
+                            {credential.networkId === null && <Check className="w-3 h-3 ml-auto" />}
+                          </button>
+                          {networks.map((network) => (
+                            <button
+                              key={network.id}
+                              onClick={() => {
+                                onMove(credential.id, network.id)
+                                setShowMoveMenu(false)
+                              }}
+                              disabled={credential.networkId === network.id}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors ${
+                                credential.networkId === network.id
+                                  ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400'
+                                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              <Network className="w-4 h-4" />
+                              {network.name}
+                              {credential.networkId === network.id && <Check className="w-3 h-3 ml-auto" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               <button
                 onClick={() => setIsEditing(true)}
                 className="p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
