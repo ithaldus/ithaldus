@@ -493,12 +493,12 @@ export function NetworkTopology() {
           {/* Visibility Toggle Pill */}
           <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-slate-700 overflow-hidden">
             {[
-              { key: 'endDevices' as const, letter: 'E', tooltip: 'End Devices — Show or hide non-network devices like computers, phones, printers, and IoT devices' },
-              { key: 'firmware' as const, letter: 'F', tooltip: 'Firmware — Show or hide firmware version information on device cards' },
-              { key: 'ports' as const, letter: 'P', tooltip: 'Ports — Show or hide open management ports (SSH, HTTP, SNMP, etc.) on device cards' },
-              { key: 'interfaces' as const, letter: 'I', tooltip: 'Interfaces — Show or hide network interface details and bridge membership' },
-              { key: 'vendor' as const, letter: 'V', tooltip: 'Vendor — Show or hide vendor/manufacturer logos and names' },
-            ].map(({ key, letter, tooltip }) => (
+              { key: 'endDevices' as const, label: 'End', tooltip: 'End Devices — Show or hide non-network devices like computers, phones, printers, and IoT devices' },
+              { key: 'firmware' as const, label: 'FW', tooltip: 'Firmware — Show or hide firmware version information on device cards' },
+              { key: 'ports' as const, label: 'Ports', tooltip: 'Ports — Show or hide open management ports (SSH, HTTP, SNMP, etc.) on device cards' },
+              { key: 'interfaces' as const, label: 'Iface', tooltip: 'Interfaces — Show or hide network interface details and bridge membership' },
+              { key: 'vendor' as const, label: 'Vendor', tooltip: 'Vendor — Show or hide vendor/manufacturer names and models' },
+            ].map(({ key, label, tooltip }) => (
               <Tooltip key={key} content={tooltip}>
                 <button
                   onClick={() => toggleVisibility(key)}
@@ -510,7 +510,7 @@ export function NetworkTopology() {
                     }
                   `}
                 >
-                  {letter}
+                  {label}
                 </button>
               </Tooltip>
             ))}
