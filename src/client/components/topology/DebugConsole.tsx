@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
-import { Terminal, ChevronLeft, X, Maximize2, Minimize2 } from 'lucide-react'
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
+import { Terminal, ChevronLeft, X, Maximize2, Minimize2, Search } from 'lucide-react'
 import type { LogMessage } from '../../lib/api'
 
 interface DebugConsoleProps {
@@ -46,6 +46,14 @@ export function DebugConsole({
     const stored = localStorage.getItem('debug-console-auto-expand')
     return stored === 'true'
   })
+  const [filter, setFilter] = useState('')
+
+  // Filter logs based on search term
+  const filteredLogs = useMemo(() => {
+    if (!filter.trim()) return logs
+    const lowerFilter = filter.toLowerCase()
+    return logs.filter((log) => log.message.toLowerCase().includes(lowerFilter))
+  }, [logs, filter])
 
   // Persist auto-expand preference
   useEffect(() => {
@@ -57,7 +65,7 @@ export function DebugConsole({
     if (consoleRef.current) {
       consoleRef.current.scrollTop = consoleRef.current.scrollHeight
     }
-  }, [logs])
+  }, [filteredLogs])
 
   // Calculate required width based on longest log message
   const calculateRequiredWidth = useCallback(() => {
@@ -168,13 +176,37 @@ export function DebugConsole({
       {/* Console Panel */}
       <div className="flex-1 flex flex-col bg-slate-900 border-l border-slate-700 shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 bg-slate-800">
+          <div className="flex items-center gap-2 shrink-0">
             <Terminal className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm font-medium text-white">Debug Console</span>
-            <span className="text-xs text-slate-400">({logs.length})</span>
+            <span className="text-sm font-medium text-white">Console</span>
+            <span className="text-xs text-slate-400">
+              {filter ? `${filteredLogs.length}/${logs.length}` : logs.length}
+            </span>
           </div>
-          <div className="flex items-center gap-1">
+
+          {/* Filter input */}
+          <div className="flex-1 relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+            <input
+              type="text"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter logs..."
+              className="w-full pl-7 pr-7 py-1 text-xs font-mono bg-slate-900 border border-slate-600 rounded focus:outline-none focus:border-cyan-500 text-white placeholder-slate-500"
+            />
+            {filter && (
+              <button
+                onClick={() => setFilter('')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-500 hover:text-white transition-colors"
+                title="Clear filter"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => setAutoExpand(!autoExpand)}
               title={autoExpand ? "Disable auto-expand — Console will stay at fixed width" : "Enable auto-expand — Console will grow to fit the longest line"}
@@ -214,8 +246,12 @@ export function DebugConsole({
             <div className="text-slate-500 text-center py-8">
               No log messages yet. Start a scan to see output.
             </div>
+          ) : filteredLogs.length === 0 ? (
+            <div className="text-slate-500 text-center py-8">
+              No logs match "{filter}"
+            </div>
           ) : (
-            logs.map((log, index) => (
+            filteredLogs.map((log, index) => (
               <div
                 key={index}
                 className={`flex items-start gap-2 py-0.5 ${levelColors[log.level]} ${
