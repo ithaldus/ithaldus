@@ -1,10 +1,17 @@
 import { Hono } from 'hono'
 import { Client } from 'ssh2'
+import sharp from 'sharp'
 import { db } from '../db/client'
 import { devices, interfaces, credentials, matchedDevices, deviceImages, scanLogs, scans } from '../db/schema'
 import { eq, desc, like, or } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { requireAdmin } from '../middleware/auth'
+
+// Image normalization settings
+// Display size is 600px max, but we store 2x for retina screens
+const MAX_DISPLAY_SIZE = 600
+const MAX_IMAGE_DIMENSION = MAX_DISPLAY_SIZE * 2  // 1200px for retina
+const AVIF_QUALITY = 65  // AVIF quality (lower = smaller, 50-70 is good for photos)
 
 export const devicesRoutes = new Hono()
 
@@ -349,7 +356,7 @@ devicesRoutes.get('/:id/image', async (c) => {
   })
 })
 
-// Upload device image
+// Upload device image (with normalization)
 devicesRoutes.post('/:id/image', async (c) => {
   const id = c.req.param('id')
   const body = await c.req.json()
@@ -367,20 +374,40 @@ devicesRoutes.post('/:id/image', async (c) => {
     return c.json({ error: 'Device not found' }, 404)
   }
 
-  // Delete existing image if any
-  await db.delete(deviceImages).where(eq(deviceImages.deviceId, id))
+  try {
+    // Decode base64 image
+    const inputBuffer = Buffer.from(data, 'base64')
 
-  // Insert new image
-  const imageId = nanoid()
-  await db.insert(deviceImages).values({
-    id: imageId,
-    deviceId: id,
-    data,
-    mimeType,
-    createdAt: new Date().toISOString(),
-  })
+    // Normalize image: resize for retina (2x display size), convert to AVIF
+    const normalizedBuffer = await sharp(inputBuffer)
+      .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
+        fit: 'inside',           // Maintain aspect ratio, fit within bounds
+        withoutEnlargement: true // Don't upscale small images
+      })
+      .avif({ quality: AVIF_QUALITY })
+      .toBuffer()
 
-  return c.json({ success: true, id: imageId })
+    const normalizedData = normalizedBuffer.toString('base64')
+    const normalizedMimeType = 'image/avif'
+
+    // Delete existing image if any
+    await db.delete(deviceImages).where(eq(deviceImages.deviceId, id))
+
+    // Insert normalized image
+    const imageId = nanoid()
+    await db.insert(deviceImages).values({
+      id: imageId,
+      deviceId: id,
+      data: normalizedData,
+      mimeType: normalizedMimeType,
+      createdAt: new Date().toISOString(),
+    })
+
+    return c.json({ success: true, id: imageId })
+  } catch (err) {
+    console.error('Image processing error:', err)
+    return c.json({ error: 'Failed to process image' }, 400)
+  }
 })
 
 // Delete device image

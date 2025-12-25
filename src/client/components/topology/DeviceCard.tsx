@@ -31,6 +31,8 @@ interface DeviceCardProps {
   showPorts?: boolean
   showInterfaces?: boolean
   showVendor?: boolean
+  showSerialNumber?: boolean
+  showAssetTag?: boolean
   onDeviceClick?: (device: TopologyDevice) => void
 }
 
@@ -122,6 +124,8 @@ export function DeviceCard({
   showPorts = true,
   showInterfaces = true,
   showVendor = true,
+  showSerialNumber = true,
+  showAssetTag = true,
   onDeviceClick,
 }: DeviceCardProps) {
   const [isExpanded, setIsExpanded] = useState(true)
@@ -336,7 +340,7 @@ export function DeviceCard({
             )}
 
             {/* Serial Number Badge - Two-part pill */}
-            {device.serialNumber && (
+            {showSerialNumber && device.serialNumber && (
               <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
                 <span className="px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
                   SN
@@ -349,7 +353,7 @@ export function DeviceCard({
             )}
 
             {/* Asset Tag Badge - Two-part pill */}
-            {device.assetTag && (
+            {showAssetTag && device.assetTag && (
               <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
                 <span className="px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
                   <Tag className="w-2.5 h-2.5" />
@@ -534,6 +538,8 @@ export function DeviceCard({
                               showPorts={showPorts}
                               showInterfaces={showInterfaces}
                               showVendor={showVendor}
+                              showSerialNumber={showSerialNumber}
+                              showAssetTag={showAssetTag}
                               onDeviceClick={onDeviceClick}
                             />
                           ))}
@@ -550,6 +556,8 @@ export function DeviceCard({
                           showPorts={showPorts}
                           showInterfaces={showInterfaces}
                           showVendor={showVendor}
+                          showSerialNumber={showSerialNumber}
+                          showAssetTag={showAssetTag}
                           onDeviceClick={onDeviceClick}
                         />
                       ))
