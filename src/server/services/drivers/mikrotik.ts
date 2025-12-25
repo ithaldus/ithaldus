@@ -44,7 +44,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
   await new Promise(resolve => setTimeout(resolve, 500))
 
   // Now fetch all the data including refreshed ARP and bridge host tables
-  const [identity, resource, routerboard, addressList, interfaceList, arpTable, bridgeHosts, defaultRoute, bridgePorts, dhcpServers, bridgeVlans] = await Promise.all([
+  const [identity, resource, routerboard, addressList, interfaceList, arpTable, bridgeHosts, defaultRoute, bridgePorts, dhcpServers, bridgeVlans, vlanInterfaces] = await Promise.all([
     sshExec(client, '/system identity print').catch(() => ''),
     sshExec(client, '/system resource print').catch(() => ''),
     sshExec(client, '/system routerboard print').catch(() => ''),  // Serial number
@@ -56,6 +56,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     sshExec(client, '/interface bridge port print terse').catch(() => ''),  // Bridge port membership with PVID
     sshExec(client, '/ip dhcp-server print terse').catch(() => ''),  // DHCP server configuration
     sshExec(client, '/interface bridge vlan print terse').catch(() => ''),  // VLAN assignments per port
+    sshExec(client, '/interface vlan print terse').catch(() => ''),  // VLAN interfaces with parent mapping
   ])
 
   // Use the already-fetched DHCP leases
@@ -112,6 +113,77 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     }
   }
 
+  // Parse VLAN interfaces to get VLAN name -> parent interface mapping
+  // Format: "0   name=vlan1000 vlan-id=1000 interface=sfp20 ..."
+  const vlanToParent: Map<string, string> = new Map()  // VLAN interface name -> parent interface
+  const vlanToId: Map<string, string> = new Map()  // VLAN interface name -> VLAN ID
+  const vlanInterfaceLines = vlanInterfaces.split('\n').filter(l => l.includes('name='))
+  for (const line of vlanInterfaceLines) {
+    const nameMatch = line.match(/name=(\S+)/)
+    const parentMatch = line.match(/interface=(\S+)/)
+    const vlanIdMatch = line.match(/vlan-id=(\d+)/)
+    if (nameMatch && parentMatch) {
+      vlanToParent.set(nameMatch[1], parentMatch[1])
+      if (vlanIdMatch) {
+        vlanToId.set(nameMatch[1], vlanIdMatch[1])
+      }
+    }
+  }
+
+  // Build interface type map and identify bridge interfaces
+  const interfaceTypes: Map<string, string> = new Map()  // interface name -> type
+  const bridgeInterfaces: Set<string> = new Set()  // Track bridge interface names
+  for (const line of interfaceList.split('\n').filter(l => l.trim())) {
+    const nameMatch = line.match(/name=(\S+)/)
+    const typeMatch = line.match(/type=(\S+)/)
+    if (nameMatch && typeMatch) {
+      interfaceTypes.set(nameMatch[1], typeMatch[1])
+      if (typeMatch[1] === 'bridge') {
+        bridgeInterfaces.add(nameMatch[1])
+      }
+    }
+  }
+
+  // Helper function to check if an interface is physical
+  const isPhysicalInterface = (ifaceName: string): boolean => {
+    const ifType = interfaceTypes.get(ifaceName) || ''
+    // Physical interface types in MikroTik
+    return ['ether', 'ethernet', 'sfp', 'sfp-sfpplus', 'combo', 'wlan', 'wifi', 'wifiwave2', 'lte'].some(
+      t => ifType.startsWith(t) || ifaceName.startsWith(t)
+    )
+  }
+
+  // Helper function to resolve interface to physical port by walking up the hierarchy
+  const resolvePhysicalPort = (ifaceName: string, maxDepth: number = 10): string => {
+    let current = ifaceName
+    let depth = 0
+
+    while (depth < maxDepth) {
+      // If it's a physical interface, we're done
+      if (isPhysicalInterface(current)) {
+        return current
+      }
+
+      // If it's a VLAN interface, get its parent
+      const vlanParent = vlanToParent.get(current)
+      if (vlanParent) {
+        current = vlanParent
+        depth++
+        continue
+      }
+
+      // If it's a bridge, we can't resolve further (need MAC lookup)
+      if (bridgeInterfaces.has(current)) {
+        return current  // Return bridge as fallback
+      }
+
+      // No more parents to walk up
+      break
+    }
+
+    return current
+  }
+
   // Parse DHCP server configuration to map server names to interfaces
   // Format: "0   name=dhcp1 interface=main-bridge address-pool=pool1 ..."
   const dhcpServerToInterface: Map<string, string> = new Map()
@@ -124,9 +196,8 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     }
   }
 
-  // Parse interfaces - keep physical ports and bridges (bridges are needed as fallback for unmapped devices)
+  // Parse interfaces - keep physical ports, bridges, and VLAN interfaces
   const interfaces: InterfaceInfo[] = []
-  const bridgeInterfaces: Set<string> = new Set()  // Track bridge interface names
   const interfaceLines = interfaceList.split('\n').filter(l => l.trim())
   for (const line of interfaceLines) {
     const nameMatch = line.match(/name=(\S+)/)
@@ -135,16 +206,6 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     if (nameMatch) {
       const name = nameMatch[1]
       const ifType = typeMatch ? typeMatch[1] : ''
-
-      // Track bridge interfaces for neighbor mapping
-      if (ifType === 'bridge') {
-        bridgeInterfaces.add(name)
-      }
-
-      // Skip VLAN interfaces (they're virtual)
-      if (ifType === 'vlan') {
-        continue
-      }
 
       // Find IP for this interface
       const ipLine = addressList.split('\n').find(l => l.includes(`interface=${name}`))
@@ -183,18 +244,36 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
   const parsedDhcpLeases: DhcpLeaseInfo[] = []
 
   // Build a MAC -> physical port map from bridge host table first
-  // (We'll refine this after parsing bridge hosts, but need it for DHCP too)
+  // Uses resolvePhysicalPort to walk up VLAN hierarchy
   const tempMacToPort: Map<string, string> = new Map()
+  const macToLogicalInterface: Map<string, string> = new Map()  // Also track original logical interface
   const bridgeLinesForDhcp = bridgeHosts.split('\n').filter(l => l.includes('mac-address='))
 
   for (const line of bridgeLinesForDhcp) {
     const macMatch = line.match(/mac-address=(\S+)/)
-    const ifMatch = line.match(/on-interface=(\S+)/)
-    if (macMatch && ifMatch) {
+    // Prefer on-interface over interface for more accurate port info
+    const onIfMatch = line.match(/on-interface=(\S+)/)
+    const ifMatch = line.match(/interface=(\S+)/)
+    const localMatch = line.match(/local=(\S+)/)
+
+    // Skip router's own MACs (local=true)
+    if (localMatch && localMatch[1] === 'true') {
+      continue
+    }
+
+    if (macMatch) {
       const mac = macMatch[1].toUpperCase()
-      const port = ifMatch[1]
-      if (!bridgeInterfaces.has(port)) {
-        tempMacToPort.set(mac, port)
+      const rawInterface = onIfMatch ? onIfMatch[1] : (ifMatch ? ifMatch[1] : null)
+
+      if (rawInterface) {
+        // Store the original logical interface
+        macToLogicalInterface.set(mac, rawInterface)
+
+        // Resolve to physical port by walking up VLAN/bridge hierarchy
+        const physicalPort = resolvePhysicalPort(rawInterface)
+        if (!bridgeInterfaces.has(physicalPort)) {
+          tempMacToPort.set(mac, physicalPort)
+        }
       }
     }
   }
@@ -247,22 +326,8 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     }
   }
 
-  // Build a MAC -> physical port map from bridge host table
-  // This tells us which physical port each MAC was learned on
-  const macToPhysicalPort: Map<string, string> = new Map()
-  const bridgeLines = bridgeHosts.split('\n').filter(l => l.includes('mac-address='))
-  for (const line of bridgeLines) {
-    const macMatch = line.match(/mac-address=(\S+)/)
-    const ifMatch = line.match(/on-interface=(\S+)/)
-    if (macMatch && ifMatch) {
-      const mac = macMatch[1].toUpperCase()
-      const port = ifMatch[1]
-      // Only store if it's a physical port, not a bridge
-      if (!bridgeInterfaces.has(port)) {
-        macToPhysicalPort.set(mac, port)
-      }
-    }
-  }
+  // Reuse the MAC -> physical port map we already built (with VLAN resolution)
+  const macToPhysicalPort = tempMacToPort
 
   // ARP table (add entries not already in DHCP)
   const arpLines = arpTable.split('\n').filter(l => l.includes('mac-address='))
@@ -274,11 +339,16 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
       const mac = macMatch[1].toUpperCase()
       let interfaceName = ifMatch ? ifMatch[1] : 'unknown'
 
-      // If interface is a bridge, look up the actual physical port from bridge host table
-      if (bridgeInterfaces.has(interfaceName)) {
-        const physicalPort = macToPhysicalPort.get(mac)
-        if (physicalPort) {
-          interfaceName = physicalPort
+      // Try to resolve to physical port
+      // First check our MAC-to-port map (which has VLAN resolution)
+      const physicalPort = macToPhysicalPort.get(mac)
+      if (physicalPort) {
+        interfaceName = physicalPort
+      } else if (bridgeInterfaces.has(interfaceName) || vlanToParent.has(interfaceName)) {
+        // If interface is virtual (bridge or VLAN), try to resolve it
+        const resolved = resolvePhysicalPort(interfaceName)
+        if (!bridgeInterfaces.has(resolved)) {
+          interfaceName = resolved
         }
       }
 
@@ -295,15 +365,29 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
   }
 
   // Bridge hosts (for switches) - only add those not already in neighbors
-  for (const line of bridgeLines) {
+  // Uses the MAC-to-port map we already built with VLAN resolution
+  for (const line of bridgeLinesForDhcp) {
     const macMatch = line.match(/mac-address=(\S+)/)
-    const ifMatch = line.match(/on-interface=(\S+)/)
-    if (macMatch && ifMatch) {
-      const mac = macMatch[1].toUpperCase()
-      const port = ifMatch[1]
+    const onIfMatch = line.match(/on-interface=(\S+)/)
+    const ifMatch = line.match(/interface=(\S+)/)
+    const localMatch = line.match(/local=(\S+)/)
 
-      // Skip if the port is a bridge (we only want physical ports)
-      if (bridgeInterfaces.has(port)) {
+    // Skip router's own MACs
+    if (localMatch && localMatch[1] === 'true') {
+      continue
+    }
+
+    if (macMatch) {
+      const mac = macMatch[1].toUpperCase()
+      const rawInterface = onIfMatch ? onIfMatch[1] : (ifMatch ? ifMatch[1] : null)
+
+      if (!rawInterface) continue
+
+      // Resolve to physical port
+      const physicalPort = resolvePhysicalPort(rawInterface)
+
+      // Skip if we couldn't resolve to a non-bridge interface
+      if (bridgeInterfaces.has(physicalPort)) {
         continue
       }
 
@@ -312,14 +396,14 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
       if (existing) {
         // Update to physical port if current is a bridge or unknown
         if (bridgeInterfaces.has(existing.interface) || existing.interface === 'unknown') {
-          existing.interface = port
+          existing.interface = physicalPort
         }
       } else {
         neighbors.push({
           mac,
           ip: null,
           hostname: null,
-          interface: port,
+          interface: physicalPort,
           type: 'bridge-host',
         })
       }
