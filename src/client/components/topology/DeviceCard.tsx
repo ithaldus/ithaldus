@@ -433,24 +433,22 @@ export function DeviceCard({
 
                   return (
                     <div className="flex items-center gap-1.5 mb-1 pt-[2px]">
-                      {/* Expand/Collapse button for virtual interfaces or interfaces with many children */}
-                      {(isVirtual || childCount > 3) && (
-                        <button
-                          onClick={(e) => handleInterfaceToggle(ifaceName, e)}
-                          className="shrink-0 p-0.5 -ml-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                        >
-                          {isCollapsed ? (
-                            <ChevronRight className="w-3 h-3" />
+                      {/* Interface badge with optional expand/collapse chevron */}
+                      <span
+                        className={`inline-flex items-center gap-0.5 text-[10px] font-mono px-1 rounded ${
+                          isVirtual
+                            ? 'text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30'
+                            : 'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800'
+                        } ${(isVirtual || childCount > 3) ? 'cursor-pointer hover:opacity-80' : ''}`}
+                        onClick={(isVirtual || childCount > 3) ? (e) => handleInterfaceToggle(ifaceName, e) : undefined}
+                      >
+                        {(isVirtual || childCount > 3) && (
+                          isCollapsed ? (
+                            <ChevronRight className="w-3 h-3 -ml-0.5" />
                           ) : (
-                            <ChevronDown className="w-3 h-3" />
-                          )}
-                        </button>
-                      )}
-                      <span className={`text-[10px] font-mono px-1 rounded ${
-                        isVirtual
-                          ? 'text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30'
-                          : 'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800'
-                      }`}>
+                            <ChevronDown className="w-3 h-3 -ml-0.5" />
+                          )
+                        )}
                         {ifaceName}
                       </span>
                       {/* Collapsed child count */}
