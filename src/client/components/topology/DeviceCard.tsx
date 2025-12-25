@@ -303,20 +303,14 @@ export function DeviceCard({
             <span className={`px-1.5 flex items-center justify-center h-full ${iconColor}`}>
               <DeviceIcon className="w-3 h-3" />
             </span>
-            {/* Vendor Name (text for Cmd+F searchability) */}
-            {showVendor && device.vendor && (
+            {/* Vendor + Model Name */}
+            {showVendor && (device.vendor || device.model) && (
               <>
                 <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
                 <span className="px-1.5 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                  {device.vendor}
+                  {device.vendor}{device.vendor && device.model && ' '}{device.model}
                 </span>
               </>
-            )}
-            {/* Model Name (if available) */}
-            {showVendor && device.model && (
-              <span className="px-1.5 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                {device.model}
-              </span>
             )}
           </span>
 
