@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { db } from '../db/client'
-import { credentials, matchedDevices, devices, networks } from '../db/schema'
+import { credentials, matchedDevices, devices, networks, failedCredentials } from '../db/schema'
 import { eq, isNull, inArray } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { requireAdmin } from '../middleware/auth'
@@ -179,6 +179,10 @@ credentialsRoutes.put('/:id', requireAdmin, async (c) => {
     return c.json({ error: 'Credential not found' }, 404)
   }
 
+  // Check if username or password is changing (not just networkId)
+  const credentialChanging = (username && username !== existing.username) ||
+                             (password && password !== existing.password)
+
   await db.update(credentials)
     .set({
       username: username || existing.username,
@@ -186,6 +190,12 @@ credentialsRoutes.put('/:id', requireAdmin, async (c) => {
       networkId: networkId !== undefined ? (networkId || null) : existing.networkId,
     })
     .where(eq(credentials.id, id))
+
+  // If credentials changed, clear failed/matched associations (need to re-test on devices)
+  if (credentialChanging) {
+    await db.delete(failedCredentials).where(eq(failedCredentials.credentialId, id))
+    await db.delete(matchedDevices).where(eq(matchedDevices.credentialId, id))
+  }
 
   const updated = await db.query.credentials.findFirst({
     where: eq(credentials.id, id),

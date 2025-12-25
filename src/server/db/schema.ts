@@ -161,6 +161,18 @@ export const deviceImages = sqliteTable('device_images', {
   index('idx_device_images_device').on(table.deviceId),
 ])
 
+// Failed credentials (credential-device pairs that failed SSH login)
+// Used to skip known-bad credentials on future scans
+export const failedCredentials = sqliteTable('failed_credentials', {
+  id: text('id').primaryKey(),
+  credentialId: text('credential_id').notNull().references(() => credentials.id, { onDelete: 'cascade' }),
+  mac: text('mac').notNull(),  // Device MAC address
+  failedAt: text('failed_at').notNull(),
+}, (table) => [
+  index('idx_failed_credentials_credential').on(table.credentialId),
+  index('idx_failed_credentials_mac').on(table.mac),
+])
+
 // Type exports for use in application
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -186,3 +198,5 @@ export type ScanLog = typeof scanLogs.$inferSelect
 export type NewScanLog = typeof scanLogs.$inferInsert
 export type DeviceImage = typeof deviceImages.$inferSelect
 export type NewDeviceImage = typeof deviceImages.$inferInsert
+export type FailedCredential = typeof failedCredentials.$inferSelect
+export type NewFailedCredential = typeof failedCredentials.$inferInsert
