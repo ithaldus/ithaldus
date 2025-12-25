@@ -491,16 +491,8 @@ export function DeviceModal({
         {/* Content */}
         <div className="px-6 py-4 overflow-y-auto max-h-[60vh] space-y-6">
 
-          {/* Device Info */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                IP Address
-              </label>
-              <p className="mt-1 text-sm font-mono text-slate-900 dark:text-white">
-                {device.ip || '-'}
-              </p>
-            </div>
+          {/* Type and Location dropdowns - same row for aesthetics */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Type
@@ -523,6 +515,48 @@ export function DeviceModal({
                   <Loader2 className="absolute right-7 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-500 animate-spin" />
                 )}
               </div>
+            </div>
+            {/* Location dropdown */}
+            {networkId ? (
+              <div>
+                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                  Location
+                </label>
+                <div className="mt-1 relative">
+                  <select
+                    value={selectedLocationId || ''}
+                    onChange={(e) => handleLocationChange(e.target.value || null)}
+                    disabled={isSavingLocation}
+                    className="appearance-none w-full px-3 py-1.5 pr-8 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent cursor-pointer disabled:opacity-50"
+                  >
+                    <option value="">No location</option>
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                    <option value="new">+ Create new location...</option>
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  {isSavingLocation && (
+                    <Loader2 className="absolute right-7 top-1/2 -translate-y-1/2 w-4 h-4 text-violet-500 animate-spin" />
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div /> /* Empty placeholder to maintain grid layout */
+            )}
+          </div>
+
+          {/* Device Info */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                IP Address
+              </label>
+              <p className="mt-1 text-sm font-mono text-slate-900 dark:text-white">
+                {device.ip || '-'}
+              </p>
             </div>
             <div>
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
@@ -564,34 +598,6 @@ export function DeviceModal({
                 {device.accessible ? 'Accessible' : 'Not Accessible'}
               </p>
             </div>
-            {/* Location dropdown */}
-            {networkId && (
-              <div>
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                  Location
-                </label>
-                <div className="mt-1 relative">
-                  <select
-                    value={selectedLocationId || ''}
-                    onChange={(e) => handleLocationChange(e.target.value || null)}
-                    disabled={isSavingLocation}
-                    className="appearance-none w-full px-3 py-1.5 pr-8 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent cursor-pointer disabled:opacity-50"
-                  >
-                    <option value="">No location</option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.name}
-                      </option>
-                    ))}
-                    <option value="new">+ Create new location...</option>
-                  </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                  {isSavingLocation && (
-                    <Loader2 className="absolute right-7 top-1/2 -translate-y-1/2 w-4 h-4 text-violet-500 animate-spin" />
-                  )}
-                </div>
-              </div>
-            )}
             {/* Working Credential */}
             <div>
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
