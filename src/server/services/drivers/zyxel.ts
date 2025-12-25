@@ -38,7 +38,13 @@ async function fetchSerialFromWeb(
     })
 
     req.on('error', (err) => {
-      if (log) log('warn', `Web serial fetch failed: ${err.message}`)
+      if (log) {
+        if (err.message.includes('ECONNREFUSED')) {
+          log('info', `Web interface not reachable (HTTPS may be disabled) - serial number unavailable`)
+        } else {
+          log('warn', `Web serial fetch failed: ${err.message}`)
+        }
+      }
       resolve(null)
     })
 
