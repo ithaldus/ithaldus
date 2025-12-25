@@ -437,7 +437,7 @@ export function DeviceCard({
                       <span
                         className={`inline-flex items-center gap-0.5 text-[10px] font-mono px-1 rounded ${
                           isVirtual
-                            ? 'text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30'
+                            ? 'text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30'
                             : 'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800'
                         } ${(isVirtual || childCount > 3) ? 'cursor-pointer hover:opacity-80' : ''}`}
                         onClick={(isVirtual || childCount > 3) ? (e) => handleInterfaceToggle(ifaceName, e) : undefined}
