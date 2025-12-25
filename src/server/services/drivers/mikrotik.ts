@@ -131,23 +131,31 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
   }
 
   // Parse VLAN interfaces to get VLAN name -> parent interface mapping
-  // Format: "0   name=vlan1000 vlan-id=1000 interface=sfp20 ..."
+  // Format: "0   name=vlan1000 vlan-id=1000 interface=sfp20 comment=description ..."
   const vlanToParent: Map<string, string> = new Map()  // VLAN interface name -> parent interface
   const vlanToId: Map<string, string> = new Map()  // VLAN interface name -> VLAN ID
+  const vlanIdToComment: Map<string, string> = new Map()  // VLAN ID -> comment
   const parentToVlanIds: Map<string, string[]> = new Map()  // parent interface -> list of VLAN IDs on it
   const vlanInterfaceLines = vlanInterfaces.split('\n').filter(l => l.includes('name='))
   for (const line of vlanInterfaceLines) {
     const nameMatch = line.match(/name=(\S+)/)
     const parentMatch = line.match(/interface=(\S+)/)
     const vlanIdMatch = line.match(/vlan-id=(\d+)/)
+    // Comment can contain spaces and special chars
+    const commentMatch = line.match(/comment="([^"]*)"/) || line.match(/comment=(\S+)/)
     if (nameMatch && parentMatch) {
       vlanToParent.set(nameMatch[1], parentMatch[1])
       if (vlanIdMatch) {
-        vlanToId.set(nameMatch[1], vlanIdMatch[1])
+        const vlanId = vlanIdMatch[1]
+        vlanToId.set(nameMatch[1], vlanId)
+        // Store VLAN comment if present
+        if (commentMatch && commentMatch[1]) {
+          vlanIdToComment.set(vlanId, commentMatch[1])
+        }
         // Also track which VLANs are on each parent interface
         const parentIface = parentMatch[1]
         const existing = parentToVlanIds.get(parentIface) || []
-        existing.push(vlanIdMatch[1])
+        existing.push(vlanId)
         parentToVlanIds.set(parentIface, existing)
       }
     }
@@ -248,18 +256,24 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
       const taggedVlans = portTaggedVlans.get(name) || []
       const vlanInterfaceIds = parentToVlanIds.get(name) || []
 
+      // Helper to format VLAN ID with optional comment
+      const formatVlanId = (id: string): string => {
+        const comment = vlanIdToComment.get(id)
+        return comment ? `${id}(${comment})` : id
+      }
+
       // Combine bridge tagged VLANs and VLAN interface IDs
       const allTaggedVlans = [...new Set([...taggedVlans, ...vlanInterfaceIds])].sort((a, b) => parseInt(a) - parseInt(b))
 
       if (pvid && allTaggedVlans.length > 0) {
         // Port has both PVID and tagged VLANs (hybrid)
-        vlan = `${pvid}+T:${allTaggedVlans.join(',')}`
+        vlan = `${formatVlanId(pvid)}+T:${allTaggedVlans.map(formatVlanId).join(',')}`
       } else if (allTaggedVlans.length > 0) {
         // Trunk port with tagged VLANs only
-        vlan = `T:${allTaggedVlans.join(',')}`
+        vlan = `T:${allTaggedVlans.map(formatVlanId).join(',')}`
       } else if (pvid) {
         // Access port with specific PVID
-        vlan = pvid
+        vlan = formatVlanId(pvid)
       }
 
       interfaces.push({
