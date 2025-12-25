@@ -110,7 +110,7 @@ function needsVirtualSwitch(interfaceName: string, children: TopologyDevice[]): 
 // Check if an interface is a virtual/bridge interface that should be collapsed by default
 function isVirtualInterface(ifaceName: string): boolean {
   const name = ifaceName.toLowerCase()
-  return name.startsWith('bridge') || name.startsWith('vlan') || name.startsWith('bond')
+  return name.includes('bridge') || name.includes('vlan') || name.includes('bond')
 }
 
 export function DeviceCard({
