@@ -646,24 +646,43 @@ export function DeviceModal({
                 Open Ports
               </label>
               <div className="mt-2 flex flex-wrap gap-2">
-                {openPorts.map((port) => (
-                  <a
-                    key={port}
-                    href={[80, 443, 8080, 8443].includes(port) ? `${port === 443 || port === 8443 ? 'https' : 'http'}://${device.ip}${port !== 80 && port !== 443 ? `:${port}` : ''}` : undefined}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`
-                      inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm
-                      ${[80, 443, 8080, 8443].includes(port)
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
-                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                      }
-                    `}
-                  >
-                    {formatPortName(port)} <span className="font-mono text-xs opacity-70">{port}</span>
-                    {[80, 443, 8080, 8443].includes(port) && <ExternalLink className="w-3 h-3" />}
-                  </a>
-                ))}
+                {openPorts.map((port) => {
+                  // Color coding for HTTP/HTTPS ports:
+                  // - Green: HTTPS ports (443, 8443)
+                  // - Yellow: HTTP port with HTTPS also available (likely redirects)
+                  // - Red: HTTP port without HTTPS (insecure)
+                  // - Gray: other ports
+                  const isHttpPort = [80, 8080].includes(port)
+                  const isHttpsPort = [443, 8443].includes(port)
+                  const hasHttpsCounterpart = isHttpPort && (
+                    (port === 80 && openPorts.includes(443)) ||
+                    (port === 8080 && openPorts.includes(8443))
+                  )
+
+                  let colorClass = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                  if (isHttpsPort) {
+                    colorClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
+                  } else if (isHttpPort && hasHttpsCounterpart) {
+                    colorClass = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50'
+                  } else if (isHttpPort) {
+                    colorClass = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50'
+                  }
+
+                  const isWebPort = isHttpPort || isHttpsPort
+
+                  return (
+                    <a
+                      key={port}
+                      href={isWebPort ? `${isHttpsPort ? 'https' : 'http'}://${device.ip}${port !== 80 && port !== 443 ? `:${port}` : ''}` : undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm ${colorClass}`}
+                    >
+                      {formatPortName(port)} <span className="font-mono text-xs opacity-70">{port}</span>
+                      {isWebPort && <ExternalLink className="w-3 h-3" />}
+                    </a>
+                  )
+                })}
               </div>
             </div>
           )}

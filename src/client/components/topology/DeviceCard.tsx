@@ -270,36 +270,43 @@ export function DeviceCard({
             )}
           </div>
 
-          {/* Hostname/IP - shown first */}
+          {/* Device Type Icon - shown before hostname */}
+          <span className={`shrink-0 p-1 rounded ${iconColor}`}>
+            <DeviceIcon className="w-3.5 h-3.5" />
+          </span>
+
+          {/* Hostname/IP */}
           <span className="font-medium text-slate-900 dark:text-slate-100">
             {displayName}
           </span>
 
-          {/* Combined Device Type + Vendor + Model Pill */}
-          <span className="shrink-0 h-[22px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
-            {/* Device Type Icon */}
-            <span className={`px-1.5 flex items-center justify-center h-full ${iconColor}`}>
-              <DeviceIcon className="w-3 h-3" />
+          {/* Vendor + Model Pill */}
+          {showVendor && (device.vendor || device.model) && (
+            <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-300/50 dark:border-slate-600/50">
+              {device.vendor}{device.vendor && device.model && ' '}{device.model}
             </span>
-            {/* Vendor + Model Name */}
-            {showVendor && (device.vendor || device.model) && (
-              <>
-                <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
-                <span className="px-1.5 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                  {device.vendor}{device.vendor && device.model && ' '}{device.model}
-                </span>
-              </>
-            )}
-          </span>
+          )}
 
           {/* Device Info */}
           <div className="flex items-center gap-2 flex-nowrap">
 
-            {/* IP Address Pill (for non-root devices - upstream interface is shown in tree branch) */}
+            {/* IP Address Pill with optional uplink interface */}
             {showInterfaces && device.ip && device.hostname && (
-              <span className="shrink-0 px-1 py-0.5 text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50">
-                {device.ip}
-              </span>
+              device.ownUpstreamInterface ? (
+                <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-mono border border-slate-300/50 dark:border-slate-600/50">
+                  <span className="px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                    {device.ownUpstreamInterface}
+                  </span>
+                  <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
+                  <span className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                    {device.ip}
+                  </span>
+                </span>
+              ) : (
+                <span className="shrink-0 px-1 py-0.5 text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50">
+                  {device.ip}
+                </span>
+              )
             )}
 
             {/* Firmware Badge */}

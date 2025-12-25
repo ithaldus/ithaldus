@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Eye, EyeOff, Pencil, Trash2, Router, Check, X } from 'lucide-react'
+import { Eye, EyeOff, Pencil, Trash2, Router, Check, X, Network } from 'lucide-react'
 import type { Credential, MatchedDevice } from '../../lib/api'
 import { VendorLogo } from '../topology/VendorLogo'
 
@@ -167,6 +167,12 @@ export function CredentialCard({ credential, allCredentials, showAllPasswords = 
                 {device.vendor && !device.hostname && !device.ip && (
                   <span className="text-slate-400 dark:text-slate-500 text-xs">
                     {device.vendor}
+                  </span>
+                )}
+                {device.networkName && (
+                  <span className="flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 rounded">
+                    <Network className="w-3 h-3" />
+                    {device.networkName}
                   </span>
                 )}
               </div>

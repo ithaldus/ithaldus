@@ -718,7 +718,7 @@ export class NetworkScanner {
       }
       // Clear network assignment from devices (will be reassigned during scan)
       await db.update(devices)
-        .set({ networkId: null, parentInterfaceId: null, upstreamInterface: null })
+        .set({ networkId: null, parentInterfaceId: null, upstreamInterface: null, ownUpstreamInterface: null })
         .where(eq(devices.networkId, this.networkId))
       await db.delete(dhcpLeases).where(eq(dhcpLeases.networkId, this.networkId)).catch(() => {})
 
@@ -935,6 +935,11 @@ export class NetworkScanner {
       return n + (s[(v - 20) % 10] || s[v] || s[0])
     }
 
+    // Check if SSH port is available
+    const hasSSHPort = openPorts.includes(22)
+    const hasMikroTikPorts = openPorts.includes(8291) || openPorts.includes(8728)
+    const hasTelnetPort = openPorts.includes(23)
+
     if (!shouldSkipLogin && useJumpHostOnly) {
       // Jump host supported - connect via tunnel (skip direct attempts)
       this.log('info', `${ip}: Connecting via jump host (${this.rootIp})...`)
@@ -956,7 +961,7 @@ export class NetworkScanner {
       if (!connectedClient) {
         this.log('warn', `${ip}: SSH via jump host failed - no valid credentials (tried ${tryCount})`)
       }
-    } else if (!shouldSkipLogin && openPorts.includes(22)) {
+    } else if (!shouldSkipLogin && hasSSHPort) {
       // No jump host or this is root device - try direct connection
       let tryCount = 0
       for (const cred of credsToTry) {
@@ -972,9 +977,9 @@ export class NetworkScanner {
       }
 
       if (!connectedClient) {
-        this.log('warn', `${ip}: SSH port open but no valid credentials (tried ${tryCount})`)
+        this.log('warn', `${ip}: SSH login failed - no valid credentials (tried ${tryCount})`)
       }
-    } else if (!shouldSkipLogin && !openPorts.includes(22) && this.jumpHostClient && !isRootDevice) {
+    } else if (!shouldSkipLogin && !hasSSHPort && this.jumpHostClient && !isRootDevice) {
       // Port 22 not directly reachable, but we have a jump host - try via tunnel
       this.log('info', `${ip}: No direct SSH access, trying via jump host (${this.rootIp})...`)
 
@@ -994,6 +999,15 @@ export class NetworkScanner {
 
       if (!connectedClient) {
         this.log('info', `${ip}: SSH via jump host also failed or no valid credentials (tried ${tryCount})`)
+      }
+    } else if (!shouldSkipLogin && !hasSSHPort) {
+      // SSH port not open - log why we can't connect
+      if (hasMikroTikPorts) {
+        this.log('warn', `${ip}: SSH port (22) not open - MikroTik API/WinBox ports detected but SSH is disabled on this device`)
+      } else if (hasTelnetPort) {
+        this.log('warn', `${ip}: SSH port (22) not open - only Telnet (23) available (not supported)`)
+      } else {
+        this.log('warn', `${ip}: SSH port (22) not open - cannot login to collect device info`)
       }
     }
 
@@ -1162,6 +1176,7 @@ export class NetworkScanner {
           parentInterfaceId,
           networkId: this.networkId,
           upstreamInterface: actualUpstreamInterface,
+          ownUpstreamInterface: deviceInfo?.ownUpstreamInterface || null,
           hostname: newDevice.hostname,
           ip,
           vendor: newDevice.vendor,
@@ -1178,6 +1193,8 @@ export class NetworkScanner {
 
       newDevice.id = existingDevice.id
       this.deviceCount++
+      const accessStatus = newDevice.accessible ? 'accessible' : 'not accessible (no SSH login)'
+      this.log('info', `${ip}: Updated existing device (MAC: ${deviceMac}, ${accessStatus})`)
     } else {
       // Insert new device
       await db.insert(devices).values({
@@ -1186,6 +1203,7 @@ export class NetworkScanner {
         parentInterfaceId,
         networkId: this.networkId,
         upstreamInterface: actualUpstreamInterface,
+        ownUpstreamInterface: deviceInfo?.ownUpstreamInterface || null,
         hostname: newDevice.hostname,
         ip,
         vendor: newDevice.vendor,
@@ -1199,6 +1217,8 @@ export class NetworkScanner {
         lastSeenAt: new Date().toISOString(),
       })
       this.deviceCount++
+      const accessStatus = newDevice.accessible ? 'accessible' : 'not accessible (no SSH login)'
+      this.log('success', `${ip}: Added as ${deviceType} (MAC: ${deviceMac}, ${accessStatus})`)
     }
 
     // Record successful credential match if we connected via SSH
@@ -1211,6 +1231,7 @@ export class NetworkScanner {
         await db.insert(matchedDevices).values({
           id: nanoid(),
           credentialId: successfulCreds.id,
+          networkId: this.networkId,
           mac: deviceMac,
           hostname: newDevice.hostname,
           ip,
@@ -1254,6 +1275,12 @@ export class NetworkScanner {
 
     // Notify about discovered device
     this.callbacks.onDeviceDiscovered(newDevice)
+
+    // Warn if root device is not accessible - network discovery will be very limited
+    if (isRootDevice && !newDevice.accessible) {
+      this.log('error', `${ip}: Root device is not accessible! Enable SSH on this device to discover the network topology.`)
+      this.log('warn', `${ip}: Only this device will be shown. DHCP leases, ARP tables, and bridge hosts cannot be collected.`)
+    }
 
     // Recursively scan neighbors
     if (deviceInfo && deviceInfo.neighbors.length > 0) {

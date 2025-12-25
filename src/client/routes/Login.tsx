@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { Loader2, AlertCircle } from 'lucide-react'
+import { Logo } from '../components/Logo'
 
 // Microsoft logo SVG component
 function MicrosoftLogo({ className }: { className?: string }) {
@@ -68,9 +69,12 @@ export function Login() {
         <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 shadow-lg p-8">
           {/* Logo / Title */}
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-cyan-600 dark:text-cyan-400 mb-2">
-              TopoGraph
-            </h1>
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <Logo className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
+              <h1 className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
+                TopoGraph
+              </h1>
+            </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Network Topology Discovery
             </p>

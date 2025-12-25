@@ -71,6 +71,20 @@
       "when": 1766692529388,
       "tag": "0009_dusty_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1766694381082,
+      "tag": "0010_curious_joseph",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1766694636879,
+      "tag": "0011_productive_nitro",
+      "breakpoints": true
     }
   ]
 }

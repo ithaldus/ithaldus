@@ -40,6 +40,7 @@ export function NetworkTopology() {
   // State
   const [network, setNetwork] = useState<Network | null>(null)
   const [devices, setDevices] = useState<TopologyDevice[]>([])
+  const [totalDeviceCount, setTotalDeviceCount] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [scanStatus, setScanStatus] = useState<ScanStatus>('idle')
   const [logs, setLogs] = useState<LogMessage[]>([])
@@ -101,6 +102,7 @@ export function NetworkTopology() {
       ])
       setNetwork(networkData)
       setDevices(topologyData.devices)
+      setTotalDeviceCount(topologyData.totalCount)
       setLastScannedAt(networkData.lastScannedAt)
 
       // If there's a scan in progress or recently completed, fetch existing logs
@@ -162,6 +164,7 @@ export function NetworkTopology() {
 
             case 'topology':
               setDevices(message.data.devices)
+              setTotalDeviceCount(message.data.totalCount)
               if (message.data.network?.lastScannedAt) {
                 setLastScannedAt(message.data.network.lastScannedAt)
               }
@@ -242,6 +245,7 @@ export function NetworkTopology() {
       // Reload topology to get any devices discovered so far
       const topologyData = await api.scan.topology(networkId!)
       setDevices(topologyData.devices)
+      setTotalDeviceCount(topologyData.totalCount)
     } catch (err) {
       console.error('Failed to stop scan:', err)
     }
@@ -566,10 +570,15 @@ export function NetworkTopology() {
         {/* Row 2: Root IP, stats, last scanned */}
         <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
           <span className="font-mono">{network.rootIp}</span>
-          {deviceCount > 0 && (
+          {totalDeviceCount > 0 && (
             <div className="flex items-center gap-1.5">
               <Monitor className="w-3.5 h-3.5" />
-              <span>{deviceCount} devices</span>
+              <span>
+                {!visibility.endDevices && deviceCount !== totalDeviceCount
+                  ? `${deviceCount} / ${totalDeviceCount} devices`
+                  : `${totalDeviceCount} devices`
+                }
+              </span>
             </div>
           )}
           {lastScannedAt && (

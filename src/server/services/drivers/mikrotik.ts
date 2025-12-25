@@ -257,7 +257,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
   }
 
   // Parse neighbors from DHCP leases, ARP, and bridge hosts
-  const neighbors: NeighborInfo[] = []
+  let neighbors: NeighborInfo[] = []
   const parsedDhcpLeases: DhcpLeaseInfo[] = []
 
   // Build a MAC -> physical port map from bridge host table first
@@ -514,6 +514,11 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
         ownUpstreamInterface = upstreamIfMatch[1]
       }
     }
+  }
+
+  // Filter out neighbors seen on upstream interface (they belong to parent device)
+  if (ownUpstreamInterface) {
+    neighbors = neighbors.filter(n => n.interface !== ownUpstreamInterface)
   }
 
   return { hostname, model, serialNumber, version, interfaces, neighbors, dhcpLeases: parsedDhcpLeases, ownUpstreamInterface }

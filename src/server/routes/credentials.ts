@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { db } from '../db/client'
-import { credentials, matchedDevices, devices } from '../db/schema'
+import { credentials, matchedDevices, devices, networks } from '../db/schema'
 import { eq, isNull, inArray } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { requireAdmin } from '../middleware/auth'
@@ -51,8 +51,15 @@ credentialsRoutes.get('/', async (c) => {
     }
   }
 
-  // Group matched devices by credentialId with vendor info
-  const matchedByCredId = new Map<string, Array<typeof matchedDevices.$inferSelect & { vendor: string | null }>>()
+  // Fetch all networks to get their names
+  const allNetworks = await db.select({ id: networks.id, name: networks.name }).from(networks)
+  const networkNamesById = new Map<string, string>()
+  for (const n of allNetworks) {
+    networkNamesById.set(n.id, n.name)
+  }
+
+  // Group matched devices by credentialId with vendor and network info
+  const matchedByCredId = new Map<string, Array<typeof matchedDevices.$inferSelect & { vendor: string | null; networkName: string | null }>>()
   for (const m of allMatched) {
     if (m.credentialId) {
       const list = matchedByCredId.get(m.credentialId) || []
@@ -60,6 +67,7 @@ credentialsRoutes.get('/', async (c) => {
       list.push({
         ...m,
         vendor: deviceInfo?.vendor || null,
+        networkName: m.networkId ? networkNamesById.get(m.networkId) || null : null,
       })
       matchedByCredId.set(m.credentialId, list)
     }

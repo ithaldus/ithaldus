@@ -1,0 +1,1 @@
+ALTER TABLE `devices` ADD `own_upstream_interface` text;

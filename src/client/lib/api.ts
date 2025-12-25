@@ -209,10 +209,12 @@ export interface Credential {
 export interface MatchedDevice {
   id: string
   credentialId: string
+  networkId: string | null
   mac: string
   hostname: string | null
   ip: string | null
   vendor: string | null
+  networkName: string | null
 }
 
 export type DeviceType = 'router' | 'switch' | 'access-point' | 'end-device' | 'server' | 'computer' | 'phone' | 'desktop-phone' | 'tv' | 'tablet' | 'printer' | 'camera' | 'iot'
@@ -223,6 +225,7 @@ export interface Device {
   parentInterfaceId: string | null
   networkId: string | null
   upstreamInterface: string | null
+  ownUpstreamInterface: string | null
   hostname: string | null
   ip: string | null
   vendor: string | null

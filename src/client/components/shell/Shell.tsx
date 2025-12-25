@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { NavLink, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin } from 'lucide-react'
+import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin, Loader2 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { api, type Network as NetworkType } from '../../lib/api'
+import { Logo } from '../Logo'
 
 interface ShellProps {
   children: React.ReactNode
@@ -16,20 +17,56 @@ export function Shell({ children }: ShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
-  const [currentNetwork, setCurrentNetwork] = useState<NetworkType | null>(null)
+  const [networks, setNetworks] = useState<NetworkType[]>([])
+  const [scanningNetworks, setScanningNetworks] = useState<Set<string>>(new Set())
 
   // Extract networkId from URL path
   const networkMatch = location.pathname.match(/^\/networks\/([^/]+)/)
-  const networkId = networkMatch ? networkMatch[1] : null
+  const currentNetworkId = networkMatch ? networkMatch[1] : null
 
-  // Fetch network info when on a network page
-  useEffect(() => {
-    if (networkId) {
-      api.networks.get(networkId).then(setCurrentNetwork).catch(() => setCurrentNetwork(null))
-    } else {
-      setCurrentNetwork(null)
+  // Fetch all networks
+  const loadNetworks = useCallback(async () => {
+    try {
+      const data = await api.networks.list()
+      setNetworks(data)
+    } catch (err) {
+      console.error('Failed to load networks:', err)
     }
-  }, [networkId])
+  }, [])
+
+  // Check scan status for all networks
+  const checkScanStatus = useCallback(async () => {
+    const scanning = new Set<string>()
+    for (const network of networks) {
+      try {
+        const status = await api.scan.status(network.id)
+        if (status.status === 'running') {
+          scanning.add(network.id)
+        }
+      } catch {
+        // Ignore errors
+      }
+    }
+    setScanningNetworks(scanning)
+  }, [networks])
+
+  // Load networks on mount and periodically
+  useEffect(() => {
+    loadNetworks()
+    // Refresh networks list periodically (every 30 seconds)
+    const interval = setInterval(loadNetworks, 30000)
+    return () => clearInterval(interval)
+  }, [loadNetworks])
+
+  // Poll scan status when there are networks
+  useEffect(() => {
+    if (networks.length === 0) return
+
+    checkScanStatus()
+    // Poll more frequently when scans might be running
+    const interval = setInterval(checkScanStatus, 3000)
+    return () => clearInterval(interval)
+  }, [networks, checkScanStatus])
 
   const toggleDarkMode = () => {
     const newDark = !isDark
@@ -89,7 +126,13 @@ export function Shell({ children }: ShellProps) {
       >
         {/* Sidebar header with collapse toggle */}
         <div className={`h-14 flex items-center shrink-0 ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''} px-4`}>
-          <span className={`flex-1 text-lg font-semibold text-cyan-400 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>TopoGraph</span>
+          <div className={`flex items-center gap-2 flex-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+            <Logo className="w-6 h-6 text-cyan-400" />
+            <span className="text-lg font-semibold text-cyan-400">TopoGraph</span>
+          </div>
+          {sidebarCollapsed && (
+            <Logo className="w-6 h-6 text-cyan-400 hidden lg:block" />
+          )}
           {/* Desktop collapse toggle */}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -135,41 +178,50 @@ export function Shell({ children }: ShellProps) {
                 <span className="text-sm font-medium truncate lg:hidden">{item.label}</span>
               </NavLink>
 
-              {/* Sub-navigation for current network */}
-              {item.to === '/networks' && currentNetwork && !sidebarCollapsed && (
+              {/* Sub-navigation: all networks */}
+              {item.to === '/networks' && networks.length > 0 && !sidebarCollapsed && (
                 <div className="ml-4 mt-1 space-y-1">
-                  {/* Network name */}
-                  <NavLink
-                    to={`/networks/${currentNetwork.id}`}
-                    end
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={({ isActive }) =>
-                      `w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors duration-150 text-sm ${
-                        isActive
-                          ? 'text-cyan-400'
-                          : 'text-slate-500 hover:bg-slate-800 hover:text-white'
-                      }`
-                    }
-                  >
-                    <Network className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="truncate">{currentNetwork.name}</span>
-                  </NavLink>
+                  {networks.map((network) => (
+                    <div key={network.id}>
+                      {/* Network name */}
+                      <NavLink
+                        to={`/networks/${network.id}`}
+                        end
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={({ isActive }) =>
+                          `w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors duration-150 text-sm ${
+                            isActive
+                              ? 'text-cyan-400'
+                              : 'text-slate-500 hover:bg-slate-800 hover:text-white'
+                          }`
+                        }
+                      >
+                        <Network className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="truncate flex-1">{network.name}</span>
+                        {scanningNetworks.has(network.id) && (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400 flex-shrink-0" />
+                        )}
+                      </NavLink>
 
-                  {/* Locations */}
-                  <NavLink
-                    to={`/networks/${currentNetwork.id}/locations`}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={({ isActive }) =>
-                      `w-full flex items-center gap-2 px-3 py-1.5 ml-5 rounded-lg transition-colors duration-150 text-sm ${
-                        isActive
-                          ? 'text-violet-400'
-                          : 'text-slate-500 hover:bg-slate-800 hover:text-white'
-                      }`
-                    }
-                  >
-                    <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>Locations</span>
-                  </NavLink>
+                      {/* Locations - only for current network */}
+                      {currentNetworkId === network.id && (
+                        <NavLink
+                          to={`/networks/${network.id}/locations`}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={({ isActive }) =>
+                            `w-full flex items-center gap-2 px-3 py-1.5 ml-5 rounded-lg transition-colors duration-150 text-sm ${
+                              isActive
+                                ? 'text-violet-400'
+                                : 'text-slate-500 hover:bg-slate-800 hover:text-white'
+                            }`
+                          }
+                        >
+                          <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span>Locations</span>
+                        </NavLink>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -260,7 +312,10 @@ export function Shell({ children }: ShellProps) {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span className="font-semibold text-cyan-400">TopoGraph</span>
+          <div className="flex items-center gap-2">
+            <Logo className="w-5 h-5 text-cyan-400" />
+            <span className="font-semibold text-cyan-400">TopoGraph</span>
+          </div>
           <div className="w-9" /> {/* Spacer for centering */}
         </header>
 

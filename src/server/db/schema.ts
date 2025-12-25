@@ -55,10 +55,13 @@ export const credentials = sqliteTable('credentials', {
 export const matchedDevices = sqliteTable('matched_devices', {
   id: text('id').primaryKey(),
   credentialId: text('credential_id').references(() => credentials.id, { onDelete: 'cascade' }),
+  networkId: text('network_id').references(() => networks.id, { onDelete: 'cascade' }),
   mac: text('mac').notNull(),
   hostname: text('hostname'),
   ip: text('ip'),
-})
+}, (table) => [
+  index('idx_matched_devices_network').on(table.networkId),
+])
 
 // Interfaces table (ports on devices)
 export const interfaces = sqliteTable('interfaces', {
@@ -82,6 +85,7 @@ export const devices = sqliteTable('devices', {
   parentInterfaceId: text('parent_interface_id').references(() => interfaces.id),
   networkId: text('network_id').references(() => networks.id),
   upstreamInterface: text('upstream_interface'),
+  ownUpstreamInterface: text('own_upstream_interface'),  // The device's own physical upstream port
   // Device info (updated on each scan)
   hostname: text('hostname'),
   ip: text('ip'),
