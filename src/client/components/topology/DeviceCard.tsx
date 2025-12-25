@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Router,
   Network,
@@ -33,6 +33,7 @@ interface DeviceCardProps {
   showVendor?: boolean
   showSerialNumber?: boolean
   showAssetTag?: boolean
+  showMac?: boolean
   onDeviceClick?: (device: TopologyDevice) => void
 }
 
@@ -126,11 +127,21 @@ export function DeviceCard({
   showVendor = true,
   showSerialNumber = true,
   showAssetTag = true,
+  showMac = false,
   onDeviceClick,
 }: DeviceCardProps) {
   const [isExpanded, setIsExpanded] = useState(true)
   const [collapsedInterfaces, setCollapsedInterfaces] = useState<Set<string>>(new Set())
   const [interfacesInitialized, setInterfacesInitialized] = useState(false)
+  const [copiedText, setCopiedText] = useState<string | null>(null)
+
+  // Copy to clipboard with brief feedback
+  const handleCopy = useCallback((text: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    navigator.clipboard.writeText(text)
+    setCopiedText(text)
+    setTimeout(() => setCopiedText(null), 1500)
+  }, [])
 
   // Persist collapse state in localStorage
   useEffect(() => {
@@ -275,6 +286,19 @@ export function DeviceCard({
             <DeviceIcon className="w-3.5 h-3.5" />
           </span>
 
+          {/* MAC Address - fixed length, shown before hostname */}
+          {showMac && device.mac && (
+            <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
+              <span className="px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                MAC
+              </span>
+              <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
+              <span className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
+                {device.mac}
+              </span>
+            </span>
+          )}
+
           {/* Hostname/IP */}
           <span className="font-medium text-slate-900 dark:text-slate-100">
             {displayName}
@@ -282,7 +306,7 @@ export function DeviceCard({
 
           {/* Vendor + Model Pill */}
           {showVendor && (device.vendor || device.model) && (
-            <span className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-300/50 dark:border-slate-600/50">
+            <span className="shrink-0 h-[18px] px-1.5 inline-flex items-center rounded text-[9px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-300/50 dark:border-slate-600/50">
               {device.vendor}{device.vendor && device.model && ' '}{device.model}
             </span>
           )}
@@ -290,7 +314,7 @@ export function DeviceCard({
           {/* Device Info */}
           <div className="flex items-center gap-2 flex-nowrap">
 
-            {/* IP Address Pill with optional uplink interface */}
+            {/* IP Address Pill with optional uplink interface - clickable to copy */}
             {showInterfaces && device.ip && device.hostname && (
               device.ownUpstreamInterface ? (
                 <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-mono border border-slate-300/50 dark:border-slate-600/50">
@@ -298,20 +322,28 @@ export function DeviceCard({
                     {device.ownUpstreamInterface}
                   </span>
                   <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
-                  <span className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                    {device.ip}
-                  </span>
+                  <button
+                    onClick={(e) => handleCopy(device.ip!, e)}
+                    className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                    title="Click to copy IP"
+                  >
+                    {copiedText === device.ip ? 'Copied!' : device.ip}
+                  </button>
                 </span>
               ) : (
-                <span className="shrink-0 px-1 py-0.5 text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50">
-                  {device.ip}
-                </span>
+                <button
+                  onClick={(e) => handleCopy(device.ip!, e)}
+                  className="shrink-0 h-[18px] px-1 inline-flex items-center text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                  title="Click to copy IP"
+                >
+                  {copiedText === device.ip ? 'Copied!' : device.ip}
+                </button>
               )
             )}
 
             {/* Firmware Badge */}
             {showFirmware && device.firmwareVersion && (
-              <span className="shrink-0 px-1 py-0.5 text-[9px] font-medium bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 rounded border border-cyan-300/50 dark:border-cyan-600/50">
+              <span className="shrink-0 h-[18px] px-1 inline-flex items-center text-[9px] font-medium bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 rounded border border-cyan-300/50 dark:border-cyan-600/50">
                 {device.firmwareVersion}
               </span>
             )}
@@ -344,7 +376,7 @@ export function DeviceCard({
 
             {/* Open Ports */}
             {showPorts && openPorts.length > 0 && (
-              <span className="shrink-0 inline-flex items-center rounded overflow-hidden text-[9px] font-medium font-mono bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-700/25 dark:border-emerald-500/25">
+              <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium font-mono bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-700/25 dark:border-emerald-500/25">
                 {openPorts.slice(0, 6).map((port, idx) => {
                   const webUrl = webPorts.has(port) ? getWebUrl(port) : null
                   return webUrl ? (
@@ -354,7 +386,7 @@ export function DeviceCard({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className={`px-1 py-0.5 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-800/50 hover:text-emerald-900 dark:hover:text-emerald-200 transition-colors cursor-pointer ${
+                      className={`px-1 h-full flex items-center text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-800/50 hover:text-emerald-900 dark:hover:text-emerald-200 transition-colors cursor-pointer ${
                         idx > 0 ? 'border-l border-emerald-700/25 dark:border-emerald-500/25' : ''
                       }`}
                     >
@@ -363,7 +395,7 @@ export function DeviceCard({
                   ) : (
                     <span
                       key={port}
-                      className={`px-1 py-0.5 text-emerald-700 dark:text-emerald-400 ${
+                      className={`px-1 h-full flex items-center text-emerald-700 dark:text-emerald-400 ${
                         idx > 0 ? 'border-l border-emerald-700/25 dark:border-emerald-500/25' : ''
                       }`}
                     >
@@ -372,7 +404,7 @@ export function DeviceCard({
                   )
                 })}
                 {openPorts.length > 6 && (
-                  <span className="px-1 py-0.5 text-emerald-600 dark:text-emerald-500 border-l border-emerald-700/25 dark:border-emerald-500/25">
+                  <span className="px-1 h-full flex items-center text-emerald-600 dark:text-emerald-500 border-l border-emerald-700/25 dark:border-emerald-500/25">
                     +{openPorts.length - 6}
                   </span>
                 )}
@@ -381,7 +413,7 @@ export function DeviceCard({
 
             {/* Status Badge (No credentials / Unreachable) */}
             {statusInfo && (
-              <span className={`shrink-0 flex items-center gap-1 px-1 py-0.5 text-[9px] font-medium rounded ${statusInfo.color}`}>
+              <span className={`shrink-0 h-[18px] inline-flex items-center gap-1 px-1 text-[9px] font-medium rounded ${statusInfo.color}`}>
                 <AlertTriangle className="w-2.5 h-2.5" />
                 {statusInfo.label}
               </span>
@@ -390,7 +422,7 @@ export function DeviceCard({
             {/* Moved Badge */}
             {wasMoved && (
               <span
-                className="shrink-0 flex items-center gap-1 px-1 py-0.5 text-[9px] font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded cursor-help"
+                className="shrink-0 h-[18px] inline-flex items-center gap-1 px-1 text-[9px] font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded cursor-help"
                 title={`Previously seen in: ${(device as any).previousNetworkName || 'another network'}`}
               >
                 <ArrowRightLeft className="w-2.5 h-2.5" />
@@ -520,6 +552,7 @@ export function DeviceCard({
                               showVendor={showVendor}
                               showSerialNumber={showSerialNumber}
                               showAssetTag={showAssetTag}
+                              showMac={showMac}
                               onDeviceClick={onDeviceClick}
                             />
                           ))}
@@ -538,6 +571,7 @@ export function DeviceCard({
                           showVendor={showVendor}
                           showSerialNumber={showSerialNumber}
                           showAssetTag={showAssetTag}
+                          showMac={showMac}
                           onDeviceClick={onDeviceClick}
                         />
                       ))

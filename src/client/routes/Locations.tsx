@@ -19,7 +19,7 @@ export function Locations() {
   const [newLocationName, setNewLocationName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   const isAdmin = user?.role === 'admin'
 
@@ -37,6 +37,13 @@ export function Locations() {
       ])
       setNetworkName(networkData.name)
       setLocations(locationsData)
+      // Expand all locations by default and load their devices
+      const allIds = new Set(locationsData.map((l: Location) => l.id))
+      setExpandedIds(allIds)
+      // Load devices for all locations
+      for (const loc of locationsData) {
+        loadLocationDevices(loc.id)
+      }
     } catch (err) {
       console.error('Failed to load locations:', err)
     } finally {
@@ -93,15 +100,19 @@ export function Locations() {
   }
 
   function toggleExpand(locationId: string) {
-    if (expandedId === locationId) {
-      setExpandedId(null)
-    } else {
-      setExpandedId(locationId)
-      const location = locations.find(l => l.id === locationId)
-      if (!location?.devices) {
-        loadLocationDevices(locationId)
+    setExpandedIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(locationId)) {
+        newSet.delete(locationId)
+      } else {
+        newSet.add(locationId)
+        const location = locations.find(l => l.id === locationId)
+        if (!location?.devices) {
+          loadLocationDevices(locationId)
+        }
       }
-    }
+      return newSet
+    })
   }
 
   if (loading) {
@@ -227,7 +238,7 @@ export function Locations() {
                         </div>
                         <ChevronRight
                           className={`w-4 h-4 text-slate-400 transition-transform ${
-                            expandedId === location.id ? 'rotate-90' : ''
+                            expandedIds.has(location.id) ? 'rotate-90' : ''
                           }`}
                         />
                       </button>
@@ -257,7 +268,7 @@ export function Locations() {
                 </div>
 
                 {/* Expanded Devices */}
-                {expandedId === location.id && (
+                {expandedIds.has(location.id) && (
                   <div className="border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-4 py-3">
                     {!location.devices ? (
                       <div className="flex items-center justify-center py-4">

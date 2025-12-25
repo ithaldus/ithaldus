@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, index } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 // Users table
 export const users = sqliteTable('users', {
@@ -50,6 +50,8 @@ export const credentials = sqliteTable('credentials', {
   password: text('password').notNull(),
   networkId: text('network_id').references(() => networks.id, { onDelete: 'cascade' }),
 })
+// Note: unique index is created manually in migration with COALESCE for NULL handling:
+// CREATE UNIQUE INDEX idx_credentials_unique ON credentials (username, password, COALESCE(network_id, ''))
 
 // Matched devices (credential-device associations)
 export const matchedDevices = sqliteTable('matched_devices', {

@@ -85,6 +85,13 @@
       "when": 1766694636879,
       "tag": "0011_productive_nitro",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1766701586677,
+      "tag": "0012_silent_wallop",
+      "breakpoints": true
     }
   ]
 }

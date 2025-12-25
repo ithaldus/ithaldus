@@ -29,6 +29,7 @@ interface VisibilityToggles {
   vendor: boolean
   serialNumber: boolean
   assetTag: boolean
+  mac: boolean
 }
 
 export function NetworkTopology() {
@@ -67,6 +68,7 @@ export function NetworkTopology() {
       vendor: true,
       serialNumber: true,
       assetTag: true,
+      mac: false,
     }
   })
 
@@ -500,16 +502,17 @@ export function NetworkTopology() {
 
           <div className="flex items-center gap-3">
 
-          {/* Visibility Toggle Pill */}
+          {/* Visibility Toggle Pill - "FAVE IMPS" anagram */}
           <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76] overflow-hidden">
             {[
-              { key: 'endDevices' as const, label: 'E', tooltip: 'End Devices — Show or hide non-network devices like computers, phones, printers, and IoT devices' },
               { key: 'firmware' as const, label: 'F', tooltip: 'Firmware — Show or hide firmware version information on device cards' },
-              { key: 'ports' as const, label: 'P', tooltip: 'Ports — Show or hide open management ports (SSH, HTTP, SNMP, etc.) on device cards' },
-              { key: 'interfaces' as const, label: 'I', tooltip: 'Interfaces — Show or hide network interface details and bridge membership' },
-              { key: 'vendor' as const, label: 'V', tooltip: 'Vendor — Show or hide vendor/manufacturer names and models' },
-              { key: 'serialNumber' as const, label: 'S', tooltip: 'Serial Number — Show or hide device serial numbers' },
               { key: 'assetTag' as const, label: 'A', tooltip: 'Asset Tag — Show or hide asset tags' },
+              { key: 'vendor' as const, label: 'V', tooltip: 'Vendor — Show or hide vendor/manufacturer names and models' },
+              { key: 'endDevices' as const, label: 'E', tooltip: 'End Devices — Show or hide non-network devices like computers, phones, printers, and IoT devices' },
+              { key: 'interfaces' as const, label: 'I', tooltip: 'Interfaces — Show or hide network interface details and bridge membership' },
+              { key: 'mac' as const, label: 'M', tooltip: 'MAC — Show or hide MAC addresses' },
+              { key: 'ports' as const, label: 'P', tooltip: 'Ports — Show or hide open management ports (SSH, HTTP, SNMP, etc.) on device cards' },
+              { key: 'serialNumber' as const, label: 'S', tooltip: 'Serial Number — Show or hide device serial numbers' },
             ].map(({ key, label, tooltip }) => (
               <Tooltip key={key} content={tooltip}>
                 <button
@@ -619,6 +622,7 @@ export function NetworkTopology() {
                 showVendor={visibility.vendor}
                 showSerialNumber={visibility.serialNumber}
                 showAssetTag={visibility.assetTag}
+                showMac={visibility.mac}
                 onDeviceClick={handleDeviceClick}
               />
             ))}
