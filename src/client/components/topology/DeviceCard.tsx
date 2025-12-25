@@ -303,6 +303,11 @@ export function DeviceCard({
             )}
           </div>
 
+          {/* Hostname/IP - shown first */}
+          <span className="font-medium text-slate-900 dark:text-slate-100">
+            {displayName}
+          </span>
+
           {/* Combined Device Type + Vendor + Model Pill */}
           <span className="shrink-0 h-[22px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
             {/* Device Type Icon */}
@@ -322,10 +327,6 @@ export function DeviceCard({
 
           {/* Device Info */}
           <div className="flex items-center gap-2 flex-nowrap">
-            {/* Hostname/IP */}
-            <span className="font-medium text-slate-900 dark:text-slate-100">
-              {displayName}
-            </span>
 
             {/* IP Address Pill (for non-root devices - upstream interface is shown in tree branch) */}
             {showInterfaces && device.ip && device.hostname && (
