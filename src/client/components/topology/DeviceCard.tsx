@@ -20,6 +20,7 @@ import {
   Cctv,
   Cpu,
   Tag,
+  MessageCircle,
 } from 'lucide-react'
 import type { TopologyDevice, Interface } from '../../lib/api'
 
@@ -435,10 +436,13 @@ export function DeviceCard({
           <div className="shrink-0 w-5" />
         </div>
 
-        {/* Location Comment (to the right of card) */}
+        {/* Comment - styled as speech bubble */}
         {device.comment && (
-          <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 whitespace-nowrap">
-            <MapPin className="w-3 h-3 shrink-0 text-red-500" />
+          <span className="relative inline-flex items-center gap-1 px-2 py-0.5 text-[10px] text-slate-700 dark:text-slate-200 bg-amber-100 dark:bg-amber-900/40 rounded-lg whitespace-nowrap border border-amber-200 dark:border-amber-800/50">
+            {/* Speech bubble tail */}
+            <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[6px] border-r-amber-200 dark:border-r-amber-800/50" />
+            <span className="absolute -left-[5px] top-1/2 -translate-y-1/2 w-0 h-0 border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent border-r-[5px] border-r-amber-100 dark:border-r-amber-900/40" />
+            <MessageCircle className="w-3 h-3 shrink-0 text-amber-500 dark:text-amber-400" />
             {device.comment}
           </span>
         )}
