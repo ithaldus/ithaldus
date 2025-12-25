@@ -287,30 +287,31 @@ export function DeviceCard({
             <DeviceIcon className="w-3.5 h-3.5" />
           </span>
 
-          {/* MAC Address - fixed length, shown before hostname */}
-          {showMac && device.mac && (
-            <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
-              <span className="px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
-                MAC
-              </span>
-              <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
-              <span className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
-                {device.mac}
-              </span>
-            </span>
-          )}
-
           {/* Hostname/IP */}
           <span className="font-medium text-slate-900 dark:text-slate-100">
             {displayName}
           </span>
 
-          {/* Vendor + Model Pill */}
-          {showVendor && (device.vendor || device.model) && (
-            <span className="shrink-0 h-[18px] px-1.5 inline-flex items-center rounded text-[9px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-300/50 dark:border-slate-600/50">
-              {device.vendor}{device.vendor && device.model && ' '}{device.model}
+          {/* Vendor + Model + MAC Pill */}
+          {(showVendor && (device.vendor || device.model)) || (showMac && device.mac) ? (
+            <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
+              {showVendor && (device.vendor || device.model) && (
+                <span className="px-1.5 h-full flex items-center bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                  {device.vendor}{device.vendor && device.model && ' '}{device.model}
+                </span>
+              )}
+              {showMac && device.mac && (
+                <>
+                  {showVendor && (device.vendor || device.model) && (
+                    <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
+                  )}
+                  <span className="px-1 h-full flex items-center bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-500 font-mono">
+                    {device.mac}
+                  </span>
+                </>
+              )}
             </span>
-          )}
+          ) : null}
 
           {/* Device Info */}
           <div className="flex items-center gap-2 flex-nowrap">
