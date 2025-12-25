@@ -12,6 +12,7 @@ import {
   type LogLevel,
 } from './drivers'
 import { scanMdns, type MdnsDevice } from './mdns'
+import { snmpQuery, type SnmpDeviceInfo } from './snmp'
 
 export type { LogLevel }
 
@@ -517,6 +518,7 @@ export class NetworkScanner {
   private jumpHostSupported: boolean = false  // True if root device supports TCP forwarding (forwardOut)
   private rootIp: string = ''  // Store root IP for jump host reference
   private mdnsDevices: Map<string, MdnsDevice> = new Map()  // IP -> mDNS device info
+  private snmpDevices: Map<string, SnmpDeviceInfo> = new Map()  // IP -> SNMP device info
 
   constructor(networkId: string, callbacks: ScanCallbacks) {
     this.networkId = networkId
@@ -541,6 +543,22 @@ export class NetworkScanner {
   private getMdnsHostname(ip: string): string | null {
     const device = this.mdnsDevices.get(ip)
     return device?.hostname || null
+  }
+
+  // Get SNMP info for an IP (queries and caches)
+  private async getSnmpInfo(ip: string): Promise<SnmpDeviceInfo | null> {
+    // Check cache first
+    if (this.snmpDevices.has(ip)) {
+      return this.snmpDevices.get(ip)!
+    }
+
+    // Query SNMP
+    const info = await snmpQuery(ip, 'public', 3)
+    if (info) {
+      this.snmpDevices.set(ip, info)
+      this.log('info', `${ip}: SNMP found hostname=${info.hostname}, model=${info.description?.substring(0, 50)}`)
+    }
+    return info
   }
 
   private log(level: LogLevel, message: string) {
@@ -1013,6 +1031,12 @@ export class NetworkScanner {
     // Use MAC OUI vendor detection as fallback if SSH detection failed
     const vendor = vendorInfo.vendor || detectVendorFromMac(deviceMac)
 
+    // Try SNMP if we couldn't get device info via SSH
+    let snmpInfo: SnmpDeviceInfo | null = null
+    if (!deviceInfo && !shouldSkipLogin) {
+      snmpInfo = await this.getSnmpInfo(ip)
+    }
+
     const deviceType = deviceInfo ? detectDeviceType(deviceInfo, vendor) : 'end-device'
 
     // Use device's own detected upstream interface if available
@@ -1031,15 +1055,15 @@ export class NetworkScanner {
       actualUpstreamInterface = upstreamInterface
     }
 
-    // Create device record
+    // Create device record - use SNMP info as fallback if no SSH access
     const newDevice: DiscoveredDevice = {
       id: deviceId,
       mac: deviceMac,
-      hostname: deviceInfo?.hostname || null,
+      hostname: deviceInfo?.hostname || snmpInfo?.hostname || null,
       ip,
       type: deviceType,
       vendor,
-      model: deviceInfo?.model || null,
+      model: deviceInfo?.model || snmpInfo?.description || null,
       serialNumber: deviceInfo?.serialNumber || null,
       firmwareVersion: deviceInfo?.version || null,
       accessible: !!connectedClient,
