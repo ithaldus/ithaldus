@@ -391,7 +391,7 @@ export function DeviceModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden">
+      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg lg:max-w-2xl xl:max-w-3xl mx-4 max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
@@ -492,7 +492,7 @@ export function DeviceModal({
         <div className="px-6 py-4 overflow-y-auto max-h-[60vh] space-y-6">
 
           {/* Device Info */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 IP Address
