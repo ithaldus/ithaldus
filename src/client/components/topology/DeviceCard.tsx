@@ -314,12 +314,9 @@ export function DeviceCard({
             )}
             {/* Model Name (if available) */}
             {showVendor && device.model && (
-              <>
-                <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
-                <span className="px-1.5 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                  {device.model}
-                </span>
-              </>
+              <span className="px-1.5 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                {device.model}
+              </span>
             )}
           </span>
 
