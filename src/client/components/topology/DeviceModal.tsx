@@ -135,6 +135,17 @@ export function DeviceModal({
   const [logsExpanded, setLogsExpanded] = useState(false)
   const [showFullImage, setShowFullImage] = useState(false)
 
+  // Close modal on ESC key
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
   // Fetch device details with working credential on mount
   useEffect(() => {
     async function fetchDeviceDetails() {
