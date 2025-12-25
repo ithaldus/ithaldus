@@ -25,6 +25,7 @@ export interface InterfaceInfo {
   ip: string | null
   bridge: string | null
   vlan: string | null
+  comment: string | null
 }
 
 export interface NeighborInfo {

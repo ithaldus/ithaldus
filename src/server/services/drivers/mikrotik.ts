@@ -220,9 +220,12 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     const nameMatch = line.match(/name=(\S+)/)
     const macMatch = line.match(/mac-address=(\S+)/)
     const typeMatch = line.match(/type=(\S+)/)
+    // Comment can contain spaces and special chars, match until next key= or end of line
+    const commentMatch = line.match(/comment="([^"]*)"/) || line.match(/comment=(\S+)/)
     if (nameMatch) {
       const name = nameMatch[1]
       const ifType = typeMatch ? typeMatch[1] : ''
+      const comment = commentMatch ? commentMatch[1] : null
 
       // Find IP for this interface
       const ipLine = addressList.split('\n').find(l => l.includes(`interface=${name}`))
@@ -252,6 +255,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
         ip: ipMatch ? ipMatch[1] : null,
         bridge: bridgeName,
         vlan,
+        comment,
       })
     }
   }

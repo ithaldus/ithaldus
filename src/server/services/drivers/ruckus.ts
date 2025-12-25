@@ -185,6 +185,7 @@ async function getRuckusUnleashedInfo(client: Client, log?: (level: LogLevel, me
       ip: null,
       bridge: null,
       vlan: null,
+      comment: null,
     },
     {
       name: 'wlan1',
@@ -192,6 +193,7 @@ async function getRuckusUnleashedInfo(client: Client, log?: (level: LogLevel, me
       ip: null,
       bridge: null,
       vlan: null,
+      comment: null,
     },
   ]
 

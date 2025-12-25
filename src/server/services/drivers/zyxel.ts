@@ -367,6 +367,7 @@ async function getZyxelInfo(client: Client, log?: (level: LogLevel, message: str
         ip: null,
         bridge: null,
         vlan,
+        comment: null,
       })
     }
   }

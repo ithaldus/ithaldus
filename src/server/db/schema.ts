@@ -75,6 +75,7 @@ export const interfaces = sqliteTable('interfaces', {
   vlan: text('vlan'),
   poeWatts: real('poe_watts'),
   poeStandard: text('poe_standard'),
+  comment: text('comment'),  // Interface description/comment from device
 }, (table) => [
   index('idx_interfaces_device').on(table.deviceId),
 ])

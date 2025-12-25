@@ -261,6 +261,7 @@ export interface Interface {
   vlan: string | null
   poeWatts: number | null
   poeStandard: string | null
+  comment: string | null
 }
 
 export interface DeviceImage {

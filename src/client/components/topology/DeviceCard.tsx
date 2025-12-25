@@ -520,6 +520,11 @@ export function DeviceCard({
                           VLAN {ifaceInfo.vlan}
                         </span>
                       )}
+                      {ifaceInfo?.comment && (
+                        <span className="text-[10px] italic text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1 rounded">
+                          {ifaceInfo.comment}
+                        </span>
+                      )}
                       {ifaceInfo?.ip && (
                         <span className="text-[10px] text-slate-400 dark:text-slate-500">
                           {ifaceInfo.ip}

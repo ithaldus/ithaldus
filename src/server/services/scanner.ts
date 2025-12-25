@@ -1259,6 +1259,7 @@ export class NetworkScanner {
           ip: iface.ip,
           bridge: iface.bridge,
           vlan: iface.vlan,
+          comment: iface.comment,
         })
 
         newDevice.interfaces.push({
@@ -1269,6 +1270,7 @@ export class NetworkScanner {
           vlan: iface.vlan,
           poeWatts: null,
           poeStandard: null,
+          comment: iface.comment,
         })
       }
     }
