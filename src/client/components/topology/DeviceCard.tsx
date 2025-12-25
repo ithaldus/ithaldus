@@ -173,6 +173,7 @@ export function DeviceCard({
     if (vendorLower.includes('ubiquiti')) return 'access-point'
     if (vendorLower.includes('ruckus')) return 'access-point'
     if (vendorLower.includes('mikrotik')) return 'router'
+    if (vendorLower.includes('kyocera')) return 'printer'
     if (vendorLower.includes('hp') || vendorLower.includes('hewlett')) {
       // HP devices with hostname starting with HP are printers
       if (hostnameLower.startsWith('hp')) return 'printer'
