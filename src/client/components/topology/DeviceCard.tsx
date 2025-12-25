@@ -170,7 +170,8 @@ export function DeviceCard({
       return 'switch'
     }
     if (vendorLower.includes('tuya')) return 'iot'
-    if (vendorLower.includes('ubiquiti') || vendorLower.includes('mikrotik')) return 'router'
+    if (vendorLower.includes('ubiquiti')) return 'access-point'
+    if (vendorLower.includes('mikrotik')) return 'router'
     return null
   }
 
