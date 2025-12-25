@@ -382,19 +382,23 @@ export function NetworkTopology() {
     setVisibility(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
-  // Count all devices recursively
-  function countDevices(deviceList: TopologyDevice[]): number {
+  // Count visible devices recursively (respects showEndDevices filter)
+  function countDevices(deviceList: TopologyDevice[], showEnd: boolean): number {
     let count = 0
     for (const device of deviceList) {
+      // Skip end devices if filter is off
+      if (!showEnd && device.type === 'end-device') {
+        continue
+      }
       count++
       if (device.children) {
-        count += countDevices(device.children)
+        count += countDevices(device.children, showEnd)
       }
     }
     return count
   }
 
-  const deviceCount = countDevices(devices)
+  const deviceCount = countDevices(devices, visibility.endDevices)
 
   async function exportPDF() {
     if (!topologyRef.current || !network) return
