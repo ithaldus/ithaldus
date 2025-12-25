@@ -513,46 +513,38 @@ export function DeviceModal({
                 )}
               </div>
             </div>
-            {device.vendor && (
-              <div>
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                  Vendor
-                </label>
-                <p className="mt-1 text-sm text-slate-900 dark:text-white">
-                  {device.vendor}
-                </p>
-              </div>
-            )}
-            {device.model && (
-              <div>
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                  Model
-                </label>
-                <p className="mt-1 text-sm text-slate-900 dark:text-white">
-                  {device.model}
-                </p>
-              </div>
-            )}
-            {device.firmwareVersion && (
-              <div className="col-span-2">
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                  Firmware
-                </label>
-                <p className="mt-1 text-sm text-slate-900 dark:text-white">
-                  {device.firmwareVersion}
-                </p>
-              </div>
-            )}
-            {device.driver && (
-              <div>
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                  Driver
-                </label>
-                <p className="mt-1 text-sm text-slate-900 dark:text-white font-mono">
-                  {device.driver}
-                </p>
-              </div>
-            )}
+            <div>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                Vendor
+              </label>
+              <p className={`mt-1 text-sm ${device.vendor ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+                {device.vendor || '—'}
+              </p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                Model
+              </label>
+              <p className={`mt-1 text-sm ${device.model ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+                {device.model || '—'}
+              </p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                Firmware
+              </label>
+              <p className={`mt-1 text-sm ${device.firmwareVersion ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+                {device.firmwareVersion || '—'}
+              </p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                Driver
+              </label>
+              <p className={`mt-1 text-sm font-mono ${device.driver ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+                {device.driver || '—'}
+              </p>
+            </div>
             <div>
               <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Status
