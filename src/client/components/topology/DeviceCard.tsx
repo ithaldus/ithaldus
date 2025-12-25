@@ -287,19 +287,21 @@ export function DeviceCard({
             hover:opacity-80 transition-opacity
           `}
         >
-          {/* Expand/Collapse Button */}
-          {hasInterfaceBranches && (
-            <button
-              onClick={handleToggle}
-              className="shrink-0 p-0.5 -ml-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-            >
-              {isExpanded ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )}
-            </button>
-          )}
+          {/* Expand/Collapse Button - always reserve space for visual consistency */}
+          <div className="shrink-0 w-5 h-5 -ml-1 flex items-center justify-center">
+            {hasInterfaceBranches && (
+              <button
+                onClick={handleToggle}
+                className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              >
+                {isExpanded ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
+            )}
+          </div>
 
           {/* Combined Device Type + Vendor + Model Pill */}
           <span className="shrink-0 h-[22px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
