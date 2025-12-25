@@ -19,6 +19,7 @@ import {
   Printer,
   Camera,
   Cpu,
+  Tag,
 } from 'lucide-react'
 import type { TopologyDevice, Interface } from '../../lib/api'
 
@@ -356,10 +357,16 @@ export function DeviceCard({
               </span>
             )}
 
-            {/* Asset Tag Badge */}
+            {/* Asset Tag Badge - Two-part pill */}
             {device.assetTag && (
-              <span className="shrink-0 px-1 py-0.5 text-[9px] font-medium font-mono bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded border border-amber-300/50 dark:border-amber-600/50">
-                {device.assetTag}
+              <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
+                <span className="px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                  <Tag className="w-2.5 h-2.5" />
+                </span>
+                <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
+                <span className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
+                  {device.assetTag}
+                </span>
               </span>
             )}
 
