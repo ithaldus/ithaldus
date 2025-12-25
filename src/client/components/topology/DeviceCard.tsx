@@ -176,6 +176,10 @@ export function DeviceCard({
       // HP devices with hostname starting with HP are printers
       if (hostnameLower.startsWith('hp')) return 'printer'
     }
+    if (vendorLower.includes('samsung')) {
+      // Samsung devices with hostname "Samsung" are TVs
+      if (hostnameLower === 'samsung') return 'tv'
+    }
     return null
   }
 
