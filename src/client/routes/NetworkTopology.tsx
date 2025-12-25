@@ -10,7 +10,7 @@ import {
   Clock,
   Radar,
   Loader2,
-  MapPin,
+  Monitor,
 } from 'lucide-react'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
@@ -382,6 +382,20 @@ export function NetworkTopology() {
     setVisibility(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
+  // Count all devices recursively
+  function countDevices(deviceList: TopologyDevice[]): number {
+    let count = 0
+    for (const device of deviceList) {
+      count++
+      if (device.children) {
+        count += countDevices(device.children)
+      }
+    }
+    return count
+  }
+
+  const deviceCount = countDevices(devices)
+
   async function exportPDF() {
     if (!topologyRef.current || !network) return
 
@@ -475,14 +489,15 @@ export function NetworkTopology() {
           <span className="text-slate-400 font-mono text-xs ml-2">
             {network.rootIp}
           </span>
-          <span className="text-slate-400 mx-2">·</span>
-          <Link
-            to={`/networks/${networkId}/locations`}
-            className="flex items-center gap-1 text-violet-500 hover:text-violet-400 transition-colors"
-          >
-            <MapPin className="w-3.5 h-3.5" />
-            <span className="text-xs font-medium">Locations</span>
-          </Link>
+          {deviceCount > 0 && (
+            <>
+              <span className="text-slate-400 mx-2">·</span>
+              <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                <Monitor className="w-3.5 h-3.5" />
+                <span className="text-xs font-medium">{deviceCount} devices</span>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-3">

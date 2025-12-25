@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon } from 'lucide-react'
+import { NavLink, useNavigate, useParams, useLocation } from 'react-router-dom'
+import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin, Router } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import { api, type Network as NetworkType } from '../../lib/api'
 
 interface ShellProps {
   children: React.ReactNode
@@ -10,10 +11,25 @@ interface ShellProps {
 export function Shell({ children }: ShellProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
+  const [currentNetwork, setCurrentNetwork] = useState<NetworkType | null>(null)
+
+  // Extract networkId from URL path
+  const networkMatch = location.pathname.match(/^\/networks\/([^/]+)/)
+  const networkId = networkMatch ? networkMatch[1] : null
+
+  // Fetch network info when on a network page
+  useEffect(() => {
+    if (networkId) {
+      api.networks.get(networkId).then(setCurrentNetwork).catch(() => setCurrentNetwork(null))
+    } else {
+      setCurrentNetwork(null)
+    }
+  }, [networkId])
 
   const toggleDarkMode = () => {
     const newDark = !isDark
@@ -98,25 +114,65 @@ export function Shell({ children }: ShellProps) {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-2 space-y-1">
           {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={() => setMobileMenuOpen(false)}
-              className={({ isActive }) =>
-                `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150 ${
-                  isActive
-                    ? 'bg-cyan-500/20 text-cyan-400'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                } ${sidebarCollapsed ? 'lg:justify-center' : ''}`
-              }
-              title={sidebarCollapsed ? item.label : undefined}
-            >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
-              {!sidebarCollapsed && (
-                <span className="text-sm font-medium truncate lg:block hidden">{item.label}</span>
+            <div key={item.to}>
+              <NavLink
+                to={item.to}
+                end={item.to === '/networks'}
+                onClick={() => setMobileMenuOpen(false)}
+                className={({ isActive }) =>
+                  `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150 ${
+                    isActive
+                      ? 'bg-cyan-500/20 text-cyan-400'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  } ${sidebarCollapsed ? 'lg:justify-center' : ''}`
+                }
+                title={sidebarCollapsed ? item.label : undefined}
+              >
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                {!sidebarCollapsed && (
+                  <span className="text-sm font-medium truncate lg:block hidden">{item.label}</span>
+                )}
+                <span className="text-sm font-medium truncate lg:hidden">{item.label}</span>
+              </NavLink>
+
+              {/* Sub-navigation for current network */}
+              {item.to === '/networks' && currentNetwork && !sidebarCollapsed && (
+                <div className="ml-4 mt-1 space-y-1">
+                  {/* Network name */}
+                  <NavLink
+                    to={`/networks/${currentNetwork.id}`}
+                    end
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={({ isActive }) =>
+                      `w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors duration-150 text-sm ${
+                        isActive
+                          ? 'text-cyan-400'
+                          : 'text-slate-500 hover:bg-slate-800 hover:text-white'
+                      }`
+                    }
+                  >
+                    <Router className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">{currentNetwork.name}</span>
+                  </NavLink>
+
+                  {/* Locations */}
+                  <NavLink
+                    to={`/networks/${currentNetwork.id}/locations`}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={({ isActive }) =>
+                      `w-full flex items-center gap-2 px-3 py-1.5 ml-5 rounded-lg transition-colors duration-150 text-sm ${
+                        isActive
+                          ? 'text-violet-400'
+                          : 'text-slate-500 hover:bg-slate-800 hover:text-white'
+                      }`
+                    }
+                  >
+                    <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>Locations</span>
+                  </NavLink>
+                </div>
               )}
-              <span className="text-sm font-medium truncate lg:hidden">{item.label}</span>
-            </NavLink>
+            </div>
           ))}
         </nav>
 
