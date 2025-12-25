@@ -477,41 +477,24 @@ export function NetworkTopology() {
 
   return (
     <div className="h-full flex flex-col p-6" style={{ marginRight: consoleOpen ? consoleWidth : 0 }}>
-      {/* Header / Breadcrumb */}
-      <div className="flex items-center justify-between mb-6 flex-shrink-0">
-        <div className="flex items-center gap-2 text-sm">
-          <Link
-            to="/networks"
-            className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-          >
-            Networks
-          </Link>
-          <ChevronRight className="w-4 h-4 text-slate-400" />
-          <span className="font-medium text-slate-900 dark:text-white">
-            {network.name}
-          </span>
-          <span className="text-slate-400 font-mono text-xs ml-2">
-            {network.rootIp}
-          </span>
-          {deviceCount > 0 && (
-            <>
-              <span className="text-slate-400 mx-2">·</span>
-              <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                <Monitor className="w-3.5 h-3.5" />
-                <span className="text-xs font-medium">{deviceCount} devices</span>
-              </div>
-            </>
-          )}
-        </div>
+      {/* Header */}
+      <div className="mb-6 flex-shrink-0 space-y-1">
+        {/* Row 1: Breadcrumb and actions */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm">
+            <Link
+              to="/networks"
+              className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            >
+              Networks
+            </Link>
+            <ChevronRight className="w-4 h-4 text-slate-400" />
+            <span className="font-medium text-slate-900 dark:text-white">
+              {network.name}
+            </span>
+          </div>
 
-        <div className="flex items-center gap-3">
-          {/* Last scanned */}
-          {lastScannedAt && (
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <Clock className="w-3.5 h-3.5" />
-              Scanned: {formatLastScanned(lastScannedAt)}
-            </div>
-          )}
+          <div className="flex items-center gap-3">
 
           {/* Visibility Toggle Pill */}
           <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76] overflow-hidden">
@@ -576,6 +559,24 @@ export function NetworkTopology() {
                 <span className="hidden xl:inline">Scan</span>
               </button>
             )
+          )}
+          </div>
+        </div>
+
+        {/* Row 2: Root IP, stats, last scanned */}
+        <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+          <span className="font-mono">{network.rootIp}</span>
+          {deviceCount > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Monitor className="w-3.5 h-3.5" />
+              <span>{deviceCount} devices</span>
+            </div>
+          )}
+          {lastScannedAt && (
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Scanned {formatLastScanned(lastScannedAt)}</span>
+            </div>
           )}
         </div>
       </div>
