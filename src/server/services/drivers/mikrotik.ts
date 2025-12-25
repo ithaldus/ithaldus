@@ -2,37 +2,78 @@ import type { Client } from 'ssh2'
 import type { DeviceInfo, InterfaceInfo, NeighborInfo, DhcpLeaseInfo, LogLevel, Driver } from './types'
 import { sshExec } from './types'
 
+// Helper: Generate all IPs in a subnet (for /24 or smaller only)
+function generateSubnetIps(ip: string, cidr: number): string[] {
+  // Only scan /24 or smaller subnets to avoid excessive pinging
+  if (cidr < 24) {
+    cidr = 24  // Limit to /24 even for larger subnets
+  }
+
+  const parts = ip.split('.').map(Number)
+  const ipNum = (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]
+  const mask = ~((1 << (32 - cidr)) - 1) >>> 0
+  const network = ipNum & mask
+  const hostCount = (1 << (32 - cidr)) - 2  // Exclude network and broadcast
+
+  const ips: string[] = []
+  for (let i = 1; i <= hostCount; i++) {
+    const hostIp = network + i
+    const a = (hostIp >>> 24) & 255
+    const b = (hostIp >>> 16) & 255
+    const c = (hostIp >>> 8) & 255
+    const d = hostIp & 255
+    ips.push(`${a}.${b}.${c}.${d}`)
+  }
+  return ips
+}
+
 // Get device info from MikroTik RouterOS
 async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: string) => void): Promise<DeviceInfo> {
-  // First, get DHCP leases to know which IPs to ping
-  const dhcpLeasesRaw = await sshExec(client, '/ip dhcp-server lease print terse').catch(() => '')
+  // First, get IP addresses to determine subnet ranges, and DHCP leases
+  const [addressListForPing, dhcpLeasesRaw] = await Promise.all([
+    sshExec(client, '/ip address print terse').catch(() => ''),
+    sshExec(client, '/ip dhcp-server lease print terse').catch(() => ''),
+  ])
 
-  // Extract IPs from active (bound) DHCP leases only - skip static leases for offline devices
-  const leaseIps: string[] = []
+  // Parse IP addresses to get subnets for scanning
+  // Format: "0   address=192.168.1.1/24 network=192.168.1.0 interface=bridge"
+  const subnetsToScan: Set<string> = new Set()
+  const addressLines = addressListForPing.split('\n').filter(l => l.includes('address='))
+  for (const line of addressLines) {
+    const addrMatch = line.match(/address=(\d+\.\d+\.\d+\.\d+)\/(\d+)/)
+    if (addrMatch) {
+      const [, ip, cidrStr] = addrMatch
+      const cidr = parseInt(cidrStr, 10)
+      // Generate IPs for this subnet
+      const subnetIps = generateSubnetIps(ip, cidr)
+      for (const subnetIp of subnetIps) {
+        subnetsToScan.add(subnetIp)
+      }
+    }
+  }
+
+  // Also add DHCP lease IPs (they might be in different subnets)
   const leaseLines = dhcpLeasesRaw.split('\n').filter(l => l.includes('address='))
   for (const line of leaseLines) {
-    // Only ping leases with status=bound (currently active)
-    // Skip waiting/expired leases as they're likely offline
-    if (!line.includes('status=bound')) {
-      continue
-    }
+    if (!line.includes('status=bound')) continue
     const ipMatch = line.match(/address=(\d+\.\d+\.\d+\.\d+)/)
     if (ipMatch && ipMatch[1]) {
-      leaseIps.push(ipMatch[1])
+      subnetsToScan.add(ipMatch[1])
     }
   }
 
-  // Ping all DHCP lease IPs (1 packet each, in batches to avoid overload)
-  if (leaseIps.length > 0 && log) {
-    log('info', `Pinging ${leaseIps.length} DHCP lease IPs to discover physical ports...`)
+  const allIpsToPing = Array.from(subnetsToScan)
+
+  // Ping all IPs to discover both DHCP and static hosts
+  if (allIpsToPing.length > 0 && log) {
+    log('info', `Pinging ${allIpsToPing.length} IPs across all subnets to discover devices...`)
   }
 
-  // Ping in batches of 20 to avoid overwhelming the router
-  const BATCH_SIZE = 20
-  for (let i = 0; i < leaseIps.length; i += BATCH_SIZE) {
-    const batch = leaseIps.slice(i, i + BATCH_SIZE)
+  // Ping in batches of 30 to avoid overwhelming the router
+  const BATCH_SIZE = 30
+  for (let i = 0; i < allIpsToPing.length; i += BATCH_SIZE) {
+    const batch = allIpsToPing.slice(i, i + BATCH_SIZE)
     // Use ping with count=1 and timeout=100ms for quick discovery
-    // Run all pings in parallel within the batch
     await Promise.all(
       batch.map(ip =>
         sshExec(client, `/ping ${ip} count=1 interval=100ms`, 2000).catch(() => '')
