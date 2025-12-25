@@ -1,19 +1,23 @@
 import type { Client, ClientChannel } from 'ssh2'
 import type { DeviceInfo, InterfaceInfo, NeighborInfo, Driver, LogLevel } from './types'
 import https from 'https'
+import http from 'http'
 
-// Fetch serial number from Zyxel web interface (CLI doesn't expose it)
-async function fetchSerialFromWeb(
+// Try to fetch serial from web using a specific protocol (http or https)
+function tryFetchSerial(
   ip: string,
   webPassword: string,
+  useHttps: boolean,
   log?: (level: LogLevel, message: string) => void
 ): Promise<string | null> {
   return new Promise((resolve) => {
     const auth = Buffer.from(`admin:${webPassword}`).toString('base64')
+    const protocol = useHttps ? https : http
+    const port = useHttps ? 443 : 80
 
-    const req = https.request({
+    const req = protocol.request({
       hostname: ip,
-      port: 443,
+      port,
       path: '/FirstPage.html',
       method: 'GET',
       rejectUnauthorized: false, // Zyxel uses self-signed certs
@@ -28,34 +32,41 @@ async function fetchSerialFromWeb(
         // Extract serial number pattern: S + 3 digits + letter + numbers
         const match = data.match(/S\d{3}[A-Z]\d+/)
         if (match) {
-          if (log) log('info', `Got serial from web: ${match[0]}`)
+          if (log) log('info', `Got serial from web (${useHttps ? 'HTTPS' : 'HTTP'}): ${match[0]}`)
           resolve(match[0])
         } else {
-          if (log) log('info', `Serial not found in web response`)
           resolve(null)
         }
       })
     })
 
-    req.on('error', (err) => {
-      if (log) {
-        if (err.message.includes('ECONNREFUSED')) {
-          log('info', `Web interface not reachable (HTTPS may be disabled) - serial number unavailable`)
-        } else {
-          log('warn', `Web serial fetch failed: ${err.message}`)
-        }
-      }
-      resolve(null)
-    })
-
+    req.on('error', () => resolve(null))
     req.on('timeout', () => {
-      if (log) log('warn', `Web serial fetch timeout`)
       req.destroy()
       resolve(null)
     })
 
     req.end()
   })
+}
+
+// Fetch serial number from Zyxel web interface (CLI doesn't expose it)
+// Tries HTTPS first, then falls back to HTTP
+async function fetchSerialFromWeb(
+  ip: string,
+  webPassword: string,
+  log?: (level: LogLevel, message: string) => void
+): Promise<string | null> {
+  // Try HTTPS first
+  let serial = await tryFetchSerial(ip, webPassword, true, log)
+  if (serial) return serial
+
+  // Fall back to HTTP
+  serial = await tryFetchSerial(ip, webPassword, false, log)
+  if (serial) return serial
+
+  if (log) log('info', `Web interface not reachable (HTTP/HTTPS) - serial number unavailable`)
+  return null
 }
 
 // Strip ANSI escape codes and other terminal control characters from Zyxel output
