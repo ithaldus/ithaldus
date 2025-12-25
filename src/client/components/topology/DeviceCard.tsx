@@ -160,12 +160,22 @@ export function DeviceCard({
 
   const openPorts = parseOpenPorts(device.openPorts)
 
+  // Infer device type from vendor
+  const vendorLower = device.vendor?.toLowerCase() || ''
+  const getVendorType = (): string | null => {
+    if (vendorLower.includes('cisco')) return 'switch'
+    if (vendorLower.includes('tuya')) return 'iot'
+    if (vendorLower.includes('ubiquiti') || vendorLower.includes('mikrotik')) return 'router'
+    return null
+  }
+
   // Infer device type from ports if not set
   // Devices with management ports are likely network devices (switches/routers)
   const managementPorts = [22, 23, 80, 443, 8080, 8443, 161, 8291, 8728]
   const hasManagementPorts = openPorts.some(p => managementPorts.includes(p))
   const hasRouterPorts = openPorts.includes(8291) || openPorts.includes(8728) // MikroTik specific
-  const inferredType = device.type || (hasRouterPorts ? 'router' : hasManagementPorts ? 'switch' : 'end-device')
+  const vendorType = getVendorType()
+  const inferredType = device.type || vendorType || (hasRouterPorts ? 'router' : hasManagementPorts ? 'switch' : 'end-device')
 
   // Use userType if set, otherwise use inferred type
   const effectiveType = device.userType || inferredType
