@@ -1,0 +1,1 @@
+ALTER TABLE `interfaces` ADD `link_up` integer;

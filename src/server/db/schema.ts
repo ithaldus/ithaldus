@@ -76,6 +76,7 @@ export const interfaces = sqliteTable('interfaces', {
   poeWatts: real('poe_watts'),
   poeStandard: text('poe_standard'),
   comment: text('comment'),  // Interface description/comment from device
+  linkUp: integer('link_up', { mode: 'boolean' }),  // Interface link status
 }, (table) => [
   index('idx_interfaces_device').on(table.deviceId),
 ])

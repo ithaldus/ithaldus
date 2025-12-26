@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { api, type Credential, type Network, type MatchedDevice } from '../lib/api'
-import { Plus, Upload, Key, Globe, Eye, EyeOff } from 'lucide-react'
+import { Plus, Upload, Key, Globe, Eye, EyeOff, List } from 'lucide-react'
 import { CredentialCard } from '../components/credentials/CredentialCard'
 
 type ExtendedCredential = Credential & { matchedDevices?: MatchedDevice[] }
@@ -11,7 +11,7 @@ export function Credentials() {
   const [credentials, setCredentials] = useState<ExtendedCredential[]>([])
   const [networks, setNetworks] = useState<Network[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(null)
+  const [selectedNetworkId, setSelectedNetworkId] = useState<string | null | 'all'>('all')
   const [showAddForm, setShowAddForm] = useState(false)
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [showAllPasswords, setShowAllPasswords] = useState(false)
@@ -24,10 +24,6 @@ export function Credentials() {
   useEffect(() => {
     loadData()
   }, [])
-
-  useEffect(() => {
-    loadCredentials()
-  }, [selectedNetworkId])
 
   async function loadData() {
     try {
@@ -43,8 +39,8 @@ export function Credentials() {
 
   async function loadCredentials() {
     try {
-      const networkId = selectedNetworkId === null ? 'global' : selectedNetworkId
-      const data = await api.credentials.list(networkId)
+      // Always load ALL credentials to keep tab counts accurate
+      const data = await api.credentials.list()
       setCredentials(data)
     } catch (err) {
       console.error('Failed to load credentials:', err)
@@ -52,6 +48,9 @@ export function Credentials() {
   }
 
   const filteredCredentials = useMemo(() => {
+    if (selectedNetworkId === 'all') {
+      return credentials
+    }
     return credentials.filter((cred) => cred.networkId === selectedNetworkId)
   }, [credentials, selectedNetworkId])
 
@@ -123,8 +122,10 @@ export function Credentials() {
   async function handleMove(id: string, newNetworkId: string | null) {
     try {
       await api.credentials.update(id, { networkId: newNetworkId ?? undefined })
-      // Remove from current list since it moved to another network
-      setCredentials(credentials.filter((c) => c.id !== id))
+      // Always update the credential in place to keep all credentials loaded
+      setCredentials(credentials.map((c) =>
+        c.id === id ? { ...c, networkId: newNetworkId } : c
+      ))
     } catch (err: unknown) {
       if (err instanceof Error) {
         alert(err.message)
@@ -141,8 +142,9 @@ export function Credentials() {
     a.username.localeCompare(b.username)
   )
 
-  // Create tabs: Global + all networks
-  const tabs = [
+  // Create tabs: All + Global + all networks
+  const tabs: { id: string | null | 'all'; name: string }[] = [
+    { id: 'all', name: 'All' },
     { id: null, name: 'Global' },
     ...networks.map((n) => ({ id: n.id, name: n.name })),
   ]
@@ -185,7 +187,9 @@ export function Credentials() {
           <div className="flex gap-1 overflow-x-auto pb-px">
             {tabs.map((tab) => {
               const isActive = tab.id === selectedNetworkId
-              const credCount = credentials.filter((c) => c.networkId === tab.id).length
+              const credCount = tab.id === 'all'
+                ? credentials.length
+                : credentials.filter((c) => c.networkId === tab.id).length
               return (
                 <button
                   key={tab.id ?? 'global'}
@@ -198,6 +202,7 @@ export function Credentials() {
                     }
                   `}
                 >
+                  {tab.id === 'all' && <List className="w-4 h-4" />}
                   {tab.id === null && <Globe className="w-4 h-4" />}
                   {tab.name}
                   <span className={`
@@ -217,7 +222,11 @@ export function Credentials() {
 
         {/* Scope Description */}
         <div className="mb-4 p-3 bg-slate-100 dark:bg-slate-800/50 rounded-lg text-sm text-slate-600 dark:text-slate-400">
-          {selectedNetworkId === null ? (
+          {selectedNetworkId === 'all' ? (
+            <>
+              Showing <strong className="text-slate-700 dark:text-slate-300">all credentials</strong> from all networks and global scope.
+            </>
+          ) : selectedNetworkId === null ? (
             <>
               <strong className="text-slate-700 dark:text-slate-300">Global credentials</strong> are tried on all networks after network-specific credentials.
             </>
@@ -380,6 +389,7 @@ export function Credentials() {
                 allCredentials={filteredCredentials}
                 networks={networks}
                 showAllPasswords={showAllPasswords}
+                showNetworkBadge={selectedNetworkId === 'all'}
                 onEdit={isAdmin ? handleEdit : undefined}
                 onDelete={isAdmin ? handleDelete : undefined}
                 onMove={isAdmin ? handleMove : undefined}

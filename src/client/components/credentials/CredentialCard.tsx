@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Eye, EyeOff, Pencil, Trash2, Router, Check, X, Network, ArrowRightLeft, Globe, ChevronDown } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Eye, EyeOff, Pencil, Trash2, Router, Check, X, Network, ArrowRightLeft, Globe } from 'lucide-react'
 import type { Credential, MatchedDevice, Network as NetworkType } from '../../lib/api'
 import { VendorLogo } from '../topology/VendorLogo'
 
@@ -10,18 +10,31 @@ interface CredentialCardProps {
   allCredentials: ExtendedCredential[]
   networks?: NetworkType[]
   showAllPasswords?: boolean
+  showNetworkBadge?: boolean
   onEdit?: (id: string, username: string, password: string) => void
   onDelete?: (id: string) => void
   onMove?: (id: string, networkId: string | null) => void
 }
 
-export function CredentialCard({ credential, allCredentials, networks = [], showAllPasswords = false, onEdit, onDelete, onMove }: CredentialCardProps) {
+export function CredentialCard({ credential, allCredentials, networks = [], showAllPasswords = false, showNetworkBadge = false, onEdit, onDelete, onMove }: CredentialCardProps) {
   const [showPasswordLocal, setShowPasswordLocal] = useState(false)
   const showPassword = showAllPasswords || showPasswordLocal
   const [showMoveMenu, setShowMoveMenu] = useState(false)
+  const [openUpward, setOpenUpward] = useState(false)
+  const moveButtonRef = useRef<HTMLButtonElement>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [editUsername, setEditUsername] = useState(credential.username)
   const [editPassword, setEditPassword] = useState(credential.password)
+
+  // Check if dropdown should open upward when menu is shown
+  useEffect(() => {
+    if (showMoveMenu && moveButtonRef.current) {
+      const rect = moveButtonRef.current.getBoundingClientRect()
+      const dropdownHeight = (networks.length + 1) * 40 + 16 // Approximate height: items + padding
+      const spaceBelow = window.innerHeight - rect.bottom
+      setOpenUpward(spaceBelow < dropdownHeight)
+    }
+  }, [showMoveMenu, networks.length])
 
   const isDuplicate = allCredentials.some(
     (c) => c.id !== credential.id && c.username === editUsername && c.password === editPassword
@@ -43,7 +56,11 @@ export function CredentialCard({ credential, allCredentials, networks = [], show
   const deviceCount = matchedDevices.length
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+    <div className={`rounded-lg border ${
+      deviceCount > 0
+        ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900'
+        : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+    }`}>
       {/* Header */}
       <div className="px-3 py-1.5">
         {isEditing ? (
@@ -94,42 +111,53 @@ export function CredentialCard({ credential, allCredentials, networks = [], show
           </div>
         ) : (
           <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-sm font-medium text-slate-900 dark:text-white">
-                  {credential.username}
-                </span>
-                <span className="text-slate-300 dark:text-slate-600">|</span>
-                <span className="font-mono text-sm text-slate-600 dark:text-slate-400">
-                  {showPassword ? credential.password : '••••••••'}
-                </span>
-                <button
-                  onClick={() => setShowPasswordLocal(!showPasswordLocal)}
-                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                  title={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-                <span className="text-xs">
-                  {deviceCount === 0 ? (
-                    <span className="text-amber-600 dark:text-amber-400">No devices matched</span>
-                  ) : (
-                    <span className="text-cyan-600 dark:text-cyan-400">
-                      Works on {deviceCount} device{deviceCount !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                </span>
-              </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-sm font-medium text-slate-900 dark:text-white">
+                {credential.username}
+              </span>
+              <span className="text-slate-300 dark:text-slate-600">|</span>
+              <span className="font-mono text-sm text-slate-600 dark:text-slate-400">
+                {showPassword ? credential.password : '••••••••'}
+              </span>
+              <button
+                onClick={() => setShowPasswordLocal(!showPasswordLocal)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
+              {showNetworkBadge && (
+                <span className={`
+                  inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full
+                  ${credential.networkId === null
+                    ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                  }
+                `}>
+                  {credential.networkId === null ? (
+                    <>
+                      <Globe className="w-3 h-3" />
+                      Global
+                    </>
+                  ) : (
+                    <>
+                      <Network className="w-3 h-3" />
+                      {networks.find((n) => n.id === credential.networkId)?.name || 'Unknown'}
+                    </>
+                  )}
+                </span>
+              )}
               {/* Move button with dropdown */}
               {onMove && networks.length > 0 && (
                 <div className="relative">
                   <button
+                    ref={moveButtonRef}
                     onClick={() => setShowMoveMenu(!showMoveMenu)}
                     className="p-2 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
                     title="Move to another network"
@@ -142,7 +170,7 @@ export function CredentialCard({ credential, allCredentials, networks = [], show
                         className="fixed inset-0 z-10"
                         onClick={() => setShowMoveMenu(false)}
                       />
-                      <div className="absolute right-0 top-full mt-1 z-20 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden">
+                      <div className={`absolute right-0 z-20 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden ${openUpward ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
                         <div className="py-1">
                           <button
                             onClick={() => {

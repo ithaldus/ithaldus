@@ -409,8 +409,13 @@ export function DeviceModal({
                 {device.vendor && <VendorLogo vendor={device.vendor} className="h-5 max-w-20 shrink-0" />}
                 <span className="truncate">{device.hostname || device.ip || 'Unknown Device'}</span>
               </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 font-mono">
-                {device.mac}
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-mono truncate">
+                {[
+                  device.mac,
+                  device.ip,
+                  device.model,
+                  device.serialNumber,
+                ].filter(Boolean).join(' | ')}
               </p>
             </div>
           </div>
@@ -486,6 +491,26 @@ export function DeviceModal({
             onChange={handleImageUpload}
             className="hidden"
           />
+        </div>
+
+        {/* Comment - Full Width Below Image */}
+        <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Add a note about this device (e.g., location, purpose, owner...)"
+              className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-slate-400 dark:placeholder-slate-500"
+            />
+            <button
+              onClick={handleSaveComment}
+              disabled={isSavingComment || comment === (device.comment || '')}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white disabled:text-slate-500 transition-colors"
+            >
+              {isSavingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -706,15 +731,23 @@ export function DeviceModal({
                 {[...device.interfaces]
                   .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
                   .map((iface) => {
-                    // Color coding: red if PoE power applied, gray otherwise
-                    // (link status up/down not currently available in data)
+                    // Color coding:
+                    // - Red if PoE power applied (with ⚡ icon)
+                    // - Green if link is up
+                    // - Gray if link is down or unknown
                     const hasPoe = iface.poeWatts && iface.poeWatts > 0
-                    const colorClass = hasPoe
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800'
-                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                    let colorClass: string
+                    if (hasPoe) {
+                      colorClass = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800'
+                    } else if (iface.linkUp === true) {
+                      colorClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800'
+                    } else {
+                      colorClass = 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                    }
 
                     // Build tooltip with additional info
                     const tooltipParts: string[] = []
+                    if (iface.linkUp !== null) tooltipParts.push(iface.linkUp ? 'Link Up' : 'Link Down')
                     if (iface.ip) tooltipParts.push(iface.ip)
                     if (iface.bridge) tooltipParts.push(`bridge: ${iface.bridge}`)
                     if (iface.vlan) tooltipParts.push(`VLAN ${iface.vlan}`)
@@ -784,33 +817,6 @@ export function DeviceModal({
               </div>
             </div>
           )}
-
-          {/* Comment */}
-          <div>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
-              <MapPin className="w-3 h-3" />
-              Comment
-            </label>
-            <div className="mt-2 flex gap-2">
-              <input
-                type="text"
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="e.g., Server Room, Building A"
-                className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-              />
-              <button
-                onClick={handleSaveComment}
-                disabled={isSavingComment || comment === (device.comment || '')}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white disabled:text-slate-500 transition-colors"
-              >
-                {isSavingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-              </button>
-            </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Comments are stored by MAC address and persist across scans.
-            </p>
-          </div>
 
           {/* Nomad Toggle */}
           <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800">
