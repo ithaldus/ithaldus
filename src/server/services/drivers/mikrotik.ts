@@ -141,8 +141,8 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     const nameMatch = line.match(/name=(\S+)/)
     const parentMatch = line.match(/interface=(\S+)/)
     const vlanIdMatch = line.match(/vlan-id=(\d+)/)
-    // Comment can contain spaces and special chars
-    const commentMatch = line.match(/comment="([^"]*)"/) || line.match(/comment=(\S+)/)
+    // Comment can contain spaces and special chars - match quoted or unquoted until next key= or end of line
+    const commentMatch = line.match(/comment="([^"]*)"/) || line.match(/comment=(.+?)(?=\s+[a-z-]+=|$)/i)
     if (nameMatch && parentMatch) {
       vlanToParent.set(nameMatch[1], parentMatch[1])
       if (vlanIdMatch) {
@@ -234,12 +234,19 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     const nameMatch = line.match(/name=(\S+)/)
     const macMatch = line.match(/mac-address=(\S+)/)
     const typeMatch = line.match(/type=(\S+)/)
-    // Comment can contain spaces and special chars, match until next key= or end of line
-    const commentMatch = line.match(/comment="([^"]*)"/) || line.match(/comment=(\S+)/)
+    // Comment can contain spaces and special chars - match quoted or unquoted until next key= or end of line
+    const commentMatch = line.match(/comment="([^"]*)"/) || line.match(/comment=(.+?)(?=\s+[a-z-]+=|$)/i)
     if (nameMatch) {
       const name = nameMatch[1]
       const ifType = typeMatch ? typeMatch[1] : ''
       const comment = commentMatch ? commentMatch[1] : null
+
+      // Parse flags from terse output: "0  R name=..." or "1 XR name=..."
+      // R = running (link up), X = disabled, S = slave
+      // Flags appear between index number and first key=value pair
+      const flagsMatch = line.match(/^\s*\d+\s+([A-Z]*)\s+name=/)
+      const flags = flagsMatch ? flagsMatch[1] : ''
+      const linkUp = flags.includes('R')
 
       // Find IP for this interface
       const ipLine = addressList.split('\n').find(l => l.includes(`interface=${name}`))
@@ -283,6 +290,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
         bridge: bridgeName,
         vlan,
         comment,
+        linkUp,
       })
     }
   }

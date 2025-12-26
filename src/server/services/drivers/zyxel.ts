@@ -184,7 +184,11 @@ async function zyxelShellExecMultiple(
 }
 
 // Get device info from Zyxel switches (GS1920 series, etc.)
-async function getZyxelInfo(client: Client, log?: (level: LogLevel, message: string) => void): Promise<DeviceInfo> {
+async function getZyxelInfo(
+  client: Client,
+  log?: (level: LogLevel, message: string) => void,
+  credentials?: { username: string; password: string }
+): Promise<DeviceInfo> {
   // Zyxel switches use a Cisco-like CLI and only support interactive shell (not exec)
   // Run ALL commands in a SINGLE shell session (connection closes after shell exits)
   const shellLog = log ? (level: 'info' | 'warn' | 'error', msg: string) => log(level, msg) : undefined
@@ -231,8 +235,10 @@ async function getZyxelInfo(client: Client, log?: (level: LogLevel, message: str
   }
 
   // Extract web admin-password from running config for fetching serial number
+  // Try multiple patterns as Zyxel config format varies
   const adminPasswordMatch = runningConfig.match(/admin-password\s+(\S+)/)
-  const webPassword = adminPasswordMatch ? adminPasswordMatch[1] : null
+  // Fallback to SSH credentials if no web password in config (Zyxel often uses same password)
+  const webPassword = adminPasswordMatch ? adminPasswordMatch[1] : credentials?.password || null
 
   // Get device IP from SSH client connection
   const clientConfig = (client as any)._sock?._host || (client as any).config?.host
@@ -358,6 +364,10 @@ async function getZyxelInfo(client: Client, log?: (level: LogLevel, message: str
       const portNum = portMatch[1]
       const portName = `Port ${portNum}`
 
+      // Parse link status: "Down" means no link, speed like "100M/F" or "1000M/F" means link up
+      // The link column typically shows: Down, 10M/H, 10M/F, 100M/H, 100M/F, 1000M/F, etc.
+      const linkUp = !line.includes('Down') && /\d+M\/[HF]/.test(line)
+
       // Build VLAN string: access VLAN + tagged VLANs
       let vlan: string | null = null
       const accessVlans = portVlans.get(portName) || []
@@ -385,6 +395,7 @@ async function getZyxelInfo(client: Client, log?: (level: LogLevel, message: str
         bridge: null,
         vlan,
         comment: null,
+        linkUp,
       })
     }
   }
@@ -422,9 +433,43 @@ async function getZyxelInfo(client: Client, log?: (level: LogLevel, message: str
     }
   }
 
-  if (log) {
-    log('info', `Parsed: hostname=${hostname}, model=${model}, interfaces=${interfaces.length}, neighbors=${neighbors.length}`)
+  // Detect uplink interface by finding the port with the most MAC addresses
+  // The uplink port typically sees all devices from the rest of the network
+  const macCountByPort: Map<string, number> = new Map()
+  for (const neighbor of neighbors) {
+    const count = macCountByPort.get(neighbor.interface) || 0
+    macCountByPort.set(neighbor.interface, count + 1)
   }
+
+  let ownUpstreamInterface: string | null = null
+  let maxMacs = 0
+  for (const [port, count] of macCountByPort) {
+    if (count > maxMacs) {
+      maxMacs = count
+      ownUpstreamInterface = port
+    }
+  }
+
+  // Only consider it an uplink if it has significantly more MACs than other ports
+  // (at least 3 MACs and more than twice the average of other ports)
+  if (ownUpstreamInterface && maxMacs >= 3) {
+    const otherPorts = [...macCountByPort.entries()].filter(([p]) => p !== ownUpstreamInterface)
+    const avgOther = otherPorts.length > 0
+      ? otherPorts.reduce((sum, [, c]) => sum + c, 0) / otherPorts.length
+      : 0
+    if (maxMacs <= avgOther * 2) {
+      ownUpstreamInterface = null  // Not clearly an uplink
+    }
+  }
+
+  if (log) {
+    log('info', `Parsed: hostname=${hostname}, model=${model}, interfaces=${interfaces.length}, neighbors=${neighbors.length}, uplink=${ownUpstreamInterface || 'unknown'}`)
+  }
+
+  // Filter out neighbors seen on upstream interface (they belong to parent device)
+  const filteredNeighbors = ownUpstreamInterface
+    ? neighbors.filter(n => n.interface !== ownUpstreamInterface)
+    : neighbors
 
   return {
     hostname,
@@ -432,9 +477,9 @@ async function getZyxelInfo(client: Client, log?: (level: LogLevel, message: str
     serialNumber,
     version,
     interfaces,
-    neighbors,
+    neighbors: filteredNeighbors,
     dhcpLeases: [],  // Zyxel switches typically don't run DHCP server
-    ownUpstreamInterface: null,  // Would need different detection for Zyxel
+    ownUpstreamInterface,
   }
 }
 
@@ -443,3 +488,6 @@ export const zyxelDriver: Driver = {
   name: 'zyxel',
   getDeviceInfo: getZyxelInfo,
 }
+
+// Export the function directly for use with credentials
+export { getZyxelInfo }

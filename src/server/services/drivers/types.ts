@@ -26,6 +26,7 @@ export interface InterfaceInfo {
   bridge: string | null
   vlan: string | null
   comment: string | null
+  linkUp: boolean | null  // Interface link status (true=up, false=down, null=unknown)
 }
 
 export interface NeighborInfo {

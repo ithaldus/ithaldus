@@ -38,6 +38,8 @@ export interface TopologyInterface {
   vlan: string | null
   poeWatts: number | null
   poeStandard: string | null
+  comment: string | null
+  linkUp: boolean | null
 }
 
 export interface TopologyResponse {

@@ -2,8 +2,8 @@
 
 export * from './types'
 export { mikrotikRouterOsDriver, mikrotikSwosDriver } from './mikrotik'
-export { zyxelDriver } from './zyxel'
-export { ruckusUnleashedDriver, ruckusSmartZoneDriver } from './ruckus'
+export { zyxelDriver, getZyxelInfo } from './zyxel'
+export { ruckusUnleashedDriver, ruckusSmartZoneDriver, getRuckusInfo, isRkscliDevice } from './ruckus'
 
 import type { Driver } from './types'
 import { mikrotikRouterOsDriver, mikrotikSwosDriver } from './mikrotik'

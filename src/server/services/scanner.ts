@@ -7,7 +7,9 @@ import { nanoid } from 'nanoid'
 import {
   sshExec,
   mikrotikRouterOsDriver,
-  zyxelDriver,
+  getZyxelInfo,
+  getRuckusInfo,
+  isRkscliDevice,
   type DeviceInfo,
   type LogLevel,
 } from './drivers'
@@ -55,6 +57,8 @@ export interface DiscoveredInterface {
   vlan: string | null
   poeWatts: number | null
   poeStandard: string | null
+  comment: string | null
+  linkUp: boolean | null
 }
 
 // Common SSH ports to check
@@ -160,6 +164,8 @@ const ouiOverrides: Record<string, string> = {
   '00241D': 'Ruckus',  // Ruckus Wireless
   '58B633': 'Ruckus',  // Ruckus Wireless
   '5C5B35': 'Ruckus',  // Ruckus Wireless
+  'D4BD4F': 'Ruckus',  // Ruckus Wireless (H550, R510, etc.)
+  '94B34F': 'Ruckus',  // Ruckus Wireless (Unleashed APs)
   '74910B': 'Routerboard.com',  // Routerboard.com (MikroTik)
 }
 
@@ -394,6 +400,15 @@ async function tryConnectOnce(
           'diffie-hellman-group14-sha1',
           'diffie-hellman-group1-sha1',
         ],
+        serverHostKey: [
+          'ssh-ed25519',
+          'ecdsa-sha2-nistp256',
+          'ecdsa-sha2-nistp384',
+          'ecdsa-sha2-nistp521',
+          'rsa-sha2-512',
+          'rsa-sha2-256',
+          'ssh-rsa',  // Legacy algorithm for older devices like Ruckus APs
+        ],
       },
     })
   })
@@ -486,6 +501,15 @@ async function tryConnectViaJumpHost(
               'diffie-hellman-group14-sha256',
               'diffie-hellman-group14-sha1',
               'diffie-hellman-group1-sha1',
+            ],
+            serverHostKey: [
+              'ssh-ed25519',
+              'ecdsa-sha2-nistp256',
+              'ecdsa-sha2-nistp384',
+              'ecdsa-sha2-nistp521',
+              'rsa-sha2-512',
+              'rsa-sha2-256',
+              'ssh-rsa',  // Legacy algorithm for older devices like Ruckus APs
             ],
           },
         })
@@ -1056,9 +1080,25 @@ export class NetworkScanner {
           // Zyxel detected from MAC or banner - use shell-based driver directly
           // Do NOT call sshExec as it will close the connection
           this.log('info', `${ip}: Zyxel detected from ${macVendor === 'Zyxel' ? 'MAC OUI' : 'banner'}, using shell mode`)
-          deviceInfo = await zyxelDriver.getDeviceInfo(connectedClient, (level, msg) => this.log(level, `${ip}: ${msg}`))
+          deviceInfo = await getZyxelInfo(
+            connectedClient,
+            (level, msg) => this.log(level, `${ip}: ${msg}`),
+            { username: successfulCreds!.username, password: successfulCreds!.password }
+          )
           vendorInfo = { vendor: 'Zyxel', driver: 'zyxel' }
-          this.log('info', `${ip}: Detected Zyxel ${deviceInfo.model || 'switch'}`)
+          this.log('info', `${ip}: Detected Zyxel ${deviceInfo.model || 'switch'}${deviceInfo.serialNumber ? ' (S/N: ' + deviceInfo.serialNumber + ')' : ''}`)
+        } else if (macVendor === 'Ruckus' || isRkscliDevice(banner)) {
+          // Ruckus detected from MAC or banner - use rkscli/Unleashed shell driver
+          // Requires special shell-based login for rkscli devices
+          this.log('info', `${ip}: Ruckus detected from ${macVendor === 'Ruckus' ? 'MAC OUI' : 'banner'}, using shell mode`)
+          deviceInfo = await getRuckusInfo(
+            connectedClient,
+            banner,
+            { username: successfulCreds!.username, password: successfulCreds!.password },
+            (level, msg) => this.log(level, `${ip}: ${msg}`)
+          )
+          vendorInfo = { vendor: 'Ruckus', driver: isRkscliDevice(banner) ? 'ruckus-smartzone' : 'ruckus-unleashed' }
+          this.log('info', `${ip}: Detected ${deviceInfo.model || 'Ruckus AP'}${deviceInfo.serialNumber ? ' (S/N: ' + deviceInfo.serialNumber + ')' : ''}`)
         } else {
           // Not Zyxel - safe to use exec channel for detection
           // Try MikroTik first (most common in this network)
@@ -1162,21 +1202,10 @@ export class NetworkScanner {
       deviceType = vendorType || 'end-device'
     }
 
-    // Use device's own detected upstream interface if available
-    // Priority: 1) Bridge-based detection (ownUpstreamInterface)
-    //           2) Interface with the IP we connected to (for non-bridged setups like combo ports)
-    //           3) Parent's interface name (fallback)
-    let actualUpstreamInterface = deviceInfo?.ownUpstreamInterface
-    if (!actualUpstreamInterface && deviceInfo) {
-      // Find the interface that has the IP we used to connect
-      const ipInterface = deviceInfo.interfaces.find(i => i.ip === ip)
-      if (ipInterface) {
-        actualUpstreamInterface = ipInterface.name
-      }
-    }
-    if (!actualUpstreamInterface) {
-      actualUpstreamInterface = upstreamInterface
-    }
+    // upstreamInterface is the PARENT device's interface where this device is connected
+    // ownUpstreamInterface is this device's own physical port that connects upstream
+    // These are different things and should not be confused
+    const actualUpstreamInterface = upstreamInterface
 
     // Create device record - use SNMP info as fallback if no SSH access
     const newDevice: DiscoveredDevice = {
@@ -1330,6 +1359,7 @@ export class NetworkScanner {
           bridge: iface.bridge,
           vlan: iface.vlan,
           comment: iface.comment,
+          linkUp: iface.linkUp,
         })
 
         newDevice.interfaces.push({
@@ -1341,6 +1371,7 @@ export class NetworkScanner {
           poeWatts: null,
           poeStandard: null,
           comment: iface.comment,
+          linkUp: iface.linkUp,
         })
       }
     }
