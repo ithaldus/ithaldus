@@ -45,3 +45,4 @@ bun.lockb
 .browser-profile/
 logos/
 .browser-profile-puppeteer/
+.playwright-mcp/
