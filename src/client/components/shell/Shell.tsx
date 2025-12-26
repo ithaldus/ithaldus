@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { NavLink, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin, Loader2 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
-import { api, type Network as NetworkType } from '../../lib/api'
+import { api, type Network as NetworkType, onConnectionChange, isConnected } from '../../lib/api'
 import { Logo } from '../Logo'
 
 interface ShellProps {
@@ -19,6 +19,7 @@ export function Shell({ children }: ShellProps) {
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
   const [networks, setNetworks] = useState<NetworkType[]>([])
   const [scanningNetworks, setScanningNetworks] = useState<Set<string>>(new Set())
+  const [serverConnected, setServerConnected] = useState(() => isConnected())
 
   // Extract networkId from URL path
   const networkMatch = location.pathname.match(/^\/networks\/([^/]+)/)
@@ -67,6 +68,14 @@ export function Shell({ children }: ShellProps) {
     const interval = setInterval(checkScanStatus, 3000)
     return () => clearInterval(interval)
   }, [networks, checkScanStatus])
+
+  // Subscribe to connection status changes
+  useEffect(() => {
+    return onConnectionChange(setServerConnected)
+  }, [])
+
+  // Logo color based on connection status
+  const logoColor = serverConnected ? 'text-cyan-400' : 'text-slate-600'
 
   const toggleDarkMode = () => {
     const newDark = !isDark
@@ -127,11 +136,11 @@ export function Shell({ children }: ShellProps) {
         {/* Sidebar header with collapse toggle */}
         <div className={`h-14 flex items-center shrink-0 ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''} px-4`}>
           <div className={`flex items-center gap-2 flex-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
-            <Logo className="w-6 h-6 text-cyan-400" />
-            <span className="text-lg font-semibold text-cyan-400">TopoGraph</span>
+            <Logo className={`w-6 h-6 ${logoColor}`} />
+            <span className={`text-lg font-semibold ${logoColor}`}>TopoGraph</span>
           </div>
           {sidebarCollapsed && (
-            <Logo className="w-6 h-6 text-cyan-400 hidden lg:block" />
+            <Logo className={`w-6 h-6 ${logoColor} hidden lg:block`} />
           )}
           {/* Desktop collapse toggle */}
           <button
@@ -313,8 +322,8 @@ export function Shell({ children }: ShellProps) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <Logo className="w-5 h-5 text-cyan-400" />
-            <span className="font-semibold text-cyan-400">TopoGraph</span>
+            <Logo className={`w-5 h-5 ${logoColor}`} />
+            <span className={`font-semibold ${logoColor}`}>TopoGraph</span>
           </div>
           <div className="w-9" /> {/* Spacer for centering */}
         </header>

@@ -13,7 +13,7 @@ const scanConnections = new Map<string, Set<ScanWebSocket>>()
 
 export interface ScanUpdate {
   type: 'log' | 'topology' | 'status'
-  data: LogMessage | TopologyResponse | { status: string }
+  data: LogMessage | TopologyResponse | { status: string; error?: string }
 }
 
 export const wsManager = {
@@ -65,8 +65,8 @@ export const wsManager = {
   },
 
   // Broadcast status change
-  broadcastStatus(networkId: string, status: string) {
-    this.broadcast(networkId, { type: 'status', data: { status } })
+  broadcastStatus(networkId: string, status: string, error?: string) {
+    this.broadcast(networkId, { type: 'status', data: { status, error } })
   },
 
   // Get connection count for a network

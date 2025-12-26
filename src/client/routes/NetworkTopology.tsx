@@ -11,6 +11,8 @@ import {
   Radar,
   Loader2,
   Monitor,
+  AlertTriangle,
+  X,
 } from 'lucide-react'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
@@ -50,6 +52,7 @@ export function NetworkTopology() {
   const [selectedDevice, setSelectedDevice] = useState<TopologyDevice | null>(null)
   const [lastScannedAt, setLastScannedAt] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
   const topologyRef = useRef<HTMLDivElement>(null)
   const [visibility, setVisibility] = useState<VisibilityToggles>(() => {
     const stored = localStorage.getItem('topology-visibility')
@@ -174,6 +177,9 @@ export function NetworkTopology() {
 
             case 'status':
               setScanStatus(message.data.status as ScanStatus)
+              if (message.data.status === 'error' && message.data.error) {
+                setScanError(message.data.error)
+              }
               if (message.data.status !== 'running') {
                 // Scan complete, close WebSocket
                 ws.close()
@@ -223,6 +229,7 @@ export function NetworkTopology() {
     try {
       setLogs([])
       setScanStatus('running')
+      setScanError(null)
       setConsoleOpen(true)
 
       // Connect to WebSocket first and wait for it to open
@@ -662,6 +669,41 @@ export function NetworkTopology() {
           onLocationChange={handleLocationChange}
           onAssetTagChange={handleAssetTagChange}
         />
+      )}
+
+      {/* Scan Error Modal */}
+      {scanError && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-8 max-w-md mx-4 text-center relative">
+            <button
+              onClick={() => setScanError(null)}
+              className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex justify-center mb-4">
+              <div className="p-4 rounded-full bg-red-100 dark:bg-red-900/30">
+                <AlertTriangle className="w-10 h-10 text-red-600 dark:text-red-400" />
+              </div>
+            </div>
+
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+              Scan Failed
+            </h2>
+
+            <p className="text-slate-600 dark:text-slate-400 mb-6">
+              {scanError}
+            </p>
+
+            <button
+              onClick={() => setScanError(null)}
+              className="w-full px-4 py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-medium rounded-lg transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )

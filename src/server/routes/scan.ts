@@ -215,11 +215,11 @@ scanRoutes.post('/:networkId/start', requireAdmin, async (c) => {
         }
       }, 5 * 60 * 1000)
     },
-    onError: () => {
+    onError: (error: string) => {
       scanState.status = 'error'
       scanState.scanner = undefined
-      // Broadcast status change
-      wsManager.broadcastStatus(networkId, 'error')
+      // Broadcast status change with error message
+      wsManager.broadcastStatus(networkId, 'error', error)
     },
   })
 

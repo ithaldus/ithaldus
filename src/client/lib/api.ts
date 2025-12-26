@@ -1,26 +1,134 @@
 const API_BASE = '/api'
 
+// Connection status event emitter
+type ConnectionListener = (connected: boolean) => void
+const connectionListeners: Set<ConnectionListener> = new Set()
+
+export function onConnectionChange(listener: ConnectionListener): () => void {
+  connectionListeners.add(listener)
+  return () => connectionListeners.delete(listener)
+}
+
+function notifyConnectionChange(connected: boolean) {
+  connectionListeners.forEach(listener => listener(connected))
+}
+
+// Server restart event emitter
+type RestartListener = () => void
+const restartListeners: Set<RestartListener> = new Set()
+
+export function onServerRestart(listener: RestartListener): () => void {
+  restartListeners.add(listener)
+  return () => restartListeners.delete(listener)
+}
+
+function notifyServerRestart() {
+  restartListeners.forEach(listener => listener())
+}
+
+// Track connection state and boot time
+let lastConnectionState = true
+let lastBootTime: number | null = null
+
+export function isConnected(): boolean {
+  return lastConnectionState
+}
+
+// Heartbeat polling to detect server disconnection and restarts
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null
+const HEARTBEAT_INTERVAL = 3000 // 3 seconds
+
+async function ping(): Promise<{ ok: boolean; bootTime?: number }> {
+  try {
+    const response = await fetch(`${API_BASE}/ping`, {
+      method: 'GET',
+      credentials: 'same-origin',
+    })
+    if (response.ok) {
+      return await response.json()
+    }
+    return { ok: false }
+  } catch {
+    return { ok: false }
+  }
+}
+
+async function checkConnection() {
+  const result = await ping()
+  const connected = result.ok
+
+  // Check for server restart (boot time changed)
+  if (connected && result.bootTime !== undefined) {
+    if (lastBootTime !== null && result.bootTime !== lastBootTime) {
+      // Server restarted!
+      notifyServerRestart()
+    }
+    lastBootTime = result.bootTime
+  }
+
+  // Notify connection state change
+  if (connected !== lastConnectionState) {
+    lastConnectionState = connected
+    notifyConnectionChange(connected)
+  }
+}
+
+export function startHeartbeat() {
+  if (heartbeatInterval) return
+  // Check immediately
+  checkConnection()
+  // Then poll regularly
+  heartbeatInterval = setInterval(checkConnection, HEARTBEAT_INTERVAL)
+}
+
+export function stopHeartbeat() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval)
+    heartbeatInterval = null
+  }
+}
+
+// Start heartbeat automatically
+startHeartbeat()
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    credentials: 'same-origin',
-  })
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      credentials: 'same-origin',
+    })
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }))
-    throw new Error(error.error || 'Request failed')
+    // Connection successful - notify if we were previously disconnected
+    if (!lastConnectionState) {
+      lastConnectionState = true
+      notifyConnectionChange(true)
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Request failed' }))
+      throw new Error(error.error || 'Request failed')
+    }
+
+    return response.json()
+  } catch (error) {
+    // Check if this is a network error (server unreachable)
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (lastConnectionState) {
+        lastConnectionState = false
+        notifyConnectionChange(false)
+      }
+    }
+    throw error
   }
-
-  return response.json()
 }
 
 export const api = {
@@ -262,6 +370,7 @@ export interface Interface {
   poeWatts: number | null
   poeStandard: string | null
   comment: string | null
+  linkUp: boolean | null
 }
 
 export interface DeviceImage {
@@ -310,7 +419,7 @@ export interface TopologyResponse {
 export type ScanUpdateMessage =
   | { type: 'log'; data: LogMessage }
   | { type: 'topology'; data: TopologyResponse }
-  | { type: 'status'; data: { status: string } }
+  | { type: 'status'; data: { status: string; error?: string } }
 
 // WebSocket URL helper
 export function getScanWebSocketUrl(networkId: string): string {

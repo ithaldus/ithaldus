@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { Shell } from './components/shell/Shell'
+import { ConnectionStatus } from './components/ConnectionStatus'
 import { Login } from './routes/Login'
 import { Networks } from './routes/Networks'
 import { NetworkTopology } from './routes/NetworkTopology'
@@ -39,33 +40,35 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 export function App() {
   return (
     <AuthProvider>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <Shell>
-                <Routes>
-                  <Route path="/" element={<Navigate to="/networks" replace />} />
-                  <Route path="/networks" element={<Networks />} />
-                  <Route path="/networks/:networkId" element={<NetworkTopology />} />
-                  <Route path="/networks/:networkId/locations" element={<Locations />} />
-                  <Route path="/credentials" element={<Credentials />} />
-                  <Route
-                    path="/users"
-                    element={
-                      <AdminRoute>
-                        <Users />
-                      </AdminRoute>
-                    }
-                  />
-                </Routes>
-              </Shell>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
+      <ConnectionStatus>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <Shell>
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/networks" replace />} />
+                    <Route path="/networks" element={<Networks />} />
+                    <Route path="/networks/:networkId" element={<NetworkTopology />} />
+                    <Route path="/networks/:networkId/locations" element={<Locations />} />
+                    <Route path="/credentials" element={<Credentials />} />
+                    <Route
+                      path="/users"
+                      element={
+                        <AdminRoute>
+                          <Users />
+                        </AdminRoute>
+                      }
+                    />
+                  </Routes>
+                </Shell>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </ConnectionStatus>
     </AuthProvider>
   )
 }

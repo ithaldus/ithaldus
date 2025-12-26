@@ -17,6 +17,12 @@ app.use('*', logger())
 // API routes
 const api = new Hono()
 
+// Server boot timestamp for detecting restarts
+const bootTime = Date.now()
+
+// Health check endpoint (public)
+api.get('/ping', (c) => c.json({ ok: true, bootTime }))
+
 // Auth routes (public)
 api.route('/auth', authRoutes)
 
