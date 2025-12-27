@@ -1528,9 +1528,8 @@ export class NetworkScanner {
     // Track which credentials we tried and failed (to save later)
     const triedCredentials: CredentialInfo[] = []
 
-    // Determine connection strategy based on jump host support
-    // If jump host is supported and this is not the root device, use jump host exclusively
-    const useJumpHostOnly = this.jumpHostSupported && this.jumpHostClient && !isRootDevice
+    // Determine if jump host is available for fallback
+    const canUseJumpHost = this.jumpHostSupported && this.jumpHostClient && !isRootDevice
 
     // Helper to format try count as ordinal
     const ordinal = (n: number) => {
@@ -1544,26 +1543,8 @@ export class NetworkScanner {
     const hasMikroTikPorts = openPorts.includes(8291) || openPorts.includes(8728)
     const hasTelnetPort = openPorts.includes(23)
 
-    if (!shouldSkipLogin && useJumpHostOnly) {
-      // Jump host supported - connect via tunnel (skip direct attempts)
-      const skipMsg = skippedCount > 0 ? ` (skipping ${skippedCount} known-bad)` : ''
-      this.updateChannel(channelId, 'testing credentials')
-      this.log('info', `${ip}: Connecting via jump host (${this.rootIp}), ${credsToTry.length} credentials (${SCAN_CONCURRENCY.CREDENTIAL_TESTING} concurrent)${skipMsg}`)
-
-      const result = await this.tryCredentialsParallel(ip, credsToTry, true, ip)
-      if (result) {
-        connectedClient = result.client
-        banner = result.banner
-        successfulCreds = result.cred
-        usedJumpHost = true
-        triedCredentials.push(...result.triedCredentials)
-        this.log('success', `${ip}: SSH login via jump host successful with ${result.cred.username} (${ordinal(result.tryNumber)} try)`)
-      } else {
-        triedCredentials.push(...credsToTry)
-        this.log('warn', `${ip}: SSH via jump host failed - no valid credentials (tried ${credsToTry.length})`)
-      }
-    } else if (!shouldSkipLogin && hasSSHPort) {
-      // No jump host or this is root device - try direct connection
+    if (!shouldSkipLogin && hasSSHPort) {
+      // SSH port is open - try direct connection first
       const skipMsg = skippedCount > 0 ? ` (skipping ${skippedCount} known-bad)` : ''
       this.updateChannel(channelId, 'testing credentials')
       this.log('info', `${ip}: Trying ${credsToTry.length} credentials (${SCAN_CONCURRENCY.CREDENTIAL_TESTING} concurrent)${skipMsg}`)
@@ -1576,8 +1557,25 @@ export class NetworkScanner {
         triedCredentials.push(...result.triedCredentials)
         this.log('success', `${ip}: SSH login successful with ${result.cred.username} (${ordinal(result.tryNumber)} try)`)
       } else {
-        triedCredentials.push(...credsToTry)
-        this.log('warn', `${ip}: SSH login failed - no valid credentials (tried ${credsToTry.length})`)
+        // Direct connection failed - try jump host if available
+        if (canUseJumpHost) {
+          this.log('info', `${ip}: Direct SSH failed, trying via jump host (${this.rootIp})...`)
+          const jumpResult = await this.tryCredentialsParallel(ip, credsToTry, true, ip)
+          if (jumpResult) {
+            connectedClient = jumpResult.client
+            banner = jumpResult.banner
+            successfulCreds = jumpResult.cred
+            usedJumpHost = true
+            triedCredentials.push(...jumpResult.triedCredentials)
+            this.log('success', `${ip}: SSH login via jump host successful with ${jumpResult.cred.username} (${ordinal(jumpResult.tryNumber)} try)`)
+          } else {
+            triedCredentials.push(...credsToTry)
+            this.log('warn', `${ip}: SSH login failed (direct and jump host) - no valid credentials (tried ${credsToTry.length})`)
+          }
+        } else {
+          triedCredentials.push(...credsToTry)
+          this.log('warn', `${ip}: SSH login failed - no valid credentials (tried ${credsToTry.length})`)
+        }
       }
     } else if (!shouldSkipLogin && !hasSSHPort && this.jumpHostClient && !isRootDevice) {
       // Port 22 not directly reachable, but we have a jump host - try via tunnel
