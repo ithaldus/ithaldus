@@ -584,30 +584,37 @@ async function scanPorts(ip: string, ports: number[], timeout = 3000): Promise<n
 // Check which ports are open on a device via SSH jump host tunnel
 // The SSH tunnel doesn't attempt TCP connection until we use the stream.
 // We call stream.end() to trigger the connection attempt.
-// - Open ports: connection stays alive, we timeout
-// - Closed ports: SSH server closes the channel immediately (connection refused)
+// - Reachable + open ports: connection stays alive, we timeout
+// - Reachable + closed ports: SSH server closes channel quickly (connection refused)
+// - Unreachable targets: ALL ports timeout (no close events)
+// We detect unreachable targets by checking if ANY port closes quickly.
 async function scanPortsViaJumpHost(
   jumpHost: Client,
   targetIp: string,
   ports: number[],
   timeout = 2000
 ): Promise<number[]> {
-  const openPorts: number[] = []
+  interface PortResult {
+    port: number
+    open: boolean
+    closedQuickly: boolean
+    gotData: boolean
+  }
 
-  await Promise.all(
+  const results = await Promise.all(
     ports.map(async (port) => {
-      const isOpen = await new Promise<boolean>((resolve) => {
+      return new Promise<PortResult>((resolve) => {
         let resolved = false
-        const done = (result: boolean) => {
+        const done = (open: boolean, closedQuickly: boolean, gotData: boolean) => {
           if (resolved) return
           resolved = true
           clearTimeout(timer)
-          resolve(result)
+          resolve({ port, open, closedQuickly, gotData })
         }
 
         const timer = setTimeout(() => {
-          // Timeout = port is open (connection stayed alive)
-          done(true)
+          // Timeout - could be open port OR unreachable target
+          done(true, false, false)
         }, timeout)
 
         jumpHost.forwardOut(
@@ -617,25 +624,25 @@ async function scanPortsViaJumpHost(
           port,
           (err, stream) => {
             if (err) {
-              // forwardOut failed - port is closed or unreachable
-              done(false)
+              // forwardOut failed - port is closed
+              done(false, true, false)
               return
             }
 
             stream.on('error', () => {
               stream.destroy()
-              done(false)
+              done(false, true, false)
             })
 
-            // If stream closes, the port is closed (connection refused)
+            // If stream closes quickly, port is closed (connection refused)
             stream.on('close', () => {
-              done(false)
+              done(false, true, false)
             })
 
             // Receiving data means port is definitely open
             stream.on('data', () => {
               stream.destroy()
-              done(true)
+              done(true, false, true)
             })
 
             // Trigger the actual TCP connection by ending the write side
@@ -643,14 +650,25 @@ async function scanPortsViaJumpHost(
           }
         )
       })
-
-      if (isOpen) {
-        openPorts.push(port)
-      }
     })
   )
 
-  return openPorts.sort((a, b) => a - b)
+  // Analyze results to detect unreachable targets
+  const closedQuicklyCount = results.filter(r => r.closedQuickly).length
+  const gotDataCount = results.filter(r => r.gotData).length
+
+  // If no ports closed quickly AND no ports received data, target is likely unreachable
+  // In this case, we can't distinguish open from closed, so return empty (assume no open ports)
+  if (closedQuicklyCount === 0 && gotDataCount === 0) {
+    // All ports timed out - target is unreachable from jump host
+    return []
+  }
+
+  // Target is reachable - ports that timed out (didn't close quickly) are open
+  return results
+    .filter(r => r.open)
+    .map(r => r.port)
+    .sort((a, b) => a - b)
 }
 
 // Test if jump host supports TCP forwarding (forwardOut)
