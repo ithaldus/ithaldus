@@ -951,7 +951,7 @@ export function DeviceModal({
           </div>
 
           {/* Device Logs - Side panel on 2xl screens */}
-          <div className="hidden 2xl:flex flex-col w-[500px] shrink-0 border-l border-slate-200 dark:border-slate-700 bg-slate-900 dark:bg-black">
+          <div className="hidden 2xl:flex flex-col w-1/2 shrink-0 border-l border-slate-200 dark:border-slate-700 bg-slate-900 dark:bg-black">
             <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2">
               <ScrollText className="w-4 h-4 text-slate-400" />
               <span className="text-sm font-medium text-white">Scan Logs</span>
