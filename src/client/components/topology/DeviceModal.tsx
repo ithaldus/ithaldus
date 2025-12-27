@@ -433,7 +433,7 @@ export function DeviceModal({
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Device Image */}
             <div
-              className="relative w-full h-48 2xl:h-72 shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 group"
+              className="relative w-full h-40 2xl:h-56 shrink-0 overflow-hidden bg-slate-800 dark:bg-slate-900 border-b border-slate-700 group"
               onMouseEnter={() => setImageHovered(true)}
               onMouseLeave={() => setImageHovered(false)}
             >
