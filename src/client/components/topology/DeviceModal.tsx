@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   X,
   Router,
@@ -211,6 +211,26 @@ export function DeviceModal({
   const DeviceIcon = deviceTypeOptions.find(opt => opt.value === deviceType)?.icon || Monitor
   const openPorts = parseOpenPorts(device.openPorts)
   const needsCredentials = !device.accessible && openPorts.includes(22)
+
+  // Group logs by scanId for visual separation
+  const groupedLogs = useMemo(() => {
+    const groups: { scanId: string; date: string; logs: typeof deviceLogs }[] = []
+    let currentScanId: string | null = null
+
+    for (const log of deviceLogs) {
+      if (log.scanId !== currentScanId) {
+        currentScanId = log.scanId
+        groups.push({
+          scanId: log.scanId,
+          date: new Date(log.timestamp).toLocaleDateString(),
+          logs: [log],
+        })
+      } else {
+        groups[groups.length - 1].logs.push(log)
+      }
+    }
+    return groups
+  }, [deviceLogs])
 
   const handleSaveComment = async () => {
     setIsSavingComment(true)
@@ -920,7 +940,7 @@ export function DeviceModal({
               )}
             </button>
             {logsExpanded && (
-              <div className="mt-3 max-h-48 overflow-y-auto space-y-1 rounded-lg bg-slate-900 dark:bg-black p-2">
+              <div className="mt-3 max-h-48 overflow-y-auto rounded-lg bg-slate-900 dark:bg-black p-2">
                 {loadingLogs ? (
                   <div className="flex items-center justify-center py-4">
                     <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
@@ -928,19 +948,32 @@ export function DeviceModal({
                 ) : deviceLogs.length === 0 ? (
                   <p className="text-sm text-slate-500 text-center py-4">No logs found for this device</p>
                 ) : (
-                  deviceLogs.map((log) => (
-                    <div key={log.id} className="flex gap-2 text-xs font-mono">
-                      <span className="text-slate-500 shrink-0">
-                        [{new Date(log.timestamp).toLocaleTimeString()}]
-                      </span>
-                      <span className={`
-                        ${log.level === 'error' ? 'text-red-400' : ''}
-                        ${log.level === 'warn' ? 'text-amber-400' : ''}
-                        ${log.level === 'success' ? 'text-green-400' : ''}
-                        ${log.level === 'info' ? 'text-slate-300' : ''}
-                      `}>
-                        {log.message}
-                      </span>
+                  groupedLogs.map((group, groupIndex) => (
+                    <div key={group.scanId}>
+                      {/* Scan separator */}
+                      <div className={`flex items-center gap-2 py-1.5 ${groupIndex > 0 ? 'mt-2 border-t border-slate-700' : ''}`}>
+                        <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">
+                          Scan {group.date}
+                        </span>
+                      </div>
+                      {/* Logs for this scan */}
+                      <div className="space-y-1">
+                        {group.logs.map((log) => (
+                          <div key={log.id} className="flex gap-2 text-xs font-mono">
+                            <span className="text-slate-500 shrink-0">
+                              [{new Date(log.timestamp).toLocaleTimeString()}]
+                            </span>
+                            <span className={`
+                              ${log.level === 'error' ? 'text-red-400' : ''}
+                              ${log.level === 'warn' ? 'text-amber-400' : ''}
+                              ${log.level === 'success' ? 'text-green-400' : ''}
+                              ${log.level === 'info' ? 'text-slate-300' : ''}
+                            `}>
+                              {log.message}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))
                 )}
@@ -961,7 +994,7 @@ export function DeviceModal({
                 </span>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-1">
+            <div className="flex-1 overflow-y-auto p-3">
               {loadingLogs ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
@@ -969,19 +1002,32 @@ export function DeviceModal({
               ) : deviceLogs.length === 0 ? (
                 <p className="text-sm text-slate-500 text-center py-8">No logs found for this device</p>
               ) : (
-                deviceLogs.map((log) => (
-                  <div key={log.id} className="flex gap-2 text-xs font-mono">
-                    <span className="text-slate-500 shrink-0">
-                      [{new Date(log.timestamp).toLocaleTimeString()}]
-                    </span>
-                    <span className={`
-                      ${log.level === 'error' ? 'text-red-400' : ''}
-                      ${log.level === 'warn' ? 'text-amber-400' : ''}
-                      ${log.level === 'success' ? 'text-green-400' : ''}
-                      ${log.level === 'info' ? 'text-slate-300' : ''}
-                    `}>
-                      {log.message}
-                    </span>
+                groupedLogs.map((group, groupIndex) => (
+                  <div key={group.scanId}>
+                    {/* Scan separator */}
+                    <div className={`flex items-center gap-2 py-2 ${groupIndex > 0 ? 'mt-3 border-t border-slate-700' : ''}`}>
+                      <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">
+                        Scan {group.date}
+                      </span>
+                    </div>
+                    {/* Logs for this scan */}
+                    <div className="space-y-1">
+                      {group.logs.map((log) => (
+                        <div key={log.id} className="flex gap-2 text-xs font-mono">
+                          <span className="text-slate-500 shrink-0">
+                            [{new Date(log.timestamp).toLocaleTimeString()}]
+                          </span>
+                          <span className={`
+                            ${log.level === 'error' ? 'text-red-400' : ''}
+                            ${log.level === 'warn' ? 'text-amber-400' : ''}
+                            ${log.level === 'success' ? 'text-green-400' : ''}
+                            ${log.level === 'info' ? 'text-slate-300' : ''}
+                          `}>
+                            {log.message}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))
               )}
