@@ -433,7 +433,7 @@ export function DeviceModal({
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Device Image */}
             <div
-              className="relative w-full h-40 2xl:h-56 shrink-0 overflow-hidden bg-slate-800 dark:bg-slate-900 border-b border-slate-700 group"
+              className="relative w-full h-48 2xl:aspect-[3/1] 2xl:h-auto 2xl:max-h-64 shrink-0 overflow-hidden bg-slate-800 dark:bg-slate-900 border-b border-slate-700 group"
               onMouseEnter={() => setImageHovered(true)}
               onMouseLeave={() => setImageHovered(false)}
             >
@@ -446,7 +446,7 @@ export function DeviceModal({
                   <img
                     src={`data:${deviceImage.mimeType};base64,${deviceImage.data}`}
                     alt="Device"
-                    className="w-full h-full object-contain cursor-pointer"
+                    className="w-full h-full object-cover cursor-pointer"
                     onClick={() => setShowFullImage(true)}
                   />
                   {/* Hover overlay */}
