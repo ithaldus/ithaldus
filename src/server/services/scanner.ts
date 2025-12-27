@@ -513,6 +513,8 @@ async function tryConnectViaJumpHost(
           username,
           password,
           readyTimeout: timeout - 2000,  // Slightly less than outer timeout
+          keepaliveInterval: 5000,  // Send keepalive every 5s to keep tunnel active
+          keepaliveCountMax: 10,
           algorithms: {
             kex: [
               'curve25519-sha256',
@@ -1443,6 +1445,12 @@ export class NetworkScanner {
     // Build ordered list of credentials to try
     let credsToTry = [...this.credentialsList]
 
+    // For root device, only try the root credential - we already know it works
+    // This prevents unnecessary auth failures being logged on the root device
+    if (isRootDevice) {
+      credsToTry = [this.credentialsList[0]!]
+    }
+
     // If we know the MAC, filter out credentials that have previously failed on this device
     // Exception: never skip the root credential (first in list) on the root device
     const failedCredsForDevice = knownMac ? this.failedCredentialsMap.get(knownMac) : undefined
@@ -1575,7 +1583,8 @@ export class NetworkScanner {
           deviceInfo = await getZyxelInfo(
             connectedClient,
             (level, msg) => this.log(level, `${ip}: ${msg}`),
-            { username: successfulCreds!.username, password: successfulCreds!.password }
+            { username: successfulCreds!.username, password: successfulCreds!.password },
+            ip  // Pass IP explicitly for jump host connections
           )
           vendorInfo = { vendor: 'Zyxel', driver: 'zyxel' }
           this.log('info', `${ip}: Detected Zyxel ${deviceInfo.model || 'switch'}${deviceInfo.serialNumber ? ' (S/N: ' + deviceInfo.serialNumber + ')' : ''}`)

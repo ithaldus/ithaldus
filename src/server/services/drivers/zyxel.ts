@@ -72,15 +72,30 @@ async function fetchSerialFromWeb(
 // Strip ANSI escape codes and other terminal control characters from Zyxel output
 function stripControlChars(str: string): string {
   return str
-    // Remove ANSI escape sequences (CSI sequences)
+    // Remove ANSI escape sequences (CSI sequences like ESC[...)
     .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
-    // Remove other escape sequences
-    .replace(/\x1b[^[]/g, '')
+    // Remove VT100 escape sequences (ESC followed by single char, e.g., ESC 7 = save cursor)
+    .replace(/\x1b./g, '')
     // Remove carriage returns
     .replace(/\r/g, '')
     // Remove null bytes
     .replace(/\x00/g, '')
-    // Remove the weird 7777... pattern (appears to be terminal init codes)
+    // Remove the weird 7777... pattern (leftover from ESC 7 sequences not fully stripped)
+    .replace(/^7+$/gm, '')
+    // Remove trailing 7s from prompt lines (e.g., "hostname# 7" -> "hostname#")
+    .replace(/^(\S+#)\s*7*\s*$/gm, '$1')
+}
+
+// Quick strip for prompt detection - handles the most common escape sequences
+function stripForPromptDetection(str: string): string {
+  return str
+    // Remove all ESC sequences
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+    .replace(/\x1b./g, '')
+    // Remove carriage returns
+    .replace(/\r/g, '')
+    // Remove standalone 7s (leftover from ESC 7)
+    .replace(/\s7+(\s|$)/g, '$1')
     .replace(/^7+/gm, '')
 }
 
@@ -93,21 +108,80 @@ async function zyxelShellExecMultiple(
   log?: (level: 'info' | 'warn' | 'error', msg: string) => void
 ): Promise<string[]> {
   return new Promise((resolve, reject) => {
+    if (log) log('info', `Opening shell for ${commands.length} commands...`)
+
+    // Track if we've already resolved/rejected
+    let finished = false
+
     const timer = setTimeout(() => {
-      if (log) log('warn', `Shell timeout after ${timeout}ms`)
-      reject(new Error('Shell command timeout'))
+      if (!finished) {
+        finished = true
+        if (log) log('warn', `Shell timeout after ${timeout}ms`)
+        reject(new Error('Shell command timeout'))
+      }
     }, timeout)
 
-    // Request PTY with xterm emulation (similar to Go implementation)
-    client.shell({ term: 'xterm', rows: 200, cols: 80 }, (err, stream: ClientChannel) => {
+    // Monitor client for unexpected closure
+    const onClientError = (err: Error) => {
+      if (!finished && log) log('error', `Client error during shell: ${err.message}`)
+    }
+    const onClientClose = () => {
+      if (!finished && log) log('warn', `Client closed unexpectedly during shell operation`)
+    }
+    client.on('error', onClientError)
+    client.on('close', onClientClose)
+
+    // Check if client is still connected before requesting shell
+    // @ts-ignore - accessing internal property for debugging
+    const isConnected = client._sock && !client._sock.destroyed
+    if (log) log('info', `Client connected: ${isConnected}, waiting 500ms then requesting shell...`)
+
+    // Track channel events on the client for debugging
+    let channelCount = 0
+    const onChannel = (info: any, accept: any, reject: any) => {
+      channelCount++
+      if (log) log('info', `Channel event: type=${info.type}, channelCount=${channelCount}`)
+    }
+    // @ts-ignore
+    client.on('channel', onChannel)
+
+    // Also track outgoing channel requests
+    // @ts-ignore - accessing internal for debugging
+    const protocol = client._protocol
+    if (protocol && log) {
+      const origChannelOpen = protocol.channelOpenSession?.bind(protocol)
+      if (origChannelOpen) {
+        // @ts-ignore
+        protocol.channelOpenSession = function(...args: any[]) {
+          log('info', `Opening SSH session channel...`)
+          return origChannelOpen(...args)
+        }
+      }
+    }
+
+    // Small delay to let tunneled connection stabilize
+    setTimeout(() => {
+      if (finished) return
+      if (log) log('info', `Requesting shell with PTY...`)
+
+      // Request shell with explicit PTY - Zyxel requires PTY for interactive shell
+      client.shell({ term: 'vt100', rows: 24, cols: 80 }, (err, stream: ClientChannel) => {
+      // Clean up channel listener
+      client.removeListener('channel', onChannel)
+
       if (err) {
+        finished = true
         clearTimeout(timer)
+        client.removeListener('error', onClientError)
+        client.removeListener('close', onClientClose)
         if (log) log('error', `Shell error: ${err.message}`)
         reject(err)
         return
       }
 
-      if (log) log('info', `Shell opened, running ${commands.length} commands`)
+      // @ts-ignore - accessing internal channel info
+      const channelId = stream._channel?.outgoing?.id || stream._channel?.id || 'unknown'
+      if (log) log('info', `Shell channel opened (id=${channelId}), waiting for prompt...`)
 
       let buffer = ''
       let currentCommandIndex = -1  // -1 = waiting for initial prompt
@@ -132,10 +206,18 @@ async function zyxelShellExecMultiple(
         const chunk = data.toString()
         buffer += chunk
 
+        // Strip escape sequences for prompt detection
+        const cleanBuffer = stripForPromptDetection(buffer)
+
         // Waiting for initial prompt
         if (currentCommandIndex === -1) {
-          if (buffer.includes('#')) {
-            if (log) log('info', `Initial prompt detected`)
+          // Debug: log first data received
+          if (buffer.length === chunk.length && log) {
+            log('info', `First data received (${chunk.length} bytes)`)
+          }
+          // Look for hostname# pattern (Zyxel prompt format)
+          if (/\w+#/.test(cleanBuffer)) {
+            if (log) log('info', `Initial prompt detected in: ${cleanBuffer.slice(-50)}`)
             sendNextCommand()
           }
           return
@@ -145,15 +227,16 @@ async function zyxelShellExecMultiple(
         currentOutput += chunk
 
         // Check if we got the prompt back (command finished)
-        // Look for hostname# pattern at end of current output
-        const lines = currentOutput.split('\n')
+        // Strip escape sequences and look for hostname# pattern at end
+        const cleanOutput = stripForPromptDetection(currentOutput)
+        const lines = cleanOutput.split('\n')
         const lastLine = lines[lines.length - 1] || ''
-        if (/\w+#\s*/.test(lastLine)) {
+        if (/\w+#\s*$/.test(lastLine)) {
           // Command complete - parse output
           // Remove first line (echoed command) and last line (prompt)
-          const outputLines = currentOutput.split('\n')
+          const outputLines = cleanOutput.split('\n')
           const resultLines = outputLines.slice(1, -1)
-          const result = resultLines.map(l => l.replace(/\r/g, '')).join('\n')
+          const result = resultLines.join('\n')
           results.push(result)
 
           if (log) log('info', `Command ${currentCommandIndex + 1} complete: ${result.length} bytes`)
@@ -164,7 +247,11 @@ async function zyxelShellExecMultiple(
       })
 
       stream.on('close', () => {
+        if (finished) return
+        finished = true
         clearTimeout(timer)
+        client.removeListener('error', onClientError)
+        client.removeListener('close', onClientClose)
         if (log) log('info', `Shell closed with ${results.length} results`)
 
         // Fill in any missing results with empty strings
@@ -175,11 +262,16 @@ async function zyxelShellExecMultiple(
       })
 
       stream.on('error', (streamErr: Error) => {
+        if (finished) return
+        finished = true
         clearTimeout(timer)
+        client.removeListener('error', onClientError)
+        client.removeListener('close', onClientClose)
         if (log) log('error', `Shell stream error: ${streamErr.message}`)
         reject(streamErr)
       })
     })
+    }, 500) // End setTimeout
   })
 }
 
@@ -187,7 +279,8 @@ async function zyxelShellExecMultiple(
 async function getZyxelInfo(
   client: Client,
   log?: (level: LogLevel, message: string) => void,
-  credentials?: { username: string; password: string }
+  credentials?: { username: string; password: string },
+  deviceIp?: string  // Pass IP explicitly for jump host connections
 ): Promise<DeviceInfo> {
   // Zyxel switches use a Cisco-like CLI and only support interactive shell (not exec)
   // Run ALL commands in a SINGLE shell session (connection closes after shell exits)
@@ -240,9 +333,12 @@ async function getZyxelInfo(
   // Fallback to SSH credentials if no web password in config (Zyxel often uses same password)
   const webPassword = adminPasswordMatch ? adminPasswordMatch[1] : credentials?.password || null
 
-  // Get device IP from SSH client connection
-  const clientConfig = (client as any)._sock?._host || (client as any).config?.host
-  const deviceIp = typeof clientConfig === 'string' ? clientConfig : null
+  // Use passed deviceIp, or try to get it from SSH client connection (may not work with jump hosts)
+  let targetIp = deviceIp
+  if (!targetIp) {
+    const clientConfig = (client as any)._sock?._host || (client as any).config?.host
+    targetIp = typeof clientConfig === 'string' ? clientConfig : null
+  }
 
   // Parse system information for hostname, model, version, serial number
   // Actual format from GS1920:
@@ -268,9 +364,9 @@ async function getZyxelInfo(
 
   // If serial not in CLI output, try fetching from web interface
   // The web interface at /FirstPage.html shows the serial number
-  if (!serialNumber && webPassword && deviceIp) {
-    if (log) log('info', `Serial not in CLI, trying web interface at ${deviceIp}`)
-    serialNumber = await fetchSerialFromWeb(deviceIp, webPassword, log)
+  if (!serialNumber && webPassword && targetIp) {
+    if (log) log('info', `Serial not in CLI, trying web interface at ${targetIp}`)
+    serialNumber = await fetchSerialFromWeb(targetIp, webPassword, log)
   }
 
   // Parse VLAN configuration from "show vlan" output
