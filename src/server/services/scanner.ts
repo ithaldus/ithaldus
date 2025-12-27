@@ -582,11 +582,15 @@ async function scanPorts(ip: string, ports: number[], timeout = 3000): Promise<n
 }
 
 // Check which ports are open on a device via SSH jump host tunnel
+// The SSH tunnel doesn't attempt TCP connection until we use the stream.
+// We call stream.end() to trigger the connection attempt.
+// - Open ports: connection stays alive, we timeout
+// - Closed ports: SSH server closes the channel immediately (connection refused)
 async function scanPortsViaJumpHost(
   jumpHost: Client,
   targetIp: string,
   ports: number[],
-  timeout = 3000
+  timeout = 2000
 ): Promise<number[]> {
   const openPorts: number[] = []
 
@@ -602,7 +606,8 @@ async function scanPortsViaJumpHost(
         }
 
         const timer = setTimeout(() => {
-          done(false)
+          // Timeout = port is open (connection stayed alive)
+          done(true)
         }, timeout)
 
         jumpHost.forwardOut(
@@ -617,26 +622,24 @@ async function scanPortsViaJumpHost(
               return
             }
 
-            // Stream created, but we need to verify the TCP connection actually works
-            // Listen for errors (connection refused comes as error after stream is created)
             stream.on('error', () => {
               stream.destroy()
               done(false)
             })
 
-            // If stream closes immediately without us closing it, port is closed
+            // If stream closes, the port is closed (connection refused)
             stream.on('close', () => {
               done(false)
             })
 
-            // Give a small delay for connection refused errors to arrive
-            // If no error after 200ms, consider port open
-            setTimeout(() => {
-              if (!resolved) {
-                stream.destroy()
-                done(true)
-              }
-            }, 200)
+            // Receiving data means port is definitely open
+            stream.on('data', () => {
+              stream.destroy()
+              done(true)
+            })
+
+            // Trigger the actual TCP connection by ending the write side
+            stream.end()
           }
         )
       })
