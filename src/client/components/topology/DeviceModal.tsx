@@ -429,7 +429,7 @@ export function DeviceModal({
 
         {/* Device Image - Full Width */}
         <div
-          className="relative w-full h-48 2xl:h-64 overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 group"
+          className="relative w-full h-48 2xl:h-80 overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 group"
           onMouseEnter={() => setImageHovered(true)}
           onMouseLeave={() => setImageHovered(false)}
         >
