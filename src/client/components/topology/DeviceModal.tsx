@@ -427,96 +427,98 @@ export function DeviceModal({
           </button>
         </div>
 
-        {/* Device Image - Full Width */}
-        <div
-          className="relative w-full h-48 2xl:h-80 overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 group"
-          onMouseEnter={() => setImageHovered(true)}
-          onMouseLeave={() => setImageHovered(false)}
-        >
-          {loadingImage ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
-            </div>
-          ) : deviceImage ? (
-            <>
-              <img
-                src={`data:${deviceImage.mimeType};base64,${deviceImage.data}`}
-                alt="Device"
-                className="w-full h-full object-contain cursor-pointer"
-                onClick={() => setShowFullImage(true)}
-              />
-              {/* Hover overlay */}
-              <div className={`absolute inset-0 bg-black/60 flex items-center justify-center gap-4 transition-opacity pointer-events-none ${imageHovered ? 'opacity-100' : 'opacity-0'}`}>
-                {uploadingImage ? (
-                  <Loader2 className="w-6 h-6 text-white animate-spin" />
-                ) : (
-                  <>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
-                      className="pointer-events-auto flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium transition-colors"
-                    >
-                      <ImagePlus className="w-4 h-4" />
-                      Change
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteImage() }}
-                      className="pointer-events-auto flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/80 hover:bg-red-500 text-white text-sm font-medium transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Remove
-                    </button>
-                  </>
-                )}
-              </div>
-            </>
-          ) : (
-            <div
-              className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-slate-500 cursor-pointer"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {uploadingImage ? (
-                <Loader2 className="w-8 h-8 animate-spin" />
-              ) : (
-                <>
-                  <Camera className="w-10 h-10" />
-                  <span className="text-sm font-medium">Click to add photo</span>
-                </>
-              )}
-            </div>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-        </div>
-
-        {/* Comment - Full Width Below Image */}
-        <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Add a note about this device (e.g., location, purpose, owner...)"
-              className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-slate-400 dark:placeholder-slate-500"
-            />
-            <button
-              onClick={handleSaveComment}
-              disabled={isSavingComment || comment === (device.comment || '')}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white disabled:text-slate-500 transition-colors"
-            >
-              {isSavingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-            </button>
-          </div>
-        </div>
-
-        {/* Content - Two column layout on wide screens */}
+        {/* Main body - Two column layout on wide screens */}
         <div className="flex-1 flex flex-col 2xl:flex-row overflow-hidden">
-          {/* Main content */}
-          <div className="flex-1 px-6 py-4 overflow-y-auto space-y-6">
+          {/* Left column: Image + Comment + Content */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Device Image */}
+            <div
+              className="relative w-full h-48 2xl:h-72 shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 group"
+              onMouseEnter={() => setImageHovered(true)}
+              onMouseLeave={() => setImageHovered(false)}
+            >
+              {loadingImage ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
+                </div>
+              ) : deviceImage ? (
+                <>
+                  <img
+                    src={`data:${deviceImage.mimeType};base64,${deviceImage.data}`}
+                    alt="Device"
+                    className="w-full h-full object-contain cursor-pointer"
+                    onClick={() => setShowFullImage(true)}
+                  />
+                  {/* Hover overlay */}
+                  <div className={`absolute inset-0 bg-black/60 flex items-center justify-center gap-4 transition-opacity pointer-events-none ${imageHovered ? 'opacity-100' : 'opacity-0'}`}>
+                    {uploadingImage ? (
+                      <Loader2 className="w-6 h-6 text-white animate-spin" />
+                    ) : (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
+                          className="pointer-events-auto flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium transition-colors"
+                        >
+                          <ImagePlus className="w-4 h-4" />
+                          Change
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteImage() }}
+                          className="pointer-events-auto flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/80 hover:bg-red-500 text-white text-sm font-medium transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Remove
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-slate-500 cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploadingImage ? (
+                    <Loader2 className="w-8 h-8 animate-spin" />
+                  ) : (
+                    <>
+                      <Camera className="w-10 h-10" />
+                      <span className="text-sm font-medium">Click to add photo</span>
+                    </>
+                  )}
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </div>
+
+            {/* Comment */}
+            <div className="px-4 py-3 shrink-0 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Add a note about this device (e.g., location, purpose, owner...)"
+                  className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-slate-400 dark:placeholder-slate-500"
+                />
+                <button
+                  onClick={handleSaveComment}
+                  disabled={isSavingComment || comment === (device.comment || '')}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white disabled:text-slate-500 transition-colors"
+                >
+                  {isSavingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 px-6 py-4 overflow-y-auto space-y-6">
 
           {/* Type and Location dropdowns - same row for aesthetics */}
           <div className="grid grid-cols-2 gap-4">
@@ -932,6 +934,7 @@ export function DeviceModal({
                 )}
               </div>
             )}
+          </div>
           </div>
           </div>
 
