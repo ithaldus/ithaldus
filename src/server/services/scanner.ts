@@ -1241,9 +1241,17 @@ export class NetworkScanner {
     this.log('info', `Scanning ${ip}...`)
 
     // Check open ports first - use jump host if available for tunneled port scanning
-    const openPorts = this.jumpHostClient && this.jumpHostSupported
-      ? await scanPortsViaJumpHost(this.jumpHostClient, ip, MANAGEMENT_PORTS)
-      : await scanPorts(ip, MANAGEMENT_PORTS)
+    let openPorts: number[] = []
+    if (this.jumpHostClient && this.jumpHostSupported) {
+      openPorts = await scanPortsViaJumpHost(this.jumpHostClient, ip, MANAGEMENT_PORTS)
+      // If jump host scan returns empty, target may be unreachable via jump host
+      // Fall back to direct scanning
+      if (openPorts.length === 0) {
+        openPorts = await scanPorts(ip, MANAGEMENT_PORTS)
+      }
+    } else {
+      openPorts = await scanPorts(ip, MANAGEMENT_PORTS)
+    }
 
     if (openPorts.length === 0) {
       this.log('info', `${ip}: No management ports open - adding as end-device`)
