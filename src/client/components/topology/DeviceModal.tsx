@@ -147,7 +147,7 @@ export function DeviceModal({
   const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null)
   const [imageToCrop, setImageToCrop] = useState<string | null>(null) // base64 data URL for cropping
 
-  // Close modal on ESC key
+  // Close modal on ESC key (without saving - use blur or X button to save)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
@@ -361,6 +361,19 @@ export function DeviceModal({
     }
   }
 
+  // Save pending changes and close modal
+  const handleClose = async () => {
+    // Save asset tag if changed
+    if (assetTag !== (device.assetTag || '')) {
+      await handleSaveAssetTag()
+    }
+    // Save comment if changed
+    if (comment !== (device.comment || '')) {
+      await handleSaveComment()
+    }
+    onClose()
+  }
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -436,7 +449,7 @@ export function DeviceModal({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 dark:bg-black/70"
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       {/* Modal */}
@@ -469,7 +482,7 @@ export function DeviceModal({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -561,23 +574,42 @@ export function DeviceModal({
               />
             </div>
 
-            {/* Comment */}
+            {/* Asset Tag + Comment */}
             <div className="px-4 py-3 shrink-0 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
               <div className="flex gap-2">
+                <div className="relative shrink-0">
+                  <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={assetTag}
+                    onChange={(e) => setAssetTag(e.target.value)}
+                    onBlur={() => {
+                      if (assetTag !== (device.assetTag || '')) {
+                        handleSaveAssetTag()
+                      }
+                    }}
+                    placeholder="Tag"
+                    className="w-28 pl-8 pr-3 py-2 text-sm font-mono rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-transparent placeholder-slate-400 dark:placeholder-slate-500"
+                  />
+                  {isSavingAssetTag && (
+                    <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500 animate-spin" />
+                  )}
+                </div>
                 <input
                   type="text"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
+                  onBlur={() => {
+                    if (comment !== (device.comment || '')) {
+                      handleSaveComment()
+                    }
+                  }}
                   placeholder="Add a note about this device (e.g., location, purpose, owner...)"
                   className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-slate-400 dark:placeholder-slate-500"
                 />
-                <button
-                  onClick={handleSaveComment}
-                  disabled={isSavingComment || comment === (device.comment || '')}
-                  className="px-4 py-2 text-sm font-medium rounded-lg bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white disabled:text-slate-500 transition-colors"
-                >
-                  {isSavingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-                </button>
+                {isSavingComment && (
+                  <Loader2 className="shrink-0 w-5 h-5 text-cyan-500 animate-spin self-center" />
+                )}
               </div>
             </div>
 
@@ -714,29 +746,6 @@ export function DeviceModal({
                 ) : (
                   <span className="text-sm text-slate-400 dark:text-slate-500">N/A</span>
                 )}
-              </div>
-            </div>
-            {/* Asset Tag */}
-            <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1">
-                <Tag className="w-3 h-3" />
-                Asset Tag
-              </label>
-              <div className="mt-1 flex gap-2">
-                <input
-                  type="text"
-                  value={assetTag}
-                  onChange={(e) => setAssetTag(e.target.value)}
-                  placeholder="234TVV"
-                  className="w-24 px-2 py-1 text-sm font-mono rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                />
-                <button
-                  onClick={handleSaveAssetTag}
-                  disabled={isSavingAssetTag || assetTag === (device.assetTag || '')}
-                  className="px-2 py-1 text-sm font-medium rounded-lg bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white disabled:text-slate-500 transition-colors"
-                >
-                  {isSavingAssetTag ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-                </button>
               </div>
             </div>
           </div>

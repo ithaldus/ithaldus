@@ -1098,6 +1098,49 @@ export class NetworkScanner {
     return device?.hostname || null
   }
 
+  // Save failed credentials for a device (to skip on future scans)
+  private async saveFailedCredentials(
+    ip: string,
+    deviceMac: string,
+    triedCredentials: CredentialInfo[]
+  ): Promise<void> {
+    let savedCount = 0
+    const now = new Date().toISOString()
+    for (const cred of triedCredentials) {
+      if (!cred.id) continue  // Skip root credentials (no ID)
+      try {
+        // Check if already recorded as failed
+        const existingFailed = await db.select().from(failedCredentials)
+          .where(and(
+            eq(failedCredentials.credentialId, cred.id),
+            eq(failedCredentials.mac, deviceMac)
+          ))
+          .get()
+
+        if (!existingFailed) {
+          await db.insert(failedCredentials).values({
+            id: nanoid(),
+            credentialId: cred.id,
+            mac: deviceMac,
+            failedAt: now,
+          })
+          savedCount++
+
+          // Update local cache
+          if (!this.failedCredentialsMap.has(deviceMac)) {
+            this.failedCredentialsMap.set(deviceMac, new Set())
+          }
+          this.failedCredentialsMap.get(deviceMac)!.add(cred.id)
+        }
+      } catch (err) {
+        console.error(`Failed to save failed credential:`, err)
+      }
+    }
+    if (savedCount > 0) {
+      this.log('info', `${ip}: Recorded ${savedCount} failed credential${savedCount !== 1 ? 's' : ''} for future scans`)
+    }
+  }
+
   // Get SNMP info for an IP (queries and caches)
   private async getSnmpInfo(ip: string): Promise<SnmpDeviceInfo | null> {
     // Check cache first
@@ -1294,7 +1337,7 @@ export class NetworkScanner {
     // Start channel tracking for this device
     const channelId = this.startChannel(ip, 'scanning ports')
 
-    this.log('info', `Scanning ${ip}...`)
+    this.log('info', `Scanning ${ip}...${knownMac ? ` (MAC: ${knownMac})` : ' (MAC unknown)'}`)
 
     // Check open ports first - use jump host if available for tunneled port scanning
     let openPorts: number[] = []
@@ -1674,6 +1717,17 @@ export class NetworkScanner {
                        knownMac ||
                        `UNKNOWN-${ip.replace(/\./g, '-')}`
 
+    // Save failed credentials BEFORE checking if already processed
+    // This handles the race condition where a device is discovered from multiple sources
+    // and one scan finishes before another, marking it as "already processed"
+    if (!successfulCreds && triedCredentials.length > 0 && !deviceMac.startsWith('UNKNOWN-')) {
+      await this.saveFailedCredentials(ip, deviceMac, triedCredentials)
+    } else if (!successfulCreds && triedCredentials.length === 0) {
+      this.log('info', `${ip}: No tried credentials to record (MAC: ${deviceMac})`)
+    } else if (!successfulCreds && deviceMac.startsWith('UNKNOWN-')) {
+      this.log('info', `${ip}: Not recording ${triedCredentials.length} failed credentials (device has UNKNOWN MAC)`)
+    }
+
     // Skip if we've already processed this MAC
     if (this.processedMacs.has(deviceMac)) {
       this.log('info', `${ip}: Already processed (MAC: ${deviceMac})`)
@@ -1810,44 +1864,8 @@ export class NetworkScanner {
       this.log('info', `${ip}: Login with root credentials (not recorded in matched devices)`)
     }
 
-    // Record failed credentials for this device (only if we tried and failed, and device has real MAC)
-    if (!successfulCreds && triedCredentials.length > 0 && !deviceMac.startsWith('UNKNOWN-')) {
-      let savedCount = 0
-      const now = new Date().toISOString()
-      for (const cred of triedCredentials) {
-        if (!cred.id) continue  // Skip root credentials (no ID)
-        try {
-          // Check if already recorded as failed
-          const existingFailed = await db.select().from(failedCredentials)
-            .where(and(
-              eq(failedCredentials.credentialId, cred.id),
-              eq(failedCredentials.mac, deviceMac)
-            ))
-            .get()
-
-          if (!existingFailed) {
-            await db.insert(failedCredentials).values({
-              id: nanoid(),
-              credentialId: cred.id,
-              mac: deviceMac,
-              failedAt: now,
-            })
-            savedCount++
-
-            // Update local cache
-            if (!this.failedCredentialsMap.has(deviceMac)) {
-              this.failedCredentialsMap.set(deviceMac, new Set())
-            }
-            this.failedCredentialsMap.get(deviceMac)!.add(cred.id)
-          }
-        } catch (err) {
-          console.error(`Failed to save failed credential:`, err)
-        }
-      }
-      if (savedCount > 0) {
-        this.log('info', `${ip}: Recorded ${savedCount} failed credential${savedCount !== 1 ? 's' : ''} for future scans`)
-      }
-    }
+    // Note: Failed credentials are saved earlier (before "Already processed" check)
+    // to handle race conditions when device is discovered from multiple sources
 
     // Save interfaces (use the correct device ID - either existing or new)
     const actualDeviceId = existingDevice ? existingDevice.id : deviceId

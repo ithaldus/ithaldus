@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
-import { Terminal, ChevronLeft, X, Maximize2, Minimize2, Search, Radio, AlertCircle, AlertTriangle, CheckCircle, Info } from 'lucide-react'
+import { Terminal, ChevronLeft, X, Maximize2, Minimize2, Search, Radio, AlertCircle, AlertTriangle, CheckCircle, Info, Copy, Check } from 'lucide-react'
 import type { LogMessage, ChannelInfo } from '../../lib/api'
 
 type LogLevel = 'info' | 'success' | 'warn' | 'error'
@@ -62,6 +62,7 @@ export function DebugConsole({
     }
     return new Set(['info', 'success', 'warn', 'error'] as LogLevel[])
   })
+  const [copied, setCopied] = useState(false)
 
   // Persist level filter preference
   useEffect(() => {
@@ -96,6 +97,15 @@ export function DebugConsole({
       return true
     })
   }, [logs, filter, enabledLevels])
+
+  const copyAllLogs = async () => {
+    const text = filteredLogs
+      .map(log => `[${formatTime(log.timestamp)}] ${log.message}`)
+      .join('\n')
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   // Persist auto-expand preference
   useEffect(() => {
@@ -376,9 +386,19 @@ export function DebugConsole({
 
         {/* Footer with status */}
         <div className="px-4 py-2 border-t border-slate-700 bg-slate-800 text-xs text-slate-400">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <span>Listening for updates...</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <span>Listening for updates...</span>
+            </div>
+            <button
+              onClick={copyAllLogs}
+              disabled={filteredLogs.length === 0}
+              title="Copy all visible logs to clipboard"
+              className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
           </div>
         </div>
       </div>
