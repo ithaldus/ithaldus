@@ -391,7 +391,7 @@ export function DeviceModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg lg:max-w-2xl xl:max-w-3xl 2xl:max-w-6xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg lg:max-w-2xl xl:max-w-3xl 2xl:max-w-[85vw] mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
@@ -429,7 +429,7 @@ export function DeviceModal({
 
         {/* Device Image - Full Width */}
         <div
-          className="relative w-full h-48 overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 group"
+          className="relative w-full h-48 2xl:h-64 overflow-hidden bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 group"
           onMouseEnter={() => setImageHovered(true)}
           onMouseLeave={() => setImageHovered(false)}
         >
@@ -936,7 +936,7 @@ export function DeviceModal({
           </div>
 
           {/* Device Logs - Side panel on 2xl screens */}
-          <div className="hidden 2xl:flex flex-col w-96 border-l border-slate-200 dark:border-slate-700 bg-slate-900 dark:bg-black">
+          <div className="hidden 2xl:flex flex-col w-[500px] shrink-0 border-l border-slate-200 dark:border-slate-700 bg-slate-900 dark:bg-black">
             <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2">
               <ScrollText className="w-4 h-4 text-slate-400" />
               <span className="text-sm font-medium text-white">Scan Logs</span>
