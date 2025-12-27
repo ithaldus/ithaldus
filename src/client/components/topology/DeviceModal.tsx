@@ -134,6 +134,7 @@ export function DeviceModal({
   const [loadingLogs, setLoadingLogs] = useState(false)
   const [logsExpanded, setLogsExpanded] = useState(false)
   const [showFullImage, setShowFullImage] = useState(false)
+  const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null)
 
   // Close modal on ESC key
   useEffect(() => {
@@ -177,6 +178,7 @@ export function DeviceModal({
   useEffect(() => {
     async function fetchImage() {
       setLoadingImage(true)
+      setImageAspectRatio(null) // Reset aspect ratio when fetching new image
       try {
         const image = await api.devices.getImage(device.id)
         setDeviceImage(image)
@@ -376,6 +378,7 @@ export function DeviceModal({
     try {
       await api.devices.deleteImage(device.id)
       setDeviceImage(null)
+      setImageAspectRatio(null)
       onImageChange?.(device.id, false)
     } catch (err) {
       console.error('Failed to delete image:', err)
@@ -433,7 +436,12 @@ export function DeviceModal({
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Device Image */}
             <div
-              className="relative w-full h-48 2xl:aspect-[3/1] 2xl:h-auto 2xl:max-h-64 shrink-0 overflow-hidden bg-slate-800 dark:bg-slate-900 border-b border-slate-700 group"
+              className="relative w-full shrink-0 overflow-hidden bg-slate-800 dark:bg-slate-900 border-b border-slate-700 group"
+              style={{
+                aspectRatio: imageAspectRatio ? `${imageAspectRatio} / 1` : '3 / 1',
+                maxHeight: '280px',
+                minHeight: '120px',
+              }}
               onMouseEnter={() => setImageHovered(true)}
               onMouseLeave={() => setImageHovered(false)}
             >
@@ -448,6 +456,15 @@ export function DeviceModal({
                     alt="Device"
                     className="w-full h-full object-cover cursor-pointer"
                     onClick={() => setShowFullImage(true)}
+                    onLoad={(e) => {
+                      const img = e.currentTarget
+                      if (img.naturalWidth && img.naturalHeight) {
+                        // Clamp aspect ratio between 1:1 (1) and 4:1 (4)
+                        const natural = img.naturalWidth / img.naturalHeight
+                        const clamped = Math.max(1, Math.min(4, natural))
+                        setImageAspectRatio(clamped)
+                      }
+                    }}
                   />
                   {/* Hover overlay */}
                   <div className={`absolute inset-0 bg-black/60 flex items-center justify-center gap-4 transition-opacity pointer-events-none ${imageHovered ? 'opacity-100' : 'opacity-0'}`}>
