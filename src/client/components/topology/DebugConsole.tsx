@@ -1,6 +1,8 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
-import { Terminal, ChevronLeft, X, Maximize2, Minimize2, Search, Radio } from 'lucide-react'
+import { Terminal, ChevronLeft, X, Maximize2, Minimize2, Search, Radio, AlertCircle, AlertTriangle, CheckCircle, Info } from 'lucide-react'
 import type { LogMessage, ChannelInfo } from '../../lib/api'
+
+type LogLevel = 'info' | 'success' | 'warn' | 'error'
 
 interface DebugConsoleProps {
   logs: LogMessage[]
@@ -49,13 +51,51 @@ export function DebugConsole({
     return stored === 'true'
   })
   const [filter, setFilter] = useState('')
+  const [enabledLevels, setEnabledLevels] = useState<Set<LogLevel>>(() => {
+    const stored = localStorage.getItem('debug-console-levels')
+    if (stored) {
+      try {
+        return new Set(JSON.parse(stored) as LogLevel[])
+      } catch {
+        return new Set(['info', 'success', 'warn', 'error'] as LogLevel[])
+      }
+    }
+    return new Set(['info', 'success', 'warn', 'error'] as LogLevel[])
+  })
 
-  // Filter logs based on search term
+  // Persist level filter preference
+  useEffect(() => {
+    localStorage.setItem('debug-console-levels', JSON.stringify([...enabledLevels]))
+  }, [enabledLevels])
+
+  const toggleLevel = (level: LogLevel) => {
+    setEnabledLevels(prev => {
+      const next = new Set(prev)
+      if (next.has(level)) {
+        // Don't allow disabling all levels
+        if (next.size > 1) {
+          next.delete(level)
+        }
+      } else {
+        next.add(level)
+      }
+      return next
+    })
+  }
+
+  // Filter logs based on search term and severity
   const filteredLogs = useMemo(() => {
-    if (!filter.trim()) return logs
-    const lowerFilter = filter.toLowerCase()
-    return logs.filter((log) => log.message.toLowerCase().includes(lowerFilter))
-  }, [logs, filter])
+    return logs.filter((log) => {
+      // Filter by level
+      if (!enabledLevels.has(log.level as LogLevel)) return false
+      // Filter by search term
+      if (filter.trim()) {
+        const lowerFilter = filter.toLowerCase()
+        if (!log.message.toLowerCase().includes(lowerFilter)) return false
+      }
+      return true
+    })
+  }, [logs, filter, enabledLevels])
 
   // Persist auto-expand preference
   useEffect(() => {
@@ -183,7 +223,7 @@ export function DebugConsole({
             <Terminal className="w-4 h-4 text-cyan-400" />
             <span className="text-sm font-medium text-white">Console</span>
             <span className="text-xs text-slate-400">
-              {filter ? `${filteredLogs.length}/${logs.length}` : logs.length}
+              {(filter || enabledLevels.size < 4) ? `${filteredLogs.length}/${logs.length}` : logs.length}
             </span>
           </div>
 
@@ -206,6 +246,54 @@ export function DebugConsole({
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
+          </div>
+
+          {/* Severity filter buttons */}
+          <div className="flex items-center gap-0.5 shrink-0 border-l border-slate-600 pl-2 ml-1">
+            <button
+              onClick={() => toggleLevel('error')}
+              title={enabledLevels.has('error') ? 'Hide errors' : 'Show errors'}
+              className={`p-1 rounded transition-colors ${
+                enabledLevels.has('error')
+                  ? 'text-red-400 bg-red-400/20'
+                  : 'text-slate-600 hover:text-slate-400'
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => toggleLevel('warn')}
+              title={enabledLevels.has('warn') ? 'Hide warnings' : 'Show warnings'}
+              className={`p-1 rounded transition-colors ${
+                enabledLevels.has('warn')
+                  ? 'text-amber-400 bg-amber-400/20'
+                  : 'text-slate-600 hover:text-slate-400'
+              }`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => toggleLevel('success')}
+              title={enabledLevels.has('success') ? 'Hide success' : 'Show success'}
+              className={`p-1 rounded transition-colors ${
+                enabledLevels.has('success')
+                  ? 'text-green-400 bg-green-400/20'
+                  : 'text-slate-600 hover:text-slate-400'
+              }`}
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => toggleLevel('info')}
+              title={enabledLevels.has('info') ? 'Hide info' : 'Show info'}
+              className={`p-1 rounded transition-colors ${
+                enabledLevels.has('info')
+                  ? 'text-slate-400 bg-slate-400/20'
+                  : 'text-slate-600 hover:text-slate-400'
+              }`}
+            >
+              <Info className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
