@@ -1422,7 +1422,7 @@ export class NetworkScanner {
     // Check for warning ports (insecure HTTP, telnet)
     const warningPorts = await getWarningPorts(ip, openPorts)
     if (warningPorts.length > 0) {
-      this.log('warn', `${ip}: Warning ports detected: ${warningPorts.join(', ')}`)
+      this.log('info', `${ip}: Warning ports detected: ${warningPorts.join(', ')}`)
     }
 
     // Check if skipLogin is enabled for this device (by MAC)
