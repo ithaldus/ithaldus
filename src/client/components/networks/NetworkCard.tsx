@@ -1,4 +1,4 @@
-import { Network, Pencil, Trash2, Play, Clock, Server } from 'lucide-react'
+import { Network, Pencil, Trash2, Map, Clock, Server } from 'lucide-react'
 import type { Network as NetworkType } from '../../lib/api'
 
 type NetworkCardProps = {
@@ -7,7 +7,6 @@ type NetworkCardProps = {
   onEdit: () => void
   onDelete: () => void
   onScan: () => void
-  onSelect: () => void
 }
 
 function formatLastScanned(lastScannedAt: string | null): string {
@@ -58,12 +57,10 @@ export function NetworkCard({
   onEdit,
   onDelete,
   onScan,
-  onSelect,
 }: NetworkCardProps) {
   return (
     <div
-      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:border-cyan-300 dark:hover:border-cyan-700 transition-colors cursor-pointer"
-      onClick={onSelect}
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4"
     >
       {/* Header */}
       <div className="flex items-center gap-3 mb-3">
@@ -121,8 +118,8 @@ export function NetworkCard({
             }}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/30 rounded hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition-colors"
           >
-            <Play className="w-3.5 h-3.5" />
-            Scan
+            <Map className="w-3.5 h-3.5" />
+            Map
           </button>
           <button
             onClick={(e) => {

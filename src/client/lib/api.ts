@@ -180,6 +180,11 @@ export const api = {
       request<Credential>(`/credentials/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) =>
       request<{ success: boolean }>(`/credentials/${id}`, { method: 'DELETE' }),
+    clearFailed: (networkId?: string | null) =>
+      request<{ success: boolean; deletedCount: number }>(
+        `/credentials/failed/clear${networkId ? `?networkId=${networkId}` : ''}`,
+        { method: 'DELETE' }
+      ),
   },
 
   // Devices
@@ -312,6 +317,7 @@ export interface Credential {
   username: string
   password: string
   networkId: string | null
+  isRoot: boolean
 }
 
 export interface MatchedDevice {

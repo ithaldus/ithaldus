@@ -15,6 +15,7 @@ import {
 } from './drivers'
 import { scanMdns, type MdnsDevice } from './mdns'
 import { snmpQuery, type SnmpDeviceInfo } from './snmp'
+import { limitConcurrency } from './concurrency'
 
 export type { LogLevel }
 
@@ -64,6 +65,12 @@ export interface DiscoveredInterface {
 // Common SSH ports to check
 const SSH_PORTS = [22]
 const MANAGEMENT_PORTS = [22, 23, 80, 443, 8291, 8728, 161]
+
+// Concurrency configuration
+const SCAN_CONCURRENCY = {
+  SIBLING_DEVICES: 10,     // Max concurrent sibling device scans
+  CREDENTIAL_TESTING: 5,   // Max concurrent credential attempts
+}
 
 // Normalize vendor names from OUI database to our standard names
 function normalizeVendorName(vendor: string): string {
@@ -351,6 +358,11 @@ function detectTypeFromVendor(vendor: string | null, hostname: string | null): E
   return null
 }
 
+// Connection result type
+type ConnectResult =
+  | { success: true; client: Client; banner: string }
+  | { success: false; authFailed: boolean }
+
 // Try to connect to device with given credentials (single attempt)
 async function tryConnectOnce(
   ip: string,
@@ -358,14 +370,14 @@ async function tryConnectOnce(
   password: string,
   port = 22,
   timeout = 15000  // Increased from 10s to 15s for slower devices
-): Promise<{ client: Client; banner: string } | null> {
+): Promise<ConnectResult> {
   return new Promise((resolve) => {
     const client = new Client()
     let banner = ''
 
     const timer = setTimeout(() => {
       client.end()
-      resolve(null)
+      resolve({ success: false, authFailed: false })
     }, timeout)
 
     client.on('banner', (message) => {
@@ -374,12 +386,14 @@ async function tryConnectOnce(
 
     client.on('ready', () => {
       clearTimeout(timer)
-      resolve({ client, banner })
+      resolve({ success: true, client, banner })
     })
 
-    client.on('error', () => {
+    client.on('error', (err: Error & { level?: string }) => {
       clearTimeout(timer)
-      resolve(null)
+      // Auth failures have level 'client-authentication'
+      const isAuthError = err.level === 'client-authentication'
+      resolve({ success: false, authFailed: isAuthError })
     })
 
     client.connect({
@@ -422,18 +436,24 @@ async function tryConnect(
   port = 22,
   timeout = 15000,
   maxRetries = 2  // Will try up to 3 times total (1 initial + 2 retries)
-): Promise<{ client: Client; banner: string } | null> {
+): Promise<ConnectResult> {
+  let lastAuthFailed = false
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const result = await tryConnectOnce(ip, username, password, port, timeout)
-    if (result) {
+    if (result.success) {
       return result
     }
+    // If it was an auth failure, don't retry - wrong password won't change
+    if (result.authFailed) {
+      return result
+    }
+    lastAuthFailed = result.authFailed
     // Small delay before retry to let the target device recover
     if (attempt < maxRetries) {
       await new Promise(resolve => setTimeout(resolve, 500))
     }
   }
-  return null
+  return { success: false, authFailed: lastAuthFailed }
 }
 
 // Try to connect via SSH jump host (tunnel through another SSH connection)
@@ -444,10 +464,10 @@ async function tryConnectViaJumpHost(
   password: string,
   targetPort = 22,
   timeout = 15000
-): Promise<{ client: Client; banner: string } | null> {
+): Promise<ConnectResult> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
-      resolve(null)
+      resolve({ success: false, authFailed: false })
     }, timeout)
 
     // Create TCP tunnel from jump host to target
@@ -459,7 +479,7 @@ async function tryConnectViaJumpHost(
       (err, stream) => {
         if (err) {
           clearTimeout(timer)
-          resolve(null)
+          resolve({ success: false, authFailed: false })
           return
         }
 
@@ -473,12 +493,13 @@ async function tryConnectViaJumpHost(
 
         client.on('ready', () => {
           clearTimeout(timer)
-          resolve({ client, banner })
+          resolve({ success: true, client, banner })
         })
 
-        client.on('error', () => {
+        client.on('error', (err: Error & { level?: string }) => {
           clearTimeout(timer)
-          resolve(null)
+          const isAuthError = err.level === 'client-authentication'
+          resolve({ success: false, authFailed: isAuthError })
         })
 
         client.on('close', () => {
@@ -603,6 +624,7 @@ export class NetworkScanner {
   private matchedCredentials: Map<string, string> = new Map()  // MAC -> credentialId
   private failedCredentialsMap: Map<string, Set<string>> = new Map()  // MAC -> Set of failed credentialIds
   private aborted: boolean = false
+  private abortController: AbortController = new AbortController()
   private jumpHostClient: Client | null = null  // Root device connection for jump host tunneling
   private jumpHostSupported: boolean = false  // True if root device supports TCP forwarding (forwardOut)
   private rootIp: string = ''  // Store root IP for jump host reference
@@ -617,6 +639,7 @@ export class NetworkScanner {
   // Call this to abort the scan
   abort() {
     this.aborted = true
+    this.abortController.abort()
     // Close jump host connection if active
     if (this.jumpHostClient) {
       this.jumpHostClient.end()
@@ -626,6 +649,267 @@ export class NetworkScanner {
 
   isAborted() {
     return this.aborted
+  }
+
+  private get signal(): AbortSignal {
+    return this.abortController.signal
+  }
+
+  /**
+   * Try multiple credentials in parallel, return first successful connection
+   * Cancels remaining attempts once one succeeds
+   */
+  private async tryCredentialsParallel(
+    ip: string,
+    credsToTry: CredentialInfo[],
+    useJumpHost: boolean,
+    logPrefix: string
+  ): Promise<{
+    client: Client
+    banner: string
+    cred: CredentialInfo
+    triedCredentials: CredentialInfo[]
+    tryNumber: number
+  } | null> {
+    if (credsToTry.length === 0) return null
+
+    const maxConcurrent = SCAN_CONCURRENCY.CREDENTIAL_TESTING
+    const triedCredentials: CredentialInfo[] = []
+    let foundResult: { client: Client; banner: string; cred: CredentialInfo; tryNumber: number } | null = null
+    let activeAttempts = 0
+    let nextIndex = 0
+    let completedCount = 0
+
+    return new Promise((resolve) => {
+      const tryNext = () => {
+        // If we found a result or are aborted, don't start new attempts
+        if (foundResult || this.aborted) {
+          if (activeAttempts === 0) {
+            const result = foundResult
+            if (result) {
+              resolve({ client: result.client, banner: result.banner, cred: result.cred, tryNumber: result.tryNumber, triedCredentials })
+            } else {
+              resolve(null)
+            }
+          }
+          return
+        }
+
+        while (activeAttempts < maxConcurrent && nextIndex < credsToTry.length) {
+          const index = nextIndex++
+          const cred = credsToTry[index]!
+          const tryNumber = index + 1
+          activeAttempts++
+
+          const attempt = useJumpHost
+            ? tryConnectViaJumpHost(this.jumpHostClient!, ip, cred.username, cred.password)
+            : tryConnect(ip, cred.username, cred.password)
+
+          attempt
+            .then(result => {
+              if (result.success && !foundResult) {
+                // First success - store it
+                foundResult = { client: result.client, banner: result.banner, cred, tryNumber }
+              } else if (result.success) {
+                // We already have a winner - close this connection
+                result.client.end()
+              } else if (result.authFailed) {
+                // Auth failure - mark credential as failed for this device
+                triedCredentials.push(cred)
+              }
+              // Connection errors (authFailed=false) are NOT tracked as failed credentials
+            })
+            .catch(() => {
+              // Unexpected error - don't mark as failed (might be temporary)
+            })
+            .finally(() => {
+              activeAttempts--
+              completedCount++
+              tryNext()
+            })
+        }
+
+        // Check if we're done
+        if (activeAttempts === 0 && nextIndex >= credsToTry.length) {
+          const result = foundResult
+          if (result) {
+            resolve({ client: result.client, banner: result.banner, cred: result.cred, tryNumber: result.tryNumber, triedCredentials })
+          } else {
+            resolve(null)
+          }
+        }
+      }
+
+      tryNext()
+    })
+  }
+
+  /**
+   * Scan multiple neighbors in parallel with concurrency limit
+   */
+  private async scanNeighborsParallel(
+    neighbors: Array<{ mac: string; ip: string | null; interface: string; type?: string }>,
+    parentDevice: DiscoveredDevice,
+    localUpstreamInterface: string | null,
+    parentIp: string
+  ): Promise<void> {
+    // Separate neighbors into scannable (has IP) and bridge-only (no IP)
+    const toScan: Array<{ neighbor: typeof neighbors[0]; parentIface: DiscoveredInterface | undefined }> = []
+    const bridgeHosts: Array<{ neighbor: typeof neighbors[0]; parentIface: DiscoveredInterface | undefined }> = []
+
+    for (const neighbor of neighbors) {
+      // Skip already processed
+      if (this.processedMacs.has(neighbor.mac)) continue
+
+      const parentIface = parentDevice.interfaces.find(i => i.name === neighbor.interface)
+
+      if (neighbor.ip) {
+        toScan.push({ neighbor, parentIface })
+      } else if (neighbor.type === 'bridge-host' && neighbor.interface !== localUpstreamInterface) {
+        bridgeHosts.push({ neighbor, parentIface })
+      }
+    }
+
+    // Add bridge hosts (fast, parallel DB writes)
+    if (bridgeHosts.length > 0) {
+      const bridgeTasks = bridgeHosts.map(({ neighbor, parentIface }) => async () => {
+        // Mark as processed early to prevent duplicates
+        if (this.processedMacs.has(neighbor.mac)) return
+        this.processedMacs.add(neighbor.mac)
+
+        await this.addBridgeHost(neighbor, parentIface, parentIp)
+      })
+      await limitConcurrency(bridgeTasks, 10, this.signal)
+    }
+
+    // Scan devices with IPs (slower, requires SSH)
+    if (toScan.length === 0) return
+
+    this.log('info', `${parentIp}: Scanning ${toScan.length} neighbors (${SCAN_CONCURRENCY.SIBLING_DEVICES} concurrent)`)
+
+    const tasks = toScan.map(({ neighbor, parentIface }) => async () => {
+      // Double-check not already processed (could have been added by parallel scan)
+      if (this.processedMacs.has(neighbor.mac)) return
+
+      await this.scanDevice(
+        neighbor.ip!,
+        parentIface?.id || null,
+        neighbor.interface,
+        neighbor.mac
+      )
+    })
+
+    const results = await limitConcurrency(tasks, SCAN_CONCURRENCY.SIBLING_DEVICES, this.signal)
+
+    // Log any errors (individual failures shouldn't stop the scan)
+    for (const result of results) {
+      if (result.status === 'rejected' && result.reason?.message !== 'Aborted') {
+        this.log('warn', `${parentIp}: Neighbor scan failed: ${result.reason?.message}`)
+      }
+    }
+  }
+
+  /**
+   * Add a bridge host as an end-device
+   */
+  private async addBridgeHost(
+    neighbor: { mac: string; ip: string | null; interface: string },
+    parentIface: DiscoveredInterface | undefined,
+    parentIp: string
+  ): Promise<void> {
+    const endDeviceId = nanoid()
+
+    // Try to look up hostname from DHCP leases
+    let hostname: string | null = null
+    let neighborIp: string | null = null
+    const lease = await db.query.dhcpLeases.findFirst({
+      where: eq(dhcpLeases.mac, neighbor.mac),
+    })
+    if (lease?.hostname) {
+      hostname = lease.hostname
+    }
+    if (lease?.ip) {
+      neighborIp = lease.ip
+    }
+
+    // Fall back to mDNS hostname if DHCP didn't provide one
+    if (!hostname && neighborIp) {
+      const mdnsHostname = this.getMdnsHostname(neighborIp)
+      if (mdnsHostname) {
+        hostname = mdnsHostname
+        this.log('info', `${neighbor.mac}: Using mDNS hostname: ${mdnsHostname}`)
+      }
+    }
+
+    // Try to detect vendor from MAC OUI
+    const endDeviceVendor = detectVendorFromMac(neighbor.mac)
+
+    // Detect device type from vendor
+    const endDeviceType = detectTypeFromVendor(endDeviceVendor, hostname) || 'end-device'
+
+    // Create device record
+    const endDevice: DiscoveredDevice = {
+      id: endDeviceId,
+      mac: neighbor.mac,
+      hostname,
+      ip: neighborIp,
+      type: endDeviceType,
+      vendor: endDeviceVendor,
+      model: null,
+      serialNumber: null,
+      firmwareVersion: null,
+      accessible: false,
+      openPorts: [],
+      driver: null,
+      parentInterfaceId: parentIface?.id || null,
+      upstreamInterface: neighbor.interface,
+      interfaces: [],
+    }
+
+    // Save to database - upsert by MAC, preserving user fields (comment, nomad, type)
+    const existingBridgeDevice = await db.select().from(devices).where(eq(devices.mac, neighbor.mac)).get()
+
+    if (existingBridgeDevice) {
+      // Update existing device, preserve user fields
+      await db.update(devices)
+        .set({
+          parentInterfaceId: parentIface?.id || null,
+          networkId: this.networkId,
+          upstreamInterface: neighbor.interface,
+          hostname,
+          ip: neighborIp,
+          vendor: endDeviceVendor,
+          // Don't update: comment, nomad, type (user-managed)
+          lastSeenAt: new Date().toISOString(),
+        })
+        .where(eq(devices.mac, neighbor.mac))
+
+      endDevice.id = existingBridgeDevice.id
+      this.log('info', `${parentIp}: Updated bridge host on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
+    } else {
+      // Insert new device
+      await db.insert(devices).values({
+        id: endDeviceId,
+        mac: neighbor.mac,
+        parentInterfaceId: parentIface?.id || null,
+        networkId: this.networkId,
+        upstreamInterface: neighbor.interface,
+        hostname,
+        ip: neighborIp,
+        vendor: endDeviceVendor,
+        model: null,
+        firmwareVersion: null,
+        type: endDevice.type,
+        accessible: false,
+        openPorts: '[]',
+        driver: null,
+        lastSeenAt: new Date().toISOString(),
+      })
+      this.log('success', `${parentIp}: Added bridge host as ${endDevice.type} on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
+    }
+
+    this.deviceCount++
+    this.callbacks.onDeviceDiscovered(endDevice)
   }
 
   // Get hostname from mDNS cache for an IP
@@ -687,14 +971,24 @@ export class NetworkScanner {
       this.log('info', `Root device: ${network.rootIp}`)
       this.rootIp = network.rootIp
 
-      // Load credentials (network-specific first, then global)
+      // Load credentials (root first, then network-specific, then global)
       const allCredentials = await db.select().from(credentials)
-      const networkCreds = allCredentials.filter(c => c.networkId === this.networkId)
+      // Find root credential by matching network's root username/password (may be shared across networks)
+      const rootCred = allCredentials.find(c =>
+        c.isRoot &&
+        c.username === network.rootUsername &&
+        c.password === network.rootPassword
+      )
+      const networkCreds = allCredentials.filter(c => c.networkId === this.networkId && !c.isRoot)
       const globalCreds = allCredentials.filter(c => c.networkId === null)
 
-      // Add root credentials at the beginning (no ID since it's from network config)
+      // Build credentials list with root credential first (or fallback to network config)
+      const rootCredEntry = rootCred
+        ? { id: rootCred.id, username: rootCred.username, password: rootCred.password }
+        : { id: null, username: network.rootUsername, password: network.rootPassword }
+
       this.credentialsList = [
-        { id: null, username: network.rootUsername, password: network.rootPassword },
+        rootCredEntry,
         ...networkCreds.map(c => ({ id: c.id, username: c.username, password: c.password })),
         ...globalCreds.map(c => ({ id: c.id, username: c.username, password: c.password })),
       ]
@@ -948,16 +1242,26 @@ export class NetworkScanner {
     let credsToTry = [...this.credentialsList]
 
     // If we know the MAC, filter out credentials that have previously failed on this device
+    // Exception: never skip the root credential (first in list) on the root device
     const failedCredsForDevice = knownMac ? this.failedCredentialsMap.get(knownMac) : undefined
     let skippedCount = 0
     if (failedCredsForDevice && failedCredsForDevice.size > 0) {
       const originalCount = credsToTry.length
-      credsToTry = credsToTry.filter(c => !c.id || !failedCredsForDevice.has(c.id))
+      const rootCredId = this.credentialsList[0]?.id
+      credsToTry = credsToTry.filter(c => {
+        // Never filter out credentials without ID (legacy root creds)
+        if (!c.id) return true
+        // Never filter out root credential on root device
+        if (isRootDevice && c.id === rootCredId) return true
+        // Filter out known-failed credentials
+        return !failedCredsForDevice.has(c.id)
+      })
       skippedCount = originalCount - credsToTry.length
     }
 
     // If we know the MAC and have a matched credential, try it first
-    if (knownMac) {
+    // Exception: on root device, always keep root credential first
+    if (knownMac && !isRootDevice) {
       const matchedCredId = this.matchedCredentials.get(knownMac)
       if (matchedCredId) {
         const matchedCred = credsToTry.find(c => c.id === matchedCredId)
@@ -990,70 +1294,52 @@ export class NetworkScanner {
     if (!shouldSkipLogin && useJumpHostOnly) {
       // Jump host supported - connect via tunnel (skip direct attempts)
       const skipMsg = skippedCount > 0 ? ` (skipping ${skippedCount} known-bad)` : ''
-      this.log('info', `${ip}: Connecting via jump host (${this.rootIp})...${skipMsg}`)
+      this.log('info', `${ip}: Connecting via jump host (${this.rootIp}), ${credsToTry.length} credentials (${SCAN_CONCURRENCY.CREDENTIAL_TESTING} concurrent)${skipMsg}`)
 
-      let tryCount = 0
-      for (const cred of credsToTry) {
-        tryCount++
-        const result = await tryConnectViaJumpHost(this.jumpHostClient!, ip, cred.username, cred.password)
-        if (result) {
-          connectedClient = result.client
-          banner = result.banner
-          successfulCreds = cred
-          usedJumpHost = true
-          this.log('success', `${ip}: SSH login via jump host successful with ${cred.username} (${ordinal(tryCount)} try)`)
-          break
-        }
-        triedCredentials.push(cred)
-      }
-
-      if (!connectedClient) {
-        this.log('warn', `${ip}: SSH via jump host failed - no valid credentials (tried ${tryCount})`)
+      const result = await this.tryCredentialsParallel(ip, credsToTry, true, ip)
+      if (result) {
+        connectedClient = result.client
+        banner = result.banner
+        successfulCreds = result.cred
+        usedJumpHost = true
+        triedCredentials.push(...result.triedCredentials)
+        this.log('success', `${ip}: SSH login via jump host successful with ${result.cred.username} (${ordinal(result.tryNumber)} try)`)
+      } else {
+        triedCredentials.push(...credsToTry)
+        this.log('warn', `${ip}: SSH via jump host failed - no valid credentials (tried ${credsToTry.length})`)
       }
     } else if (!shouldSkipLogin && hasSSHPort) {
       // No jump host or this is root device - try direct connection
       const skipMsg = skippedCount > 0 ? ` (skipping ${skippedCount} known-bad)` : ''
-      if (skipMsg) this.log('info', `${ip}: Trying ${credsToTry.length} credentials${skipMsg}`)
+      this.log('info', `${ip}: Trying ${credsToTry.length} credentials (${SCAN_CONCURRENCY.CREDENTIAL_TESTING} concurrent)${skipMsg}`)
 
-      let tryCount = 0
-      for (const cred of credsToTry) {
-        tryCount++
-        const result = await tryConnect(ip, cred.username, cred.password)
-        if (result) {
-          connectedClient = result.client
-          banner = result.banner
-          successfulCreds = cred
-          this.log('success', `${ip}: SSH login successful with ${cred.username} (${ordinal(tryCount)} try)`)
-          break
-        }
-        triedCredentials.push(cred)
-      }
-
-      if (!connectedClient) {
-        this.log('warn', `${ip}: SSH login failed - no valid credentials (tried ${tryCount})`)
+      const result = await this.tryCredentialsParallel(ip, credsToTry, false, ip)
+      if (result) {
+        connectedClient = result.client
+        banner = result.banner
+        successfulCreds = result.cred
+        triedCredentials.push(...result.triedCredentials)
+        this.log('success', `${ip}: SSH login successful with ${result.cred.username} (${ordinal(result.tryNumber)} try)`)
+      } else {
+        triedCredentials.push(...credsToTry)
+        this.log('warn', `${ip}: SSH login failed - no valid credentials (tried ${credsToTry.length})`)
       }
     } else if (!shouldSkipLogin && !hasSSHPort && this.jumpHostClient && !isRootDevice) {
       // Port 22 not directly reachable, but we have a jump host - try via tunnel
       const skipMsg = skippedCount > 0 ? ` (skipping ${skippedCount} known-bad)` : ''
-      this.log('info', `${ip}: No direct SSH access, trying via jump host (${this.rootIp})...${skipMsg}`)
+      this.log('info', `${ip}: No direct SSH access, trying via jump host (${this.rootIp}), ${credsToTry.length} credentials (${SCAN_CONCURRENCY.CREDENTIAL_TESTING} concurrent)${skipMsg}`)
 
-      let tryCount = 0
-      for (const cred of credsToTry) {
-        tryCount++
-        const result = await tryConnectViaJumpHost(this.jumpHostClient, ip, cred.username, cred.password)
-        if (result) {
-          connectedClient = result.client
-          banner = result.banner
-          successfulCreds = cred
-          usedJumpHost = true
-          this.log('success', `${ip}: SSH login via jump host successful with ${cred.username} (${ordinal(tryCount)} try)`)
-          break
-        }
-        triedCredentials.push(cred)
-      }
-
-      if (!connectedClient) {
-        this.log('info', `${ip}: SSH via jump host also failed or no valid credentials (tried ${tryCount})`)
+      const result = await this.tryCredentialsParallel(ip, credsToTry, true, ip)
+      if (result) {
+        connectedClient = result.client
+        banner = result.banner
+        successfulCreds = result.cred
+        usedJumpHost = true
+        triedCredentials.push(...result.triedCredentials)
+        this.log('success', `${ip}: SSH login via jump host successful with ${result.cred.username} (${ordinal(result.tryNumber)} try)`)
+      } else {
+        triedCredentials.push(...credsToTry)
+        this.log('info', `${ip}: SSH via jump host also failed - no valid credentials (tried ${credsToTry.length})`)
       }
     } else if (!shouldSkipLogin && !hasSSHPort) {
       // SSH port not open - log why we can't connect
@@ -1143,7 +1429,7 @@ export class NetworkScanner {
         if (isRootDevice && !this.jumpHostClient && successfulCreds) {
           this.log('info', `${ip}: Establishing jump host connection...`)
           const jumpResult = await tryConnect(ip, successfulCreds.username, successfulCreds.password)
-          if (jumpResult) {
+          if (jumpResult.success) {
             this.jumpHostClient = jumpResult.client
 
             // Test if TCP forwarding (forwardOut) is supported
@@ -1385,7 +1671,7 @@ export class NetworkScanner {
       this.log('warn', `${ip}: Only this device will be shown. DHCP leases, ARP tables, and bridge hosts cannot be collected.`)
     }
 
-    // Recursively scan neighbors
+    // Recursively scan neighbors in parallel
     if (deviceInfo && deviceInfo.neighbors.length > 0) {
       this.log('info', `${ip}: Found ${deviceInfo.neighbors.length} neighbors`)
 
@@ -1393,122 +1679,12 @@ export class NetworkScanner {
       // It's the interface that has the IP we used to connect to this device
       const localUpstreamInterface = deviceInfo.interfaces.find(i => i.ip === ip)?.name
 
-      for (const neighbor of deviceInfo.neighbors) {
-        // Skip if we've already processed this MAC
-        if (this.processedMacs.has(neighbor.mac)) {
-          continue
-        }
-
-        // Find the interface ID for this neighbor
-        const parentIface = newDevice.interfaces.find(i => i.name === neighbor.interface)
-
-        if (neighbor.ip) {
-          // Neighbor has an IP - scan it recursively
-          await this.scanDevice(
-            neighbor.ip,
-            parentIface?.id || null,
-            neighbor.interface,
-            neighbor.mac  // Pass known MAC for credential prioritization
-          )
-        } else if (neighbor.type === 'bridge-host' && neighbor.interface !== localUpstreamInterface) {
-          // Bridge host without IP on a downstream interface - add as end-device
-          // Skip hosts on the upstream interface (they come from elsewhere in the network)
-          this.processedMacs.add(neighbor.mac)
-
-          const endDeviceId = nanoid()
-
-          // Try to look up hostname from DHCP leases
-          let hostname: string | null = null
-          let neighborIp: string | null = null
-          const lease = await db.query.dhcpLeases.findFirst({
-            where: eq(dhcpLeases.mac, neighbor.mac),
-          })
-          if (lease?.hostname) {
-            hostname = lease.hostname
-          }
-          if (lease?.ip) {
-            neighborIp = lease.ip
-          }
-
-          // Fall back to mDNS hostname if DHCP didn't provide one
-          if (!hostname && neighborIp) {
-            const mdnsHostname = this.getMdnsHostname(neighborIp)
-            if (mdnsHostname) {
-              hostname = mdnsHostname
-              this.log('info', `${neighbor.mac}: Using mDNS hostname: ${mdnsHostname}`)
-            }
-          }
-
-          // Try to detect vendor from MAC OUI
-          const endDeviceVendor = detectVendorFromMac(neighbor.mac)
-
-          // Detect device type from vendor
-          const endDeviceType = detectTypeFromVendor(endDeviceVendor, hostname) || 'end-device'
-
-          // Create device record
-          const endDevice: DiscoveredDevice = {
-            id: endDeviceId,
-            mac: neighbor.mac,
-            hostname,
-            ip: neighborIp,
-            type: endDeviceType,
-            vendor: endDeviceVendor,
-            model: null,
-            firmwareVersion: null,
-            accessible: false,
-            openPorts: [],
-            driver: null,
-            parentInterfaceId: parentIface?.id || null,
-            upstreamInterface: neighbor.interface,
-            interfaces: [],
-          }
-
-          // Save to database - upsert by MAC, preserving user fields (comment, nomad, type)
-          const existingBridgeDevice = await db.select().from(devices).where(eq(devices.mac, neighbor.mac)).get()
-
-          if (existingBridgeDevice) {
-            // Update existing device, preserve user fields
-            await db.update(devices)
-              .set({
-                parentInterfaceId: parentIface?.id || null,
-                networkId: this.networkId,
-                upstreamInterface: neighbor.interface,
-                hostname,
-                ip: neighborIp,
-                vendor: endDeviceVendor,
-                // Don't update: comment, nomad, type (user-managed)
-                lastSeenAt: new Date().toISOString(),
-              })
-              .where(eq(devices.mac, neighbor.mac))
-
-            endDevice.id = existingBridgeDevice.id
-            this.log('info', `${ip}: Updated bridge host on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
-          } else {
-            // Insert new device
-            await db.insert(devices).values({
-              id: endDeviceId,
-              mac: neighbor.mac,
-              parentInterfaceId: parentIface?.id || null,
-              networkId: this.networkId,
-              upstreamInterface: neighbor.interface,
-              hostname,
-              ip: neighborIp,
-              vendor: endDeviceVendor,
-              model: null,
-              firmwareVersion: null,
-              type: endDevice.type,
-              accessible: false,
-              openPorts: '[]',
-              driver: null,
-              lastSeenAt: new Date().toISOString(),
-            })
-            this.log('success', `${ip}: Added bridge host as ${endDevice.type} on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
-          }
-
-          this.deviceCount++
-          this.callbacks.onDeviceDiscovered(endDevice)
-        }
-      }
+      await this.scanNeighborsParallel(
+        deviceInfo.neighbors,
+        newDevice,
+        localUpstreamInterface || null,
+        ip
+      )
     }
   }
 }

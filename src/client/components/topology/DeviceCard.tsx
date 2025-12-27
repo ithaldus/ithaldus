@@ -24,6 +24,45 @@ import {
 } from 'lucide-react'
 import type { TopologyDevice, Interface } from '../../lib/api'
 
+// Parse VLAN string into individual VLAN entries
+// Formats: "1000(comment)", "T:1000(comment),1010", "1000+T:1010,1020(comment)"
+interface VlanEntry {
+  id: string
+  comment?: string
+  tagged: boolean
+}
+
+function parseVlans(vlanStr: string): VlanEntry[] {
+  if (!vlanStr) return []
+
+  const entries: VlanEntry[] = []
+
+  // Split by '+' to handle hybrid ports (PVID + tagged)
+  const parts = vlanStr.split('+')
+
+  for (const part of parts) {
+    const isTagged = part.startsWith('T:')
+    const cleanPart = isTagged ? part.slice(2) : part
+
+    // Split by comma to get individual VLANs
+    const vlanItems = cleanPart.split(',')
+
+    for (const item of vlanItems) {
+      // Match VLAN ID and optional comment: "1000(comment)" or "1000"
+      const match = item.match(/^(\d+)(?:\((.+)\))?$/)
+      if (match) {
+        entries.push({
+          id: match[1],
+          comment: match[2],
+          tagged: isTagged,
+        })
+      }
+    }
+  }
+
+  return entries
+}
+
 interface DeviceCardProps {
   device: TopologyDevice
   level?: number
@@ -527,11 +566,21 @@ export function DeviceCard({
                           {ifaceInfo.bridge}
                         </span>
                       )}
-                      {ifaceInfo?.vlan && (
-                        <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-1 rounded">
-                          VLAN {ifaceInfo.vlan}
+                      {ifaceInfo?.vlan && parseVlans(ifaceInfo.vlan).map((vlan, idx) => (
+                        <span
+                          key={`${vlan.id}-${idx}`}
+                          className="inline-flex items-center text-[10px] font-mono text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded overflow-hidden"
+                        >
+                          <span className="px-1 bg-blue-200 dark:bg-blue-800/50">
+                            {vlan.tagged ? 'T' : 'U'}{vlan.id}
+                          </span>
+                          {vlan.comment && (
+                            <span className="px-1 font-sans">
+                              {vlan.comment}
+                            </span>
+                          )}
                         </span>
-                      )}
+                      ))}
                       {ifaceInfo?.comment && (
                         <span className="text-[10px] italic text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1 rounded">
                           {ifaceInfo.comment}

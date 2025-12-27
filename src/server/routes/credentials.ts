@@ -204,6 +204,38 @@ credentialsRoutes.put('/:id', requireAdmin, async (c) => {
   return c.json(updated)
 })
 
+// Clear failed credentials (admin only)
+// This removes entries from failedCredentials table, allowing credentials to be retried
+// NOTE: This route must come BEFORE /:id to avoid "failed" being matched as an ID
+credentialsRoutes.delete('/failed/clear', requireAdmin, async (c) => {
+  const networkId = c.req.query('networkId')
+
+  let deletedCount: number
+
+  if (networkId) {
+    // Get all devices in this network
+    const networkDevices = await db.select({ mac: devices.mac })
+      .from(devices)
+      .where(eq(devices.networkId, networkId))
+
+    const macs = networkDevices.map(d => d.mac)
+
+    if (macs.length > 0) {
+      const result = await db.delete(failedCredentials)
+        .where(inArray(failedCredentials.mac, macs))
+      deletedCount = result.rowsAffected
+    } else {
+      deletedCount = 0
+    }
+  } else {
+    // Clear all failed credentials
+    const result = await db.delete(failedCredentials)
+    deletedCount = result.rowsAffected
+  }
+
+  return c.json({ success: true, deletedCount })
+})
+
 // Delete credential (admin only)
 credentialsRoutes.delete('/:id', requireAdmin, async (c) => {
   const id = c.req.param('id')

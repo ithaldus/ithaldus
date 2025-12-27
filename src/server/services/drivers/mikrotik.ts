@@ -2,6 +2,28 @@ import type { Client } from 'ssh2'
 import type { DeviceInfo, InterfaceInfo, NeighborInfo, DhcpLeaseInfo, LogLevel, Driver } from './types'
 import { sshExec } from './types'
 
+// Helper: Decode MikroTik hex-encoded UTF-8 strings
+// MikroTik encodes non-ASCII characters as hex bytes without prefix, e.g., "vC3B5rk" for "võrk"
+function decodeMikrotikString(str: string): string {
+  if (!str) return str
+
+  // Match sequences of hex bytes (2+ pairs of hex digits that look like UTF-8)
+  // UTF-8 multi-byte sequences start with C0-FF and continue with 80-BF
+  return str.replace(/([C-F][0-9A-F][89AB][0-9A-F])+/gi, (match) => {
+    try {
+      // Convert hex pairs to bytes
+      const bytes: number[] = []
+      for (let i = 0; i < match.length; i += 2) {
+        bytes.push(parseInt(match.slice(i, i + 2), 16))
+      }
+      // Decode as UTF-8
+      return new TextDecoder('utf-8').decode(new Uint8Array(bytes))
+    } catch {
+      return match // Return original if decoding fails
+    }
+  })
+}
+
 // Helper: Calculate network address from IP and CIDR
 function getNetworkAddress(ip: string, cidr: number): string {
   const parts = ip.split('.').map(Number)
@@ -81,7 +103,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
 
   // Parse identity
   const hostnameMatch = identity.match(/name:\s*(\S+)/)
-  const hostname = hostnameMatch ? hostnameMatch[1] : null
+  const hostname = hostnameMatch ? decodeMikrotikString(hostnameMatch[1]) : null
 
   // Parse resource for model/version
   const modelMatch = resource.match(/board-name:\s*(.+?)(?:\r?\n|$)/)
@@ -150,7 +172,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
         vlanToId.set(nameMatch[1], vlanId)
         // Store VLAN comment if present
         if (commentMatch && commentMatch[1]) {
-          vlanIdToComment.set(vlanId, commentMatch[1])
+          vlanIdToComment.set(vlanId, decodeMikrotikString(commentMatch[1]))
         }
         // Also track which VLANs are on each parent interface
         const parentIface = parentMatch[1]
@@ -239,7 +261,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     if (nameMatch) {
       const name = nameMatch[1]
       const ifType = typeMatch ? typeMatch[1] : ''
-      const comment = commentMatch ? commentMatch[1] : null
+      const comment = commentMatch ? decodeMikrotikString(commentMatch[1]) : null
 
       // Parse flags from terse output: "0  R name=..." or "1 XR name=..."
       // R = running (link up), X = disabled, S = slave
@@ -348,7 +370,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     if (macMatch) {
       const mac = macMatch[1].toUpperCase()
       const ip = ipMatch ? ipMatch[1] : null
-      const hostname = hostMatch ? hostMatch[1] : null
+      const hostname = hostMatch ? decodeMikrotikString(hostMatch[1]) : null
 
       // Try to find physical port from bridge host table first
       let interfaceName = 'unknown'

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { X, Eye, EyeOff } from 'lucide-react'
+import { X } from 'lucide-react'
 import type { Network } from '../../lib/api'
+import { CredentialCombobox } from './CredentialCombobox'
 
 type NetworkModalProps = {
   network?: Network | null
@@ -19,7 +20,6 @@ export function NetworkModal({
   const [rootIp, setRootIp] = useState(network?.rootIp ?? '')
   const [rootUsername, setRootUsername] = useState(network?.rootUsername ?? '')
   const [rootPassword, setRootPassword] = useState(network?.rootPassword ?? '')
-  const [showPassword, setShowPassword] = useState(false)
 
   // Handle escape key
   useEffect(() => {
@@ -92,46 +92,13 @@ export function NetworkModal({
             />
           </div>
 
-          {/* Username */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Username
-            </label>
-            <input
-              type="text"
-              value={rootUsername}
-              onChange={(e) => setRootUsername(e.target.value)}
-              placeholder="e.g., admin"
-              className="w-full px-3 py-2 text-sm font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 focus:border-transparent"
-            />
-          </div>
-
-          {/* Password */}
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={rootPassword}
-                onChange={(e) => setRootPassword(e.target.value)}
-                placeholder="Enter password"
-                className="w-full px-3 py-2 pr-10 text-sm font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-400 focus:border-transparent"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-              >
-                {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-          </div>
+          {/* Credentials */}
+          <CredentialCombobox
+            username={rootUsername}
+            password={rootPassword}
+            onUsernameChange={setRootUsername}
+            onPasswordChange={setRootPassword}
+          />
 
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4">

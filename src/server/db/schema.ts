@@ -49,6 +49,7 @@ export const credentials = sqliteTable('credentials', {
   username: text('username').notNull(),
   password: text('password').notNull(),
   networkId: text('network_id').references(() => networks.id, { onDelete: 'cascade' }),
+  isRoot: integer('is_root', { mode: 'boolean' }).notNull().default(false),
 })
 // Note: unique index is created manually in migration with COALESCE for NULL handling:
 // CREATE UNIQUE INDEX idx_credentials_unique ON credentials (username, password, COALESCE(network_id, ''))

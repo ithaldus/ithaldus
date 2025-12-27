@@ -89,10 +89,6 @@ export function Networks() {
     navigate(`/networks/${networkId}`)
   }
 
-  function handleSelect(networkId: string) {
-    navigate(`/networks/${networkId}`)
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -131,7 +127,6 @@ export function Networks() {
                 onEdit={() => setEditingNetwork(network)}
                 onDelete={() => setDeletingNetwork(network)}
                 onScan={() => handleScan(network.id)}
-                onSelect={() => handleSelect(network.id)}
               />
             ))}
           </div>

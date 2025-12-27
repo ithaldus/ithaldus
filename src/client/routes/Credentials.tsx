@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { api, type Credential, type Network, type MatchedDevice } from '../lib/api'
-import { Plus, Upload, Key, Globe, Eye, EyeOff, List } from 'lucide-react'
+import { Plus, Upload, Key, Globe, Eye, EyeOff, List, RotateCcw } from 'lucide-react'
 import { CredentialCard } from '../components/credentials/CredentialCard'
 
 type ExtendedCredential = Credential & { matchedDevices?: MatchedDevice[] }
@@ -133,14 +133,34 @@ export function Credentials() {
     }
   }
 
+  async function handleClearFailed() {
+    const networkName = selectedNetworkId === 'all' ? 'all networks' : (currentTab?.name ?? 'Global')
+    if (!confirm(`Clear failed credential cache for ${networkName}?\n\nThis will allow all credentials to be retried on devices where they previously failed (due to wrong password or connection issues).`)) {
+      return
+    }
+    try {
+      const networkId = selectedNetworkId === 'all' ? undefined : selectedNetworkId
+      const result = await api.credentials.clearFailed(networkId)
+      alert(`Cleared ${result.deletedCount} failed credential entries.`)
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        alert(err.message)
+      }
+    }
+  }
+
   const totalDevices = filteredCredentials.reduce(
     (sum, cred) => sum + (cred.matchedDevices?.length || 0),
     0
   )
 
-  const sortedCredentials = [...filteredCredentials].sort((a, b) =>
-    a.username.localeCompare(b.username)
-  )
+  const sortedCredentials = [...filteredCredentials].sort((a, b) => {
+    // Root credentials first
+    if (a.isRoot && !b.isRoot) return -1
+    if (!a.isRoot && b.isRoot) return 1
+    // Then alphabetically by username
+    return a.username.localeCompare(b.username)
+  })
 
   // Create tabs: All + Global + all networks
   const tabs: { id: string | null | 'all'; name: string }[] = [
@@ -161,7 +181,7 @@ export function Credentials() {
 
   return (
     <div className="h-full bg-slate-50 dark:bg-slate-950 overflow-auto">
-      <div className="max-w-3xl mx-auto p-6">
+      <div className="max-w-5xl mx-auto p-6">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
@@ -184,7 +204,7 @@ export function Credentials() {
 
         {/* Network Tabs */}
         <div className="mb-6 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex gap-1 overflow-x-auto pb-px">
+          <div className="flex flex-wrap gap-1 pb-px">
             {tabs.map((tab) => {
               const isActive = tab.id === selectedNetworkId
               const credCount = tab.id === 'all'
@@ -288,6 +308,16 @@ export function Credentials() {
             {showAllPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             {showAllPasswords ? 'Hide Passwords' : 'Show Passwords'}
           </button>
+          {isAdmin && (
+            <button
+              onClick={handleClearFailed}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-red-500 dark:hover:border-red-500 hover:text-red-600 dark:hover:text-red-400"
+              title="Clear failed credential cache - allows credentials to be retried on devices"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset Failed
+            </button>
+          )}
         </div>
 
         {/* Add Form */}

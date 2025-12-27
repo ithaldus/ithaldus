@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Dark mode input text colors */
+@layer base {
+  .dark input,
+  .dark textarea,
+  .dark select {
+    color: white;
+  }
+}
+
 /* Custom scrollbar styling */
 @layer utilities {
   .scrollbar-thin {

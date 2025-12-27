@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Eye, EyeOff, Pencil, Trash2, Router, Check, X, Network, ArrowRightLeft, Globe } from 'lucide-react'
+import { Eye, EyeOff, Pencil, Trash2, Router, Check, X, Network, ArrowRightLeft, Globe, Crown } from 'lucide-react'
 import type { Credential, MatchedDevice, Network as NetworkType } from '../../lib/api'
 import { VendorLogo } from '../topology/VendorLogo'
 
@@ -132,6 +132,12 @@ export function CredentialCard({ credential, allCredentials, networks = [], show
               </button>
             </div>
             <div className="flex items-center gap-2">
+              {credential.isRoot && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                  <Crown className="w-3 h-3" />
+                  Root
+                </span>
+              )}
               {showNetworkBadge && (
                 <span className={`
                   inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full
@@ -153,8 +159,8 @@ export function CredentialCard({ credential, allCredentials, networks = [], show
                   )}
                 </span>
               )}
-              {/* Move button with dropdown */}
-              {onMove && networks.length > 0 && (
+              {/* Move button with dropdown - hidden for root credentials */}
+              {onMove && networks.length > 0 && !credential.isRoot && (
                 <div className="relative">
                   <button
                     ref={moveButtonRef}
@@ -213,20 +219,25 @@ export function CredentialCard({ credential, allCredentials, networks = [], show
                   )}
                 </div>
               )}
-              <button
-                onClick={() => setIsEditing(true)}
-                className="p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
-                title="Edit credential"
-              >
-                <Pencil className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => onDelete?.(credential.id)}
-                className="p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
-                title="Delete credential"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {/* Edit/Delete buttons - hidden for root credentials (managed via network settings) */}
+              {!credential.isRoot && (
+                <>
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                    title="Edit credential"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onDelete?.(credential.id)}
+                    className="p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                    title="Delete credential"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
