@@ -1003,6 +1003,8 @@ export class NetworkScanner {
           hostname,
           ip: neighborIp,
           vendor: endDeviceVendor,
+          accessible: false,
+          openPorts: '[]',
           // Don't update: comment, nomad, type (user-managed)
           lastSeenAt: new Date().toISOString(),
         })
@@ -1322,6 +1324,8 @@ export class NetworkScanner {
             hostname,
             ip,
             vendor,
+            accessible: false,
+            openPorts: '[]',
             // Don't update: comment, nomad, type (user-managed)
             lastSeenAt: new Date().toISOString(),
           })
