@@ -581,6 +581,56 @@ async function scanPorts(ip: string, ports: number[], timeout = 3000): Promise<n
   return openPorts.sort((a, b) => a - b)
 }
 
+// Check if HTTP port is serving insecure content (2xx without redirect)
+// Returns true if port should be marked as warning (insecure)
+async function checkHttpInsecure(ip: string, port: number, timeout = 3000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeout)
+
+    // Using fetch with redirect: 'manual' to capture redirect without following
+    fetch(`http://${ip}${port === 80 ? '' : ':' + port}/`, {
+      method: 'HEAD',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(timeout),
+    })
+      .then((response) => {
+        clearTimeout(timer)
+        // Port is insecure if it returns 2xx without a Location header
+        // (meaning it's serving actual HTTP content without redirecting)
+        // Non-2xx responses (3xx redirects, 503 errors, etc.) are OK
+        const is2xx = response.status >= 200 && response.status < 300
+        const hasLocation = response.headers.has('location')
+        resolve(is2xx && !hasLocation)
+      })
+      .catch(() => {
+        clearTimeout(timer)
+        resolve(false)
+      })
+  })
+}
+
+// Determine which ports should be marked as warnings
+// - Port 23 (telnet) is always a warning
+// - Port 80 is a warning if it serves 2xx content without redirect
+async function getWarningPorts(ip: string, openPorts: number[]): Promise<number[]> {
+  const warnings: number[] = []
+
+  // Telnet is always a warning
+  if (openPorts.includes(23)) {
+    warnings.push(23)
+  }
+
+  // Check HTTP port 80 - warn if it's serving content without redirect
+  if (openPorts.includes(80)) {
+    const isInsecure = await checkHttpInsecure(ip, 80)
+    if (isInsecure) {
+      warnings.push(80)
+    }
+  }
+
+  return warnings.sort((a, b) => a - b)
+}
+
 // Check which ports are open on a device via SSH jump host tunnel
 // The SSH tunnel doesn't attempt TCP connection until we use the stream.
 // We call stream.end() to trigger the connection attempt.
@@ -1005,6 +1055,7 @@ export class NetworkScanner {
           vendor: endDeviceVendor,
           accessible: false,
           openPorts: '[]',
+          warningPorts: '[]',
           // Don't update: comment, nomad, type (user-managed)
           lastSeenAt: new Date().toISOString(),
         })
@@ -1028,6 +1079,7 @@ export class NetworkScanner {
         type: endDevice.type,
         accessible: false,
         openPorts: '[]',
+        warningPorts: '[]',
         driver: null,
         lastSeenAt: new Date().toISOString(),
       })
@@ -1326,6 +1378,7 @@ export class NetworkScanner {
             vendor,
             accessible: false,
             openPorts: '[]',
+            warningPorts: '[]',
             // Don't update: comment, nomad, type (user-managed)
             lastSeenAt: new Date().toISOString(),
           })
@@ -1349,6 +1402,7 @@ export class NetworkScanner {
           type: newDevice.type,
           accessible: false,
           openPorts: '[]',
+          warningPorts: '[]',
           driver: null,
           lastSeenAt: new Date().toISOString(),
         })
@@ -1362,6 +1416,12 @@ export class NetworkScanner {
     }
 
     this.log('info', `${ip}: Open ports: ${openPorts.join(', ')}`)
+
+    // Check for warning ports (insecure HTTP, telnet)
+    const warningPorts = await getWarningPorts(ip, openPorts)
+    if (warningPorts.length > 0) {
+      this.log('warn', `${ip}: Warning ports detected: ${warningPorts.join(', ')}`)
+    }
 
     // Check if skipLogin is enabled for this device (by MAC)
     let shouldSkipLogin = false
@@ -1678,6 +1738,7 @@ export class NetworkScanner {
           // Don't update type - only set on first discovery, user can change via UI
           accessible: newDevice.accessible,
           openPorts: JSON.stringify(openPorts),
+          warningPorts: JSON.stringify(warningPorts),
           driver: newDevice.driver,
           lastSeenAt: new Date().toISOString(),
         })
@@ -1705,6 +1766,7 @@ export class NetworkScanner {
         type: deviceType,
         accessible: newDevice.accessible,
         openPorts: JSON.stringify(openPorts),
+        warningPorts: JSON.stringify(warningPorts),
         driver: newDevice.driver,
         lastSeenAt: new Date().toISOString(),
       })

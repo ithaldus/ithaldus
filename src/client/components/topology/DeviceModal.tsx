@@ -81,6 +81,15 @@ function parseOpenPorts(openPorts: string | null): number[] {
   }
 }
 
+function parseWarningPorts(warningPorts: string | null): Set<number> {
+  if (!warningPorts) return new Set()
+  try {
+    return new Set(JSON.parse(warningPorts))
+  } catch {
+    return new Set()
+  }
+}
+
 function formatPortName(port: number): string {
   const portNames: Record<number, string> = {
     22: 'SSH',
@@ -212,6 +221,7 @@ export function DeviceModal({
   // Get icon for the current device type
   const DeviceIcon = deviceTypeOptions.find(opt => opt.value === deviceType)?.icon || Monitor
   const openPorts = parseOpenPorts(device.openPorts)
+  const warningPorts = parseWarningPorts((device as any).warningPorts)
   const needsCredentials = !device.accessible && openPorts.includes(22)
 
   // Group logs by scanId for visual separation
@@ -739,25 +749,19 @@ export function DeviceModal({
               </label>
               <div className="mt-2 flex flex-wrap gap-2">
                 {openPorts.map((port) => {
-                  // Color coding for HTTP/HTTPS ports:
+                  // Color coding for ports:
+                  // - Red: warning ports (telnet, HTTP without redirect)
                   // - Green: HTTPS ports (443, 8443)
-                  // - Yellow: HTTP port with HTTPS also available (likely redirects)
-                  // - Red: HTTP port without HTTPS (insecure)
                   // - Gray: other ports
+                  const isWarning = warningPorts.has(port)
                   const isHttpPort = [80, 8080].includes(port)
                   const isHttpsPort = [443, 8443].includes(port)
-                  const hasHttpsCounterpart = isHttpPort && (
-                    (port === 80 && openPorts.includes(443)) ||
-                    (port === 8080 && openPorts.includes(8443))
-                  )
 
                   let colorClass = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                  if (isHttpsPort) {
-                    colorClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
-                  } else if (isHttpPort && hasHttpsCounterpart) {
-                    colorClass = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50'
-                  } else if (isHttpPort) {
+                  if (isWarning) {
                     colorClass = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50'
+                  } else if (isHttpsPort) {
+                    colorClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
                   }
 
                   const isWebPort = isHttpPort || isHttpsPort

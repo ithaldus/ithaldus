@@ -101,6 +101,7 @@ export const devices = sqliteTable('devices', {
   type: text('type', { enum: ['router', 'switch', 'access-point', 'end-device', 'server', 'computer', 'phone', 'desktop-phone', 'tv', 'tablet', 'printer', 'camera', 'iot'] }),
   accessible: integer('accessible', { mode: 'boolean' }),
   openPorts: text('open_ports'),
+  warningPorts: text('warning_ports'),  // Ports that should be highlighted as warnings (e.g., insecure HTTP, telnet)
   driver: text('driver'),
   // Metadata (user-managed)
   comment: text('comment'),

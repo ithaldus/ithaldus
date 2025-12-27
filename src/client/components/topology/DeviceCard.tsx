@@ -150,6 +150,15 @@ function parseOpenPorts(openPorts: string | null): number[] {
   }
 }
 
+function parseWarningPorts(warningPorts: string | null): Set<number> {
+  if (!warningPorts) return new Set()
+  try {
+    return new Set(JSON.parse(warningPorts))
+  } catch {
+    return new Set()
+  }
+}
+
 // Check if we need a virtual switch placeholder
 // (multiple children, all inaccessible = there's an unmanaged switch in between)
 // Only applies to wired interfaces - wireless interfaces naturally have multiple clients
@@ -224,6 +233,7 @@ export function DeviceCard({
   }
 
   const openPorts = parseOpenPorts(device.openPorts)
+  const warningPorts = parseWarningPorts((device as any).warningPorts)
 
   // Use device type from database (fallback to end-device if not set)
   const effectiveType = device.type || 'end-device'
@@ -431,6 +441,13 @@ export function DeviceCard({
               <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium font-mono bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-700/25 dark:border-emerald-500/25">
                 {openPorts.slice(0, 6).map((port, idx) => {
                   const webUrl = webPorts.has(port) ? getWebUrl(port) : null
+                  const isWarning = warningPorts.has(port)
+                  const textColor = isWarning
+                    ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/50'
+                    : 'text-emerald-700 dark:text-emerald-400'
+                  const hoverColor = isWarning
+                    ? 'hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-700 dark:hover:text-red-300'
+                    : 'hover:bg-emerald-200 dark:hover:bg-emerald-800/50 hover:text-emerald-900 dark:hover:text-emerald-200'
                   return webUrl ? (
                     <a
                       key={port}
@@ -438,7 +455,7 @@ export function DeviceCard({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className={`px-1 h-full flex items-center text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-800/50 hover:text-emerald-900 dark:hover:text-emerald-200 transition-colors cursor-pointer ${
+                      className={`px-1 h-full flex items-center ${textColor} ${hoverColor} transition-colors cursor-pointer ${
                         idx > 0 ? 'border-l border-emerald-700/25 dark:border-emerald-500/25' : ''
                       }`}
                     >
@@ -447,7 +464,7 @@ export function DeviceCard({
                   ) : (
                     <span
                       key={port}
-                      className={`px-1 h-full flex items-center text-emerald-700 dark:text-emerald-400 ${
+                      className={`px-1 h-full flex items-center ${textColor} ${
                         idx > 0 ? 'border-l border-emerald-700/25 dark:border-emerald-500/25' : ''
                       }`}
                     >

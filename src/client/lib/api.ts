@@ -349,6 +349,7 @@ export interface Device {
   type: DeviceType | null
   accessible: boolean | null
   openPorts: string | null
+  warningPorts: string | null
   driver: string | null
   comment: string | null
   locationId: string | null
