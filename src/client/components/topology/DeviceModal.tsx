@@ -31,6 +31,7 @@ import {
   ChevronUp,
 } from 'lucide-react'
 import { VendorLogo } from './VendorLogo'
+import { ImageCropper } from '../ImageCropper'
 import { api, type TopologyDevice, type Interface, type DeviceType, type Location, type DeviceImage, type DeviceLog } from '../../lib/api'
 
 // Device type options for the dropdown
@@ -135,6 +136,7 @@ export function DeviceModal({
   const [logsExpanded, setLogsExpanded] = useState(false)
   const [showFullImage, setShowFullImage] = useState(false)
   const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null)
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null) // base64 data URL for cropping
 
   // Close modal on ESC key
   useEffect(() => {
@@ -365,32 +367,46 @@ export function DeviceModal({
       return
     }
 
-    setUploadingImage(true)
-    try {
-      // Read file as base64
-      const reader = new FileReader()
-      reader.onload = async () => {
-        const base64 = (reader.result as string).split(',')[1] // Remove data:image/...;base64, prefix
-        await api.devices.uploadImage(device.id, base64, file.type)
-        // Fetch the updated image
-        const image = await api.devices.getImage(device.id)
-        setDeviceImage(image)
-        onImageChange?.(device.id, true)
-        setUploadingImage(false)
-      }
-      reader.onerror = () => {
-        console.error('Failed to read file')
-        setUploadingImage(false)
-      }
-      reader.readAsDataURL(file)
-    } catch (err) {
-      console.error('Failed to upload image:', err)
-      setUploadingImage(false)
+    // Read file and show cropper
+    const reader = new FileReader()
+    reader.onload = () => {
+      setImageToCrop(reader.result as string)
     }
+    reader.onerror = () => {
+      console.error('Failed to read file')
+    }
+    reader.readAsDataURL(file)
+
     // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+  }
+
+  const handleCropComplete = async (croppedDataUrl: string) => {
+    setImageToCrop(null)
+    setUploadingImage(true)
+
+    try {
+      // Extract base64 and mime type from data URL
+      const [header, base64] = croppedDataUrl.split(',')
+      const mimeType = header.match(/data:(.*);base64/)?.[1] || 'image/jpeg'
+
+      await api.devices.uploadImage(device.id, base64, mimeType)
+      // Fetch the updated image
+      const image = await api.devices.getImage(device.id)
+      setDeviceImage(image)
+      setImageAspectRatio(null) // Reset so it recalculates
+      onImageChange?.(device.id, true)
+    } catch (err) {
+      console.error('Failed to upload image:', err)
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  const handleCropCancel = () => {
+    setImageToCrop(null)
   }
 
   const handleDeleteImage = async () => {
@@ -456,7 +472,13 @@ export function DeviceModal({
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Device Image */}
             <div
-              className="relative w-full h-48 2xl:h-56 shrink-0 overflow-hidden bg-slate-800 dark:bg-slate-900 border-b border-slate-700 group"
+              className="relative w-full shrink-0 overflow-hidden bg-white border-b border-slate-200 dark:border-slate-700 group"
+              style={{
+                // Use image aspect ratio (clamped 0.75-3) so container matches image, no cropping needed
+                aspectRatio: imageAspectRatio || 2,
+                maxHeight: '18rem',
+                minHeight: '10rem',
+              }}
               onMouseEnter={() => setImageHovered(true)}
               onMouseLeave={() => setImageHovered(false)}
             >
@@ -474,9 +496,9 @@ export function DeviceModal({
                     onLoad={(e) => {
                       const img = e.currentTarget
                       if (img.naturalWidth && img.naturalHeight) {
-                        // Clamp aspect ratio between 1:1 (1) and 4:1 (4)
+                        // Clamp aspect ratio between 3:4 portrait (0.75) and 3:1 landscape (3)
                         const natural = img.naturalWidth / img.naturalHeight
-                        const clamped = Math.max(1, Math.min(4, natural))
+                        const clamped = Math.max(0.75, Math.min(3, natural))
                         setImageAspectRatio(clamped)
                       }
                     }}
@@ -1118,6 +1140,15 @@ export function DeviceModal({
             onClick={(e) => e.stopPropagation()}
           />
         </div>
+      )}
+
+      {/* Image Cropper */}
+      {imageToCrop && (
+        <ImageCropper
+          image={imageToCrop}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+        />
       )}
     </div>
   )
