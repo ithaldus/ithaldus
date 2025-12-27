@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { NavLink, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin, Loader2 } from 'lucide-react'
+import { Tooltip } from '../ui/Tooltip'
 import { useAuth } from '../../hooks/useAuth'
 import { api, type Network as NetworkType, onConnectionChange, isConnected } from '../../lib/api'
 import { Logo } from '../Logo'
@@ -143,17 +144,18 @@ export function Shell({ children }: ShellProps) {
             <Logo className={`w-6 h-6 ${logoColor} hidden lg:block`} />
           )}
           {/* Desktop collapse toggle */}
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="hidden lg:flex items-center justify-center w-8 h-8 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {sidebarCollapsed ? (
-              <PanelLeft className="w-5 h-5" />
-            ) : (
-              <PanelLeftClose className="w-5 h-5" />
-            )}
-          </button>
+          <Tooltip content={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} position="right">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="hidden lg:flex items-center justify-center w-8 h-8 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+            >
+              {sidebarCollapsed ? (
+                <PanelLeft className="w-5 h-5" />
+              ) : (
+                <PanelLeftClose className="w-5 h-5" />
+              )}
+            </button>
+          </Tooltip>
           {/* Mobile close button */}
           <button
             onClick={() => setMobileMenuOpen(false)}
@@ -165,8 +167,8 @@ export function Shell({ children }: ShellProps) {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-2 space-y-1">
-          {navItems.map((item) => (
-            <div key={item.to}>
+          {navItems.map((item) => {
+            const navLink = (
               <NavLink
                 to={item.to}
                 end={item.to === '/networks'}
@@ -178,7 +180,6 @@ export function Shell({ children }: ShellProps) {
                       : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                   } ${sidebarCollapsed ? 'lg:justify-center' : ''}`
                 }
-                title={sidebarCollapsed ? item.label : undefined}
               >
                 <item.icon className="w-5 h-5 flex-shrink-0" />
                 {!sidebarCollapsed && (
@@ -186,6 +187,14 @@ export function Shell({ children }: ShellProps) {
                 )}
                 <span className="text-sm font-medium truncate lg:hidden">{item.label}</span>
               </NavLink>
+            )
+            return (
+            <div key={item.to}>
+              {sidebarCollapsed ? (
+                <Tooltip content={item.label} position="right" className="hidden lg:block">
+                  {navLink}
+                </Tooltip>
+              ) : navLink}
 
               {/* Sub-navigation: all networks */}
               {item.to === '/networks' && networks.length > 0 && !sidebarCollapsed && (
@@ -234,7 +243,8 @@ export function Shell({ children }: ShellProps) {
                 </div>
               )}
             </div>
-          ))}
+            )
+          })}
         </nav>
 
         {/* User menu at bottom */}

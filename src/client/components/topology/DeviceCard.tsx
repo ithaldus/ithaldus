@@ -22,6 +22,7 @@ import {
   Tag,
   MessageCircle,
 } from 'lucide-react'
+import { Tooltip } from '../ui/Tooltip'
 import type { TopologyDevice, Interface } from '../../lib/api'
 
 // Parse VLAN string into individual VLAN entries
@@ -384,22 +385,24 @@ export function DeviceCard({
                     {device.ownUpstreamInterface}
                   </span>
                   <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
-                  <button
-                    onClick={(e) => handleCopy(device.ip!, e)}
-                    className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                    title="Click to copy IP"
-                  >
-                    {copiedText === device.ip ? 'Copied!' : device.ip}
-                  </button>
+                  <Tooltip content={copiedText === device.ip ? 'Copied!' : 'Click to copy'} position="bottom">
+                    <button
+                      onClick={(e) => handleCopy(device.ip!, e)}
+                      className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                    >
+                      {device.ip}
+                    </button>
+                  </Tooltip>
                 </span>
               ) : (
-                <button
-                  onClick={(e) => handleCopy(device.ip!, e)}
-                  className="shrink-0 h-[18px] px-1 inline-flex items-center text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                  title="Click to copy IP"
-                >
-                  {copiedText === device.ip ? 'Copied!' : device.ip}
-                </button>
+                <Tooltip content={copiedText === device.ip ? 'Copied!' : 'Click to copy'} position="bottom">
+                  <button
+                    onClick={(e) => handleCopy(device.ip!, e)}
+                    className="shrink-0 h-[18px] px-1 inline-flex items-center text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                  >
+                    {device.ip}
+                  </button>
+                </Tooltip>
               )
             )}
 
@@ -490,13 +493,12 @@ export function DeviceCard({
 
             {/* Moved Badge */}
             {wasMoved && (
-              <span
-                className="shrink-0 h-[18px] inline-flex items-center gap-1 px-1 text-[9px] font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded cursor-help"
-                title={`Previously seen in: ${(device as any).previousNetworkName || 'another network'}`}
-              >
-                <ArrowRightLeft className="w-2.5 h-2.5" />
-                Moved
-              </span>
+              <Tooltip content={`Previously seen in: ${(device as any).previousNetworkName || 'another network'}`} position="bottom">
+                <span className="shrink-0 h-[18px] inline-flex items-center gap-1 px-1 text-[9px] font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded cursor-help">
+                  <ArrowRightLeft className="w-2.5 h-2.5" />
+                  Moved
+                </span>
+              </Tooltip>
             )}
           </div>
 
@@ -570,13 +572,12 @@ export function DeviceCard({
                         </span>
                       )}
                       {ifaceInfo?.poeWatts && (
-                        <span
-                          className="flex items-center gap-0.5 text-[10px] font-mono text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1 rounded cursor-help"
-                          title={`PoE${ifaceInfo.poeStandard ? ` ${ifaceInfo.poeStandard.toUpperCase()}` : ''}: ${ifaceInfo.poeWatts}W`}
-                        >
-                          <Zap className="w-2.5 h-2.5" />
-                          {ifaceInfo.poeWatts}W
-                        </span>
+                        <Tooltip content={`PoE${ifaceInfo.poeStandard ? ` ${ifaceInfo.poeStandard.toUpperCase()}` : ''}: ${ifaceInfo.poeWatts}W`} position="bottom">
+                          <span className="flex items-center gap-0.5 text-[10px] font-mono text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1 rounded cursor-help">
+                            <Zap className="w-2.5 h-2.5" />
+                            {ifaceInfo.poeWatts}W
+                          </span>
+                        </Tooltip>
                       )}
                       {ifaceInfo?.bridge && (
                         <span className="text-[10px] font-mono text-violet-500 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-1 rounded">

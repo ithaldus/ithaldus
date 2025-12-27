@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { Terminal, ChevronLeft, X, Maximize2, Minimize2, Search, Radio, AlertCircle, AlertTriangle, CheckCircle, Info, Copy, Check } from 'lucide-react'
+import { Tooltip } from '../ui/Tooltip'
 import type { LogMessage, ChannelInfo } from '../../lib/api'
 
 type LogLevel = 'info' | 'success' | 'warn' | 'error'
@@ -260,71 +261,77 @@ export function DebugConsole({
 
           {/* Severity filter buttons */}
           <div className="flex items-center gap-0.5 shrink-0 border-l border-slate-600 pl-2 ml-1">
-            <button
-              onClick={() => toggleLevel('error')}
-              title={enabledLevels.has('error') ? 'Hide errors' : 'Show errors'}
-              className={`p-1 rounded transition-colors ${
-                enabledLevels.has('error')
-                  ? 'text-red-400 bg-red-400/20'
-                  : 'text-slate-600 hover:text-slate-400'
-              }`}
-            >
-              <AlertCircle className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => toggleLevel('warn')}
-              title={enabledLevels.has('warn') ? 'Hide warnings' : 'Show warnings'}
-              className={`p-1 rounded transition-colors ${
-                enabledLevels.has('warn')
-                  ? 'text-amber-400 bg-amber-400/20'
-                  : 'text-slate-600 hover:text-slate-400'
-              }`}
-            >
-              <AlertTriangle className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => toggleLevel('success')}
-              title={enabledLevels.has('success') ? 'Hide success' : 'Show success'}
-              className={`p-1 rounded transition-colors ${
-                enabledLevels.has('success')
-                  ? 'text-green-400 bg-green-400/20'
-                  : 'text-slate-600 hover:text-slate-400'
-              }`}
-            >
-              <CheckCircle className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => toggleLevel('info')}
-              title={enabledLevels.has('info') ? 'Hide info' : 'Show info'}
-              className={`p-1 rounded transition-colors ${
-                enabledLevels.has('info')
-                  ? 'text-slate-400 bg-slate-400/20'
-                  : 'text-slate-600 hover:text-slate-400'
-              }`}
-            >
-              <Info className="w-3.5 h-3.5" />
-            </button>
+            <Tooltip content={enabledLevels.has('error') ? 'Hide errors' : 'Show errors'} position="bottom">
+              <button
+                onClick={() => toggleLevel('error')}
+                className={`p-1 rounded transition-colors ${
+                  enabledLevels.has('error')
+                    ? 'text-red-400 bg-red-400/20'
+                    : 'text-slate-600 hover:text-slate-400'
+                }`}
+              >
+                <AlertCircle className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
+            <Tooltip content={enabledLevels.has('warn') ? 'Hide warnings' : 'Show warnings'} position="bottom">
+              <button
+                onClick={() => toggleLevel('warn')}
+                className={`p-1 rounded transition-colors ${
+                  enabledLevels.has('warn')
+                    ? 'text-amber-400 bg-amber-400/20'
+                    : 'text-slate-600 hover:text-slate-400'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
+            <Tooltip content={enabledLevels.has('success') ? 'Hide success' : 'Show success'} position="bottom">
+              <button
+                onClick={() => toggleLevel('success')}
+                className={`p-1 rounded transition-colors ${
+                  enabledLevels.has('success')
+                    ? 'text-green-400 bg-green-400/20'
+                    : 'text-slate-600 hover:text-slate-400'
+                }`}
+              >
+                <CheckCircle className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
+            <Tooltip content={enabledLevels.has('info') ? 'Hide info' : 'Show info'} position="bottom">
+              <button
+                onClick={() => toggleLevel('info')}
+                className={`p-1 rounded transition-colors ${
+                  enabledLevels.has('info')
+                    ? 'text-slate-400 bg-slate-400/20'
+                    : 'text-slate-600 hover:text-slate-400'
+                }`}
+              >
+                <Info className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={() => setAutoExpand(!autoExpand)}
-              title={autoExpand ? "Disable auto-expand — Console will stay at fixed width" : "Enable auto-expand — Console will grow to fit the longest line"}
-              className={`p-1.5 rounded transition-colors ${
-                autoExpand
-                  ? 'bg-cyan-600 text-white'
-                  : 'hover:bg-slate-700 text-slate-400 hover:text-white'
-              }`}
-            >
-              {autoExpand ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-            </button>
-            <button
-              onClick={onToggle}
-              title="Close debug console"
-              className="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+            <Tooltip content={autoExpand ? "Disable auto-expand" : "Enable auto-expand"} position="bottom">
+              <button
+                onClick={() => setAutoExpand(!autoExpand)}
+                className={`p-1.5 rounded transition-colors ${
+                  autoExpand
+                    ? 'bg-cyan-600 text-white'
+                    : 'hover:bg-slate-700 text-slate-400 hover:text-white'
+                }`}
+              >
+                {autoExpand ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+              </button>
+            </Tooltip>
+            <Tooltip content="Close console" position="bottom">
+              <button
+                onClick={onToggle}
+                className="p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -391,14 +398,15 @@ export function DebugConsole({
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
               <span>Listening for updates...</span>
             </div>
-            <button
-              onClick={copyAllLogs}
-              disabled={filteredLogs.length === 0}
-              title="Copy all visible logs to clipboard"
-              className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-            </button>
+            <Tooltip content={copied ? "Copied!" : "Copy all logs"} position="top">
+              <button
+                onClick={copyAllLogs}
+                disabled={filteredLogs.length === 0}
+                className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>

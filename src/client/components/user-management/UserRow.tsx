@@ -1,4 +1,5 @@
 import { Pencil, Trash2 } from 'lucide-react'
+import { Tooltip } from '../ui/Tooltip'
 import { RoleBadge } from './RoleBadge'
 import type { User } from '../../lib/api'
 
@@ -59,21 +60,23 @@ export function UserRow({
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-1">
-          <button
-            onClick={onEdit}
-            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
-            title="Edit user"
-          >
-            <Pencil className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onDelete}
-            disabled={isCurrentUser}
-            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-500"
-            title={isCurrentUser ? "Cannot delete yourself" : "Delete user"}
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <Tooltip content="Edit user" position="bottom">
+            <button
+              onClick={onEdit}
+              className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content={isCurrentUser ? "Cannot delete yourself" : "Delete user"} position="bottom">
+            <button
+              onClick={onDelete}
+              disabled={isCurrentUser}
+              className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-500"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       </td>
     </tr>

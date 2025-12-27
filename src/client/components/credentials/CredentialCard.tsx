@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Eye, EyeOff, Pencil, Trash2, Router, Check, X, Network, ArrowRightLeft, Globe, Crown } from 'lucide-react'
+import { Tooltip } from '../ui/Tooltip'
 import type { Credential, MatchedDevice, Network as NetworkType } from '../../lib/api'
 import { VendorLogo } from '../topology/VendorLogo'
 
@@ -119,17 +120,18 @@ export function CredentialCard({ credential, allCredentials, networks = [], show
               <span className="font-mono text-sm text-slate-600 dark:text-slate-400">
                 {showPassword ? credential.password : '••••••••'}
               </span>
-              <button
-                onClick={() => setShowPasswordLocal(!showPasswordLocal)}
-                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                title={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
-              </button>
+              <Tooltip content={showPassword ? 'Hide password' : 'Show password'} position="bottom">
+                <button
+                  onClick={() => setShowPasswordLocal(!showPasswordLocal)}
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </Tooltip>
             </div>
             <div className="flex items-center gap-2">
               {credential.isRoot && (
@@ -162,14 +164,15 @@ export function CredentialCard({ credential, allCredentials, networks = [], show
               {/* Move button with dropdown - hidden for root credentials */}
               {onMove && networks.length > 0 && !credential.isRoot && (
                 <div className="relative">
-                  <button
-                    ref={moveButtonRef}
-                    onClick={() => setShowMoveMenu(!showMoveMenu)}
-                    className="p-2 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
-                    title="Move to another network"
-                  >
-                    <ArrowRightLeft className="w-4 h-4" />
-                  </button>
+                  <Tooltip content="Move to network" position="bottom">
+                    <button
+                      ref={moveButtonRef}
+                      onClick={() => setShowMoveMenu(!showMoveMenu)}
+                      className="p-2 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                    >
+                      <ArrowRightLeft className="w-4 h-4" />
+                    </button>
+                  </Tooltip>
                   {showMoveMenu && (
                     <>
                       <div
@@ -222,20 +225,22 @@ export function CredentialCard({ credential, allCredentials, networks = [], show
               {/* Edit/Delete buttons - hidden for root credentials (managed via network settings) */}
               {!credential.isRoot && (
                 <>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
-                    title="Edit credential"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => onDelete?.(credential.id)}
-                    className="p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
-                    title="Delete credential"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <Tooltip content="Edit credential" position="bottom">
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                  </Tooltip>
+                  <Tooltip content="Delete credential" position="bottom">
+                    <button
+                      onClick={() => onDelete?.(credential.id)}
+                      className="p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </Tooltip>
                 </>
               )}
             </div>

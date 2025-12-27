@@ -1,4 +1,5 @@
 import { Network, Pencil, Trash2, Map, Clock, Server } from 'lucide-react'
+import { Tooltip } from '../ui/Tooltip'
 import type { Network as NetworkType } from '../../lib/api'
 
 type NetworkCardProps = {
@@ -121,26 +122,28 @@ export function NetworkCard({
             <Map className="w-3.5 h-3.5" />
             Map
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onEdit?.()
-            }}
-            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
-            title="Edit network"
-          >
-            <Pencil className="w-4 h-4" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete?.()
-            }}
-            className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-            title="Delete network"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <Tooltip content="Edit network" position="bottom">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit?.()
+              }}
+              className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Delete network" position="bottom">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete?.()
+              }}
+              className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       )}
     </div>
