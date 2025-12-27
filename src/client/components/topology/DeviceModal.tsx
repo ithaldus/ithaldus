@@ -391,7 +391,7 @@ export function DeviceModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg lg:max-w-2xl xl:max-w-3xl mx-4 max-h-[90vh] overflow-hidden">
+      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg lg:max-w-2xl xl:max-w-3xl 2xl:max-w-6xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
@@ -513,8 +513,10 @@ export function DeviceModal({
           </div>
         </div>
 
-        {/* Content */}
-        <div className="px-6 py-4 overflow-y-auto max-h-[60vh] space-y-6">
+        {/* Content - Two column layout on wide screens */}
+        <div className="flex-1 flex flex-col 2xl:flex-row overflow-hidden">
+          {/* Main content */}
+          <div className="flex-1 px-6 py-4 overflow-y-auto space-y-6">
 
           {/* Type and Location dropdowns - same row for aesthetics */}
           <div className="grid grid-cols-2 gap-4">
@@ -882,8 +884,8 @@ export function DeviceModal({
             </button>
           </div>
 
-          {/* Device Logs */}
-          <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+          {/* Device Logs - Collapsible on smaller screens */}
+          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 2xl:hidden">
             <button
               onClick={() => setLogsExpanded(!logsExpanded)}
               className="w-full flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
@@ -930,6 +932,45 @@ export function DeviceModal({
                 )}
               </div>
             )}
+          </div>
+          </div>
+
+          {/* Device Logs - Side panel on 2xl screens */}
+          <div className="hidden 2xl:flex flex-col w-96 border-l border-slate-200 dark:border-slate-700 bg-slate-900 dark:bg-black">
+            <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2">
+              <ScrollText className="w-4 h-4 text-slate-400" />
+              <span className="text-sm font-medium text-white">Scan Logs</span>
+              {deviceLogs.length > 0 && (
+                <span className="px-1.5 py-0.5 text-[10px] rounded bg-slate-700 text-slate-300">
+                  {deviceLogs.length}
+                </span>
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-1">
+              {loadingLogs ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+                </div>
+              ) : deviceLogs.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-8">No logs found for this device</p>
+              ) : (
+                deviceLogs.map((log) => (
+                  <div key={log.id} className="flex gap-2 text-xs font-mono">
+                    <span className="text-slate-500 shrink-0">
+                      [{new Date(log.timestamp).toLocaleTimeString()}]
+                    </span>
+                    <span className={`
+                      ${log.level === 'error' ? 'text-red-400' : ''}
+                      ${log.level === 'warn' ? 'text-amber-400' : ''}
+                      ${log.level === 'success' ? 'text-green-400' : ''}
+                      ${log.level === 'info' ? 'text-slate-300' : ''}
+                    `}>
+                      {log.message}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
 
