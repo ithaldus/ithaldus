@@ -16,6 +16,7 @@ import {
 import { scanMdns, type MdnsDevice } from './mdns'
 import { snmpQuery, type SnmpDeviceInfo } from './snmp'
 import { limitConcurrency } from './concurrency'
+import { wsManager } from './websocket'
 
 export type { LogLevel }
 
@@ -64,7 +65,8 @@ export interface DiscoveredInterface {
 
 // Common SSH ports to check
 const SSH_PORTS = [22]
-const MANAGEMENT_PORTS = [22, 23, 80, 443, 8291, 8728, 161]
+// Management ports: SSH, Telnet, HTTP, HTTPS, MikroTik (8291, 8728), SNMP (161), Ruckus AP (8090, 8099, 8100, 9998)
+const MANAGEMENT_PORTS = [22, 23, 80, 443, 8291, 8728, 161, 8090, 8099, 8100, 9998]
 
 // Concurrency configuration
 const SCAN_CONCURRENCY = {
@@ -579,6 +581,75 @@ async function scanPorts(ip: string, ports: number[], timeout = 3000): Promise<n
   return openPorts.sort((a, b) => a - b)
 }
 
+// Check which ports are open on a device via SSH jump host tunnel
+async function scanPortsViaJumpHost(
+  jumpHost: Client,
+  targetIp: string,
+  ports: number[],
+  timeout = 3000
+): Promise<number[]> {
+  const openPorts: number[] = []
+
+  await Promise.all(
+    ports.map(async (port) => {
+      const isOpen = await new Promise<boolean>((resolve) => {
+        let resolved = false
+        const done = (result: boolean) => {
+          if (resolved) return
+          resolved = true
+          clearTimeout(timer)
+          resolve(result)
+        }
+
+        const timer = setTimeout(() => {
+          done(false)
+        }, timeout)
+
+        jumpHost.forwardOut(
+          '127.0.0.1',
+          0,
+          targetIp,
+          port,
+          (err, stream) => {
+            if (err) {
+              // forwardOut failed - port is closed or unreachable
+              done(false)
+              return
+            }
+
+            // Stream created, but we need to verify the TCP connection actually works
+            // Listen for errors (connection refused comes as error after stream is created)
+            stream.on('error', () => {
+              stream.destroy()
+              done(false)
+            })
+
+            // If stream closes immediately without us closing it, port is closed
+            stream.on('close', () => {
+              done(false)
+            })
+
+            // Give a small delay for connection refused errors to arrive
+            // If no error after 200ms, consider port open
+            setTimeout(() => {
+              if (!resolved) {
+                stream.destroy()
+                done(true)
+              }
+            }, 200)
+          }
+        )
+      })
+
+      if (isOpen) {
+        openPorts.push(port)
+      }
+    })
+  )
+
+  return openPorts.sort((a, b) => a - b)
+}
+
 // Test if jump host supports TCP forwarding (forwardOut)
 // We test by trying to forward to the jump host's own SSH port
 async function testJumpHostForwarding(jumpHost: Client, targetIp: string, timeout = 5000): Promise<boolean> {
@@ -630,10 +701,42 @@ export class NetworkScanner {
   private rootIp: string = ''  // Store root IP for jump host reference
   private mdnsDevices: Map<string, MdnsDevice> = new Map()  // IP -> mDNS device info
   private snmpDevices: Map<string, SnmpDeviceInfo> = new Map()  // IP -> SNMP device info
+  private activeChannels: Map<string, { ip: string; action: string }> = new Map()  // channelId -> info
+  private channelCounter: number = 0
 
   constructor(networkId: string, callbacks: ScanCallbacks) {
     this.networkId = networkId
     this.callbacks = callbacks
+  }
+
+  // Channel tracking for UI display
+  private startChannel(ip: string, action: string): string {
+    const channelId = `ch-${++this.channelCounter}`
+    this.activeChannels.set(channelId, { ip, action })
+    this.broadcastChannels()
+    return channelId
+  }
+
+  private updateChannel(channelId: string, action: string) {
+    const channel = this.activeChannels.get(channelId)
+    if (channel) {
+      channel.action = action
+      this.broadcastChannels()
+    }
+  }
+
+  private endChannel(channelId: string) {
+    this.activeChannels.delete(channelId)
+    this.broadcastChannels()
+  }
+
+  private broadcastChannels() {
+    const channels = Array.from(this.activeChannels.entries()).map(([id, info]) => ({
+      id,
+      ip: info.ip,
+      action: info.action,
+    }))
+    wsManager.broadcastChannels(this.networkId, channels)
   }
 
   // Call this to abort the scan
@@ -1111,10 +1214,15 @@ export class NetworkScanner {
       return
     }
 
+    // Start channel tracking for this device
+    const channelId = this.startChannel(ip, 'scanning ports')
+
     this.log('info', `Scanning ${ip}...`)
 
-    // Check open ports first
-    const openPorts = await scanPorts(ip, MANAGEMENT_PORTS)
+    // Check open ports first - use jump host if available for tunneled port scanning
+    const openPorts = this.jumpHostClient && this.jumpHostSupported
+      ? await scanPortsViaJumpHost(this.jumpHostClient, ip, MANAGEMENT_PORTS)
+      : await scanPorts(ip, MANAGEMENT_PORTS)
 
     if (openPorts.length === 0) {
       this.log('info', `${ip}: No management ports open - adding as end-device`)
@@ -1216,6 +1324,7 @@ export class NetworkScanner {
 
       this.deviceCount++
       this.callbacks.onDeviceDiscovered(newDevice)
+      this.endChannel(channelId)
       return
     }
 
@@ -1294,6 +1403,7 @@ export class NetworkScanner {
     if (!shouldSkipLogin && useJumpHostOnly) {
       // Jump host supported - connect via tunnel (skip direct attempts)
       const skipMsg = skippedCount > 0 ? ` (skipping ${skippedCount} known-bad)` : ''
+      this.updateChannel(channelId, 'testing credentials')
       this.log('info', `${ip}: Connecting via jump host (${this.rootIp}), ${credsToTry.length} credentials (${SCAN_CONCURRENCY.CREDENTIAL_TESTING} concurrent)${skipMsg}`)
 
       const result = await this.tryCredentialsParallel(ip, credsToTry, true, ip)
@@ -1311,6 +1421,7 @@ export class NetworkScanner {
     } else if (!shouldSkipLogin && hasSSHPort) {
       // No jump host or this is root device - try direct connection
       const skipMsg = skippedCount > 0 ? ` (skipping ${skippedCount} known-bad)` : ''
+      this.updateChannel(channelId, 'testing credentials')
       this.log('info', `${ip}: Trying ${credsToTry.length} credentials (${SCAN_CONCURRENCY.CREDENTIAL_TESTING} concurrent)${skipMsg}`)
 
       const result = await this.tryCredentialsParallel(ip, credsToTry, false, ip)
@@ -1327,6 +1438,7 @@ export class NetworkScanner {
     } else if (!shouldSkipLogin && !hasSSHPort && this.jumpHostClient && !isRootDevice) {
       // Port 22 not directly reachable, but we have a jump host - try via tunnel
       const skipMsg = skippedCount > 0 ? ` (skipping ${skippedCount} known-bad)` : ''
+      this.updateChannel(channelId, 'testing via jump host')
       this.log('info', `${ip}: No direct SSH access, trying via jump host (${this.rootIp}), ${credsToTry.length} credentials (${SCAN_CONCURRENCY.CREDENTIAL_TESTING} concurrent)${skipMsg}`)
 
       const result = await this.tryCredentialsParallel(ip, credsToTry, true, ip)
@@ -1356,6 +1468,7 @@ export class NetworkScanner {
     let vendorInfo: { vendor: string | null; driver: string | null } = { vendor: null, driver: null }
 
     if (connectedClient) {
+      this.updateChannel(channelId, 'fetching device info')
       try {
         // Check if vendor can be determined from MAC OUI first
         // IMPORTANT: Zyxel switches don't support SSH exec channel - they close the connection
@@ -1673,6 +1786,7 @@ export class NetworkScanner {
 
     // Recursively scan neighbors in parallel
     if (deviceInfo && deviceInfo.neighbors.length > 0) {
+      this.updateChannel(channelId, 'scanning neighbors')
       this.log('info', `${ip}: Found ${deviceInfo.neighbors.length} neighbors`)
 
       // Detect which interface on THIS device connects upstream
@@ -1686,5 +1800,8 @@ export class NetworkScanner {
         ip
       )
     }
+
+    // End channel tracking for this device
+    this.endChannel(channelId)
   }
 }

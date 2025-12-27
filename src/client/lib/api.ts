@@ -421,11 +421,19 @@ export interface TopologyResponse {
   totalCount: number
 }
 
+// Channel info for active scan operations
+export interface ChannelInfo {
+  id: string
+  ip: string
+  action: string
+}
+
 // WebSocket message types
 export type ScanUpdateMessage =
   | { type: 'log'; data: LogMessage }
   | { type: 'topology'; data: TopologyResponse }
   | { type: 'status'; data: { status: string; error?: string } }
+  | { type: 'channels'; data: ChannelInfo[] }
 
 // WebSocket URL helper
 export function getScanWebSocketUrl(networkId: string): string {

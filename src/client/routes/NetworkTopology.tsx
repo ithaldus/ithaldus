@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { api, type Network, type TopologyDevice, type LogMessage, type ScanUpdateMessage } from '../lib/api'
+import { api, type Network, type TopologyDevice, type LogMessage, type ScanUpdateMessage, type ChannelInfo } from '../lib/api'
 import {
   ArrowLeft,
   Square,
@@ -47,6 +47,7 @@ export function NetworkTopology() {
   const [loading, setLoading] = useState(true)
   const [scanStatus, setScanStatus] = useState<ScanStatus>('idle')
   const [logs, setLogs] = useState<LogMessage[]>([])
+  const [channels, setChannels] = useState<ChannelInfo[]>([])
   const [consoleOpen, setConsoleOpen] = useState(false)
   const [consoleWidth, setConsoleWidth] = useState(400)
   const [selectedDevice, setSelectedDevice] = useState<TopologyDevice | null>(null)
@@ -184,10 +185,15 @@ export function NetworkTopology() {
                 // Scan complete, close WebSocket
                 ws.close()
                 wsRef.current = null
+                setChannels([])  // Clear channels when scan ends
                 // Reload network to get final lastScannedAt
                 const networkData = await api.networks.get(networkId!)
                 setLastScannedAt(networkData.lastScannedAt)
               }
+              break
+
+            case 'channels':
+              setChannels(message.data)
               break
           }
         } catch (err) {
@@ -649,6 +655,7 @@ export function NetworkTopology() {
       {/* Debug Console */}
       <DebugConsole
         logs={logs}
+        channels={channels}
         isOpen={consoleOpen}
         onToggle={() => setConsoleOpen(!consoleOpen)}
         width={consoleWidth}

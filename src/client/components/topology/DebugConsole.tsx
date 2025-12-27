@@ -1,9 +1,10 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
-import { Terminal, ChevronLeft, X, Maximize2, Minimize2, Search } from 'lucide-react'
-import type { LogMessage } from '../../lib/api'
+import { Terminal, ChevronLeft, X, Maximize2, Minimize2, Search, Radio } from 'lucide-react'
+import type { LogMessage, ChannelInfo } from '../../lib/api'
 
 interface DebugConsoleProps {
   logs: LogMessage[]
+  channels?: ChannelInfo[]
   isOpen: boolean
   onToggle: () => void
   width?: number
@@ -34,6 +35,7 @@ const PADDING = 60 // Console padding + scrollbar + resize handle
 
 export function DebugConsole({
   logs,
+  channels = [],
   isOpen,
   onToggle,
   width = 400,
@@ -227,6 +229,23 @@ export function DebugConsole({
             </button>
           </div>
         </div>
+
+        {/* Active channels badges */}
+        {channels && channels.length > 0 && (
+          <div className="px-3 py-2 border-b border-slate-700 bg-slate-850 flex flex-wrap gap-1.5">
+            {channels.map((channel) => (
+              <div
+                key={channel.id}
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-slate-700 rounded text-xs"
+              >
+                <Radio className="w-3 h-3 text-cyan-400 animate-pulse" />
+                <span className="font-mono text-slate-300">{channel.ip}</span>
+                <span className="text-slate-500">·</span>
+                <span className="text-slate-400">{channel.action}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Hidden element for measuring text width */}
         <span

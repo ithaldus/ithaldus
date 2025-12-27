@@ -11,9 +11,15 @@ export type ScanWebSocket = ServerWebSocket<WebSocketData>
 // Store active WebSocket connections per network
 const scanConnections = new Map<string, Set<ScanWebSocket>>()
 
+export interface ChannelInfo {
+  id: string
+  ip: string
+  action: string  // e.g., "scanning ports", "testing credentials", "fetching device info"
+}
+
 export interface ScanUpdate {
-  type: 'log' | 'topology' | 'status'
-  data: LogMessage | TopologyResponse | { status: string; error?: string }
+  type: 'log' | 'topology' | 'status' | 'channels'
+  data: LogMessage | TopologyResponse | { status: string; error?: string } | ChannelInfo[]
 }
 
 export const wsManager = {
@@ -67,6 +73,11 @@ export const wsManager = {
   // Broadcast status change
   broadcastStatus(networkId: string, status: string, error?: string) {
     this.broadcast(networkId, { type: 'status', data: { status, error } })
+  },
+
+  // Broadcast active channels
+  broadcastChannels(networkId: string, channels: ChannelInfo[]) {
+    this.broadcast(networkId, { type: 'channels', data: channels })
   },
 
   // Get connection count for a network
