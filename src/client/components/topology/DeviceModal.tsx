@@ -442,7 +442,7 @@ export function DeviceModal({
               <img
                 src={`data:${deviceImage.mimeType};base64,${deviceImage.data}`}
                 alt="Device"
-                className="w-full h-full object-cover cursor-pointer"
+                className="w-full h-full object-contain cursor-pointer"
                 onClick={() => setShowFullImage(true)}
               />
               {/* Hover overlay */}
