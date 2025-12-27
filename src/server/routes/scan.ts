@@ -6,6 +6,10 @@ import { requireAdmin } from '../middleware/auth'
 import { NetworkScanner, type LogMessage, type DiscoveredDevice } from '../services/scanner'
 import { wsManager } from '../services/websocket'
 import { buildTopology } from '../services/topology'
+import { appendFileSync, writeFileSync } from 'fs'
+
+// Log file path for debugging (in project root, accessible outside container)
+const SCAN_LOG_FILE = '/app/scan_debug.log'
 
 export const scanRoutes = new Hono()
 
@@ -171,6 +175,9 @@ scanRoutes.post('/:networkId/start', requireAdmin, async (c) => {
       scanState.logs.push(message)
       // Broadcast log via WebSocket
       wsManager.broadcastLog(networkId, message)
+      // Also write to debug log file
+      const time = new Date(message.timestamp).toLocaleTimeString('en-US', { hour12: false })
+      appendFileSync(SCAN_LOG_FILE, `[${time}] ${message.message}\n`)
 
       // Persist log to database (async, non-blocking)
       // First, get scanId if we don't have it yet
@@ -229,6 +236,8 @@ scanRoutes.post('/:networkId/start', requireAdmin, async (c) => {
 
   // Don't await - let it run in background
   console.log(`[Scan] Starting scan for network ${networkId}`)
+  // Clear log file at start
+  writeFileSync(SCAN_LOG_FILE, `=== Scan started at ${new Date().toISOString()} ===\n`)
   scanner.start().then(() => {
     console.log(`[Scan] Scan completed for network ${networkId}`)
   }).catch((err) => {

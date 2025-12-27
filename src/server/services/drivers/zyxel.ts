@@ -164,113 +164,150 @@ async function zyxelShellExecMultiple(
       if (finished) return
       if (log) log('info', `Requesting shell with PTY...`)
 
-      // Request shell with explicit PTY - Zyxel requires PTY for interactive shell
-      client.shell({ term: 'vt100', rows: 24, cols: 80 }, (err, stream: ClientChannel) => {
-      // Clean up channel listener
-      client.removeListener('channel', onChannel)
-
-      if (err) {
-        finished = true
-        clearTimeout(timer)
-        client.removeListener('error', onClientError)
-        client.removeListener('close', onClientClose)
-        if (log) log('error', `Shell error: ${err.message}`)
-        reject(err)
-        return
-      }
-
-      // @ts-ignore - accessing internal channel info
-      const channelId = stream._channel?.outgoing?.id || stream._channel?.id || 'unknown'
-      if (log) log('info', `Shell channel opened (id=${channelId}), waiting for prompt...`)
-
-      let buffer = ''
-      let currentCommandIndex = -1  // -1 = waiting for initial prompt
-      let currentOutput = ''
-      const results: string[] = []
-
-      const sendNextCommand = () => {
-        currentCommandIndex++
-        if (currentCommandIndex < commands.length) {
-          currentOutput = ''
-          const cmd = commands[currentCommandIndex]
-          if (log) log('info', `Sending command ${currentCommandIndex + 1}/${commands.length}: ${cmd}`)
-          stream.write(cmd + '\n')
-        } else {
-          // All commands done, exit
-          if (log) log('info', `All commands complete, exiting shell`)
-          stream.write('exit\n')
+      // Set a shorter timeout for shell channel open - if it doesn't respond in 10s, try without PTY
+      // If that also fails after another 10s, give up and return empty results (will use web fallback)
+      let shellResponded = false
+      let noPtyAttempted = false
+      const shellTimeout = setTimeout(() => {
+        if (!shellResponded && !finished && log) {
+          log('warn', `Shell with PTY not responding after 10s, trying without PTY...`)
+          noPtyAttempted = true
+          // Try again without PTY
+          client.shell((err2, stream2: ClientChannel) => {
+            if (finished) return
+            if (err2) {
+              log('error', `Shell without PTY also failed: ${err2.message}`)
+              return
+            }
+            shellResponded = true
+            log('info', `Shell without PTY opened! Processing commands...`)
+            handleShellStream(stream2)
+          })
         }
-      }
+      }, 10000)
 
-      stream.on('data', (data: Buffer) => {
-        const chunk = data.toString()
-        buffer += chunk
+      // Second timeout - if no-PTY attempt also fails, give up
+      const giveUpTimeout = setTimeout(() => {
+        if (!shellResponded && noPtyAttempted && !finished && log) {
+          log('warn', `Shell not responding after 20s total - giving up on CLI, will try web-only`)
+          finished = true
+          clearTimeout(timer)
+          client.removeListener('error', onClientError)
+          client.removeListener('close', onClientClose)
+          client.removeListener('channel', onChannel)
+          // Return empty results - caller will use web fallback
+          resolve([])
+        }
+      }, 20000)
 
-        // Strip escape sequences for prompt detection
-        const cleanBuffer = stripForPromptDetection(buffer)
+      // Helper function to handle the shell stream (reusable for both PTY and non-PTY)
+      const handleShellStream = (stream: ClientChannel) => {
+        clearTimeout(shellTimeout)
+        clearTimeout(giveUpTimeout)
+        // Clean up channel listener
+        client.removeListener('channel', onChannel)
 
-        // Waiting for initial prompt
-        if (currentCommandIndex === -1) {
-          // Debug: log first data received
-          if (buffer.length === chunk.length && log) {
-            log('info', `First data received (${chunk.length} bytes)`)
+        // @ts-ignore - accessing internal channel info
+        const channelId = stream._channel?.outgoing?.id || stream._channel?.id || 'unknown'
+        if (log) log('info', `Shell channel opened (id=${channelId}), waiting for prompt...`)
+
+        let buffer = ''
+        let currentCommandIndex = -1  // -1 = waiting for initial prompt
+        let currentOutput = ''
+        const results: string[] = []
+
+        const sendNextCommand = () => {
+          currentCommandIndex++
+          if (currentCommandIndex < commands.length) {
+            currentOutput = ''
+            const cmd = commands[currentCommandIndex]
+            if (log) log('info', `Sending command ${currentCommandIndex + 1}/${commands.length}: ${cmd}`)
+            stream.write(cmd + '\n')
+          } else {
+            // All commands done, exit
+            if (log) log('info', `All commands complete, exiting shell`)
+            stream.write('exit\n')
           }
-          // Look for hostname# pattern (Zyxel prompt format)
-          if (/\w+#/.test(cleanBuffer)) {
-            if (log) log('info', `Initial prompt detected in: ${cleanBuffer.slice(-50)}`)
+        }
+
+        stream.on('data', (data: Buffer) => {
+          const chunk = data.toString()
+          buffer += chunk
+
+          // Strip escape sequences for prompt detection
+          const cleanBuffer = stripForPromptDetection(buffer)
+
+          // Waiting for initial prompt
+          if (currentCommandIndex === -1) {
+            // Debug: log first data received
+            if (buffer.length === chunk.length && log) {
+              log('info', `First data received (${chunk.length} bytes)`)
+            }
+            // Look for hostname# pattern (Zyxel prompt format)
+            if (/\w+#/.test(cleanBuffer)) {
+              if (log) log('info', `Initial prompt detected in: ${cleanBuffer.slice(-50)}`)
+              sendNextCommand()
+            }
+            return
+          }
+
+          // Collecting output from current command
+          currentOutput += chunk
+
+          // Check if we got the prompt back (command finished)
+          // Strip escape sequences and look for hostname# pattern at end
+          const cleanOutput = stripForPromptDetection(currentOutput)
+          const lines = cleanOutput.split('\n')
+          const lastLine = lines[lines.length - 1] || ''
+          if (/\w+#\s*$/.test(lastLine)) {
+            // Command complete - parse output
+            // Remove first line (echoed command) and last line (prompt)
+            const outputLines = cleanOutput.split('\n')
+            const resultLines = outputLines.slice(1, -1)
+            const result = resultLines.join('\n')
+            results.push(result)
+
+            if (log) log('info', `Command ${currentCommandIndex + 1} complete: ${result.length} bytes`)
+
+            // Send next command
             sendNextCommand()
           }
+        })
+
+        stream.on('close', () => {
+          if (log) log('info', `Shell closed with ${results.length} results`)
+          finished = true
+          clearTimeout(timer)
+          client.removeListener('error', onClientError)
+          client.removeListener('close', onClientClose)
+          resolve(results)
+        })
+
+        stream.on('error', (err) => {
+          if (!finished && log) log('error', `Shell stream error: ${err.message}`)
+        })
+      }
+
+      // Request shell with explicit PTY - Zyxel requires PTY for interactive shell
+      client.shell({ term: 'vt100', rows: 24, cols: 80 }, (err, stream: ClientChannel) => {
+        if (finished) return
+        shellResponded = true
+        clearTimeout(shellTimeout)
+        clearTimeout(giveUpTimeout)
+
+        if (err) {
+          client.removeListener('channel', onChannel)
+          finished = true
+          clearTimeout(timer)
+          client.removeListener('error', onClientError)
+          client.removeListener('close', onClientClose)
+          if (log) log('error', `Shell error: ${err.message}`)
+          reject(err)
           return
         }
 
-        // Collecting output from current command
-        currentOutput += chunk
-
-        // Check if we got the prompt back (command finished)
-        // Strip escape sequences and look for hostname# pattern at end
-        const cleanOutput = stripForPromptDetection(currentOutput)
-        const lines = cleanOutput.split('\n')
-        const lastLine = lines[lines.length - 1] || ''
-        if (/\w+#\s*$/.test(lastLine)) {
-          // Command complete - parse output
-          // Remove first line (echoed command) and last line (prompt)
-          const outputLines = cleanOutput.split('\n')
-          const resultLines = outputLines.slice(1, -1)
-          const result = resultLines.join('\n')
-          results.push(result)
-
-          if (log) log('info', `Command ${currentCommandIndex + 1} complete: ${result.length} bytes`)
-
-          // Send next command
-          sendNextCommand()
-        }
+        handleShellStream(stream)
       })
-
-      stream.on('close', () => {
-        if (finished) return
-        finished = true
-        clearTimeout(timer)
-        client.removeListener('error', onClientError)
-        client.removeListener('close', onClientClose)
-        if (log) log('info', `Shell closed with ${results.length} results`)
-
-        // Fill in any missing results with empty strings
-        while (results.length < commands.length) {
-          results.push('')
-        }
-        resolve(results)
-      })
-
-      stream.on('error', (streamErr: Error) => {
-        if (finished) return
-        finished = true
-        clearTimeout(timer)
-        client.removeListener('error', onClientError)
-        client.removeListener('close', onClientClose)
-        if (log) log('error', `Shell stream error: ${streamErr.message}`)
-        reject(streamErr)
-      })
-    })
     }, 500) // End setTimeout
   })
 }
