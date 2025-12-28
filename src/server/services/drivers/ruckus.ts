@@ -243,6 +243,14 @@ async function ruckusUnleashedExecMultiple(
             return
           }
 
+          // Check for account lockout - stop immediately
+          // "Login failure" (without "incorrect") means the device has locked out after too many attempts
+          if (isRkscliMode && buffer.includes('Login failure') && !buffer.includes('Login incorrect')) {
+            if (log) log('warn', `Account lockout detected - device has locked out after failed attempts`)
+            stream.end()
+            return
+          }
+
           // Check for login failed - prepare for retry
           if (isRkscliMode && loginPhase === 'password_sent' && buffer.includes('Login incorrect')) {
             if (log) log('info', `Login failed for ${credentialsList[credentialIndex].username}`)

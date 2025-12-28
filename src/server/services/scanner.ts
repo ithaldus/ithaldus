@@ -2031,13 +2031,30 @@ export class NetworkScanner {
           // Requires special shell-based login for rkscli devices
           // Pass all credentials since Ruckus often has different SSH vs CLI auth
           this.log('info', `${ip}: Ruckus detected from ${macVendor === 'Ruckus' ? 'MAC OUI' : 'banner'}, using shell mode`)
-          // Put the successful SSH credential first, then add all others
-          const ruckusCredentials = [
+
+          // Common Ruckus CLI defaults (often different from SSH credentials)
+          const ruckusDefaults = [
+            { username: 'super', password: 'sp-admin' },  // Most common Ruckus default
+            { username: 'admin', password: 'admin' },
+          ]
+
+          // Build credentials list: SSH cred first, then Ruckus defaults, then other network creds
+          // Limit to 4 attempts to avoid lockout (some devices lock after 1-3 failures)
+          const allCreds = [
             { username: successfulCreds!.username, password: successfulCreds!.password },
+            ...ruckusDefaults,
             ...this.credentialsList
               .filter(c => c.username !== successfulCreds!.username || c.password !== successfulCreds!.password)
               .map(c => ({ username: c.username, password: c.password }))
           ]
+          // Deduplicate by username+password
+          const seen = new Set<string>()
+          const ruckusCredentials = allCreds.filter(c => {
+            const key = `${c.username}:${c.password}`
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+          }).slice(0, 4)  // Limit attempts to avoid lockout
           deviceInfo = await getRuckusInfo(
             connectedClient,
             banner,
