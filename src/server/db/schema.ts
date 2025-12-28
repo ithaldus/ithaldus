@@ -62,6 +62,7 @@ export const matchedDevices = sqliteTable('matched_devices', {
   mac: text('mac').notNull(),
   hostname: text('hostname'),
   ip: text('ip'),
+  service: text('service').default('ssh'),  // Service type: ssh, api, web, etc.
 }, (table) => [
   index('idx_matched_devices_network').on(table.networkId),
 ])
@@ -171,6 +172,7 @@ export const failedCredentials = sqliteTable('failed_credentials', {
   id: text('id').primaryKey(),
   credentialId: text('credential_id').notNull().references(() => credentials.id, { onDelete: 'cascade' }),
   mac: text('mac').notNull(),  // Device MAC address
+  service: text('service').default('ssh'),  // Service type: ssh, api, web, etc.
   failedAt: text('failed_at').notNull(),
 }, (table) => [
   index('idx_failed_credentials_credential').on(table.credentialId),

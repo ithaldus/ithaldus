@@ -767,8 +767,8 @@ export class NetworkScanner {
   private processedMacs: Set<string> = new Set()
   private deviceDepths: Map<string, number> = new Map()  // MAC -> depth level (0 = root, 1 = direct child, etc.)
   private credentialsList: CredentialInfo[] = []
-  private matchedCredentials: Map<string, string> = new Map()  // MAC -> credentialId
-  private failedCredentialsMap: Map<string, Set<string>> = new Map()  // MAC -> Set of failed credentialIds
+  private matchedCredentials: Map<string, string> = new Map()  // "MAC:service" -> credentialId
+  private failedCredentialsMap: Map<string, Set<string>> = new Map()  // "MAC:service" -> Set of failed credentialIds
   private aborted: boolean = false
   private abortController: AbortController = new AbortController()
   private jumpHostClient: Client | null = null  // Root device connection for jump host tunneling
@@ -1202,18 +1202,22 @@ export class NetworkScanner {
   private async saveFailedCredentials(
     ip: string,
     deviceMac: string,
-    triedCredentials: CredentialInfo[]
+    triedCredentials: CredentialInfo[],
+    service: string = 'ssh'
   ): Promise<void> {
     let savedCount = 0
     const now = new Date().toISOString()
+    const cacheKey = `${deviceMac}:${service}`
+
     for (const cred of triedCredentials) {
       if (!cred.id) continue  // Skip root credentials (no ID)
       try {
-        // Check if already recorded as failed
+        // Check if already recorded as failed for this service
         const existingFailed = await db.select().from(failedCredentials)
           .where(and(
             eq(failedCredentials.credentialId, cred.id),
-            eq(failedCredentials.mac, deviceMac)
+            eq(failedCredentials.mac, deviceMac),
+            eq(failedCredentials.service, service)
           ))
           .get()
 
@@ -1222,22 +1226,23 @@ export class NetworkScanner {
             id: nanoid(),
             credentialId: cred.id,
             mac: deviceMac,
+            service,
             failedAt: now,
           })
           savedCount++
 
           // Update local cache
-          if (!this.failedCredentialsMap.has(deviceMac)) {
-            this.failedCredentialsMap.set(deviceMac, new Set())
+          if (!this.failedCredentialsMap.has(cacheKey)) {
+            this.failedCredentialsMap.set(cacheKey, new Set())
           }
-          this.failedCredentialsMap.get(deviceMac)!.add(cred.id)
+          this.failedCredentialsMap.get(cacheKey)!.add(cred.id)
         }
       } catch (err) {
         console.error(`Failed to save failed credential:`, err)
       }
     }
     if (savedCount > 0) {
-      this.log('info', `${ip}: Recorded ${savedCount} failed credential${savedCount !== 1 ? 's' : ''} for future scans`)
+      this.log('info', `${ip}: Recorded ${savedCount} failed ${service} credential${savedCount !== 1 ? 's' : ''} for future scans`)
     }
   }
 
@@ -1320,17 +1325,19 @@ export class NetworkScanner {
       const existingMatches = await db.select().from(matchedDevices)
       for (const match of existingMatches) {
         if (match.credentialId) {
-          this.matchedCredentials.set(match.mac, match.credentialId)
+          const key = `${match.mac}:${match.service || 'ssh'}`
+          this.matchedCredentials.set(key, match.credentialId)
         }
       }
 
       // Load failed credentials to skip them
       const existingFailed = await db.select().from(failedCredentials)
       for (const failed of existingFailed) {
-        if (!this.failedCredentialsMap.has(failed.mac)) {
-          this.failedCredentialsMap.set(failed.mac, new Set())
+        const key = `${failed.mac}:${failed.service || 'ssh'}`
+        if (!this.failedCredentialsMap.has(key)) {
+          this.failedCredentialsMap.set(key, new Set())
         }
-        this.failedCredentialsMap.get(failed.mac)!.add(failed.credentialId)
+        this.failedCredentialsMap.get(key)!.add(failed.credentialId)
       }
 
       const failedCount = existingFailed.length
@@ -1591,6 +1598,8 @@ export class NetworkScanner {
     let usedJumpHost = false
     let connectedViaApi = false
     let apiDeviceInfo_cache: DeviceInfo | null = null
+    let successfulService: 'ssh' | 'api' | null = null  // Which service succeeded
+    let triedServices: Set<'ssh' | 'api'> = new Set()  // Which services were attempted
     const isRootDevice = ip === this.rootIp
 
     // Build ordered list of credentials to try
@@ -1602,11 +1611,11 @@ export class NetworkScanner {
       credsToTry = [this.credentialsList[0]!]
     }
 
-    // If we know the MAC, filter out credentials that have previously failed on this device
+    // If we know the MAC, filter out credentials that have previously failed for SSH on this device
     // Exception: never skip the root credential (first in list) on the root device
-    const failedCredsForDevice = knownMac ? this.failedCredentialsMap.get(knownMac) : undefined
+    const sshFailedCreds = knownMac ? this.failedCredentialsMap.get(`${knownMac}:ssh`) : undefined
     let skippedCount = 0
-    if (failedCredsForDevice && failedCredsForDevice.size > 0) {
+    if (sshFailedCreds && sshFailedCreds.size > 0) {
       const originalCount = credsToTry.length
       const rootCredId = this.credentialsList[0]?.id
       credsToTry = credsToTry.filter(c => {
@@ -1614,16 +1623,16 @@ export class NetworkScanner {
         if (!c.id) return true
         // Never filter out root credential on root device
         if (isRootDevice && c.id === rootCredId) return true
-        // Filter out known-failed credentials
-        return !failedCredsForDevice.has(c.id)
+        // Filter out known-failed SSH credentials
+        return !sshFailedCreds.has(c.id)
       })
       skippedCount = originalCount - credsToTry.length
     }
 
-    // If we know the MAC and have a matched credential, try it first
+    // If we know the MAC and have a matched SSH credential, try it first
     // Exception: on root device, always keep root credential first
     if (knownMac && !isRootDevice) {
-      const matchedCredId = this.matchedCredentials.get(knownMac)
+      const matchedCredId = this.matchedCredentials.get(`${knownMac}:ssh`)
       if (matchedCredId) {
         const matchedCred = credsToTry.find(c => c.id === matchedCredId)
         if (matchedCred) {
@@ -1653,6 +1662,7 @@ export class NetworkScanner {
 
     if (!shouldSkipLogin && hasSSHPort) {
       // SSH port is open - try direct connection first
+      triedServices.add('ssh')
       const skipMsg = skippedCount > 0 ? ` (skipping ${skippedCount} known-bad)` : ''
       this.updateChannel(channelId, 'testing credentials')
       this.log('info', `${ip}: Trying ${credsToTry.length} credentials (${SCAN_CONCURRENCY.CREDENTIAL_TESTING} concurrent)${skipMsg}`)
@@ -1662,6 +1672,7 @@ export class NetworkScanner {
         connectedClient = result.client
         banner = result.banner
         successfulCreds = result.cred
+        successfulService = 'ssh'
         triedCredentials.push(...result.triedCredentials)
         this.log('success', `${ip}: SSH login successful with ${result.cred.username} (${ordinal(result.tryNumber)} try)`)
       } else {
@@ -1673,6 +1684,7 @@ export class NetworkScanner {
             connectedClient = jumpResult.client
             banner = jumpResult.banner
             successfulCreds = jumpResult.cred
+            successfulService = 'ssh'
             usedJumpHost = true
             triedCredentials.push(...jumpResult.triedCredentials)
             this.log('success', `${ip}: SSH login via jump host successful with ${jumpResult.cred.username} (${ordinal(jumpResult.tryNumber)} try)`)
@@ -1687,6 +1699,7 @@ export class NetworkScanner {
       }
     } else if (!shouldSkipLogin && !hasSSHPort && this.jumpHostClient && !isRootDevice) {
       // Port 22 not directly reachable, but we have a jump host - try via tunnel
+      triedServices.add('ssh')
       const skipMsg = skippedCount > 0 ? ` (skipping ${skippedCount} known-bad)` : ''
       this.updateChannel(channelId, 'testing via jump host')
       this.log('info', `${ip}: No direct SSH access, trying via jump host (${this.rootIp}), ${credsToTry.length} credentials (${SCAN_CONCURRENCY.CREDENTIAL_TESTING} concurrent)${skipMsg}`)
@@ -1696,6 +1709,7 @@ export class NetworkScanner {
         connectedClient = result.client
         banner = result.banner
         successfulCreds = result.cred
+        successfulService = 'ssh'
         usedJumpHost = true
         triedCredentials.push(...result.triedCredentials)
         this.log('success', `${ip}: SSH login via jump host successful with ${result.cred.username} (${ordinal(result.tryNumber)} try)`)
@@ -1715,11 +1729,32 @@ export class NetworkScanner {
 
     // Try MikroTik API (port 8728) if SSH failed or was not available
     const hasApiPort = openPorts.includes(8728)
+    const apiTriedCredentials: CredentialInfo[] = []
     if (!connectedClient && hasApiPort && !shouldSkipLogin && credsToTry.length > 0) {
-      this.log('info', `${ip}: Trying MikroTik API (port 8728) with ${credsToTry.length} credentials`)
+      triedServices.add('api')
+
+      // Filter out credentials that have failed for API on this device
+      let apiCredsToTry = [...this.credentialsList]
+      const apiFailedCreds = knownMac ? this.failedCredentialsMap.get(`${knownMac}:api`) : undefined
+      if (apiFailedCreds && apiFailedCreds.size > 0) {
+        apiCredsToTry = apiCredsToTry.filter(c => !c.id || !apiFailedCreds.has(c.id))
+      }
+
+      // Prioritize matched API credential
+      if (knownMac) {
+        const matchedApiCredId = this.matchedCredentials.get(`${knownMac}:api`)
+        if (matchedApiCredId) {
+          const matchedCred = apiCredsToTry.find(c => c.id === matchedApiCredId)
+          if (matchedCred) {
+            apiCredsToTry = [matchedCred, ...apiCredsToTry.filter(c => c.id !== matchedApiCredId)]
+          }
+        }
+      }
+
+      this.log('info', `${ip}: Trying MikroTik API (port 8728) with ${apiCredsToTry.length} credentials`)
       this.updateChannel(channelId, 'trying API')
 
-      for (const cred of credsToTry) {
+      for (const cred of apiCredsToTry) {
         try {
           const apiDeviceInfo = await getMikrotikInfoViaApi(
             ip,
@@ -1730,12 +1765,14 @@ export class NetworkScanner {
           )
           // Success! Store the device info and credentials
           successfulCreds = cred
+          successfulService = 'api'
           connectedViaApi = true
           apiDeviceInfo_cache = apiDeviceInfo
           this.log('success', `${ip}: MikroTik API connection successful with ${cred.username}`)
           break
         } catch (error) {
-          // Try next credential
+          // Track failed credential for API
+          apiTriedCredentials.push(cred)
         }
       }
 
@@ -1881,12 +1918,23 @@ export class NetworkScanner {
     // Save failed credentials BEFORE checking if already processed
     // This handles the race condition where a device is discovered from multiple sources
     // and one scan finishes before another, marking it as "already processed"
-    if (!successfulCreds && triedCredentials.length > 0 && !deviceMac.startsWith('UNKNOWN-')) {
-      await this.saveFailedCredentials(ip, deviceMac, triedCredentials)
-    } else if (!successfulCreds && triedCredentials.length === 0) {
-      this.log('info', `${ip}: No tried credentials to record (MAC: ${deviceMac})`)
-    } else if (!successfulCreds && deviceMac.startsWith('UNKNOWN-')) {
-      this.log('info', `${ip}: Not recording ${triedCredentials.length} failed credentials (device has UNKNOWN MAC)`)
+    // Save failures for each service that was tried
+    if (!deviceMac.startsWith('UNKNOWN-')) {
+      // Save SSH failures if SSH was tried and failed (or succeeded but we want to track other failed creds)
+      if (triedServices.has('ssh') && triedCredentials.length > 0) {
+        const sshFailedCreds = successfulService === 'ssh'
+          ? triedCredentials.filter(c => c.id !== successfulCreds?.id)
+          : triedCredentials
+        if (sshFailedCreds.length > 0) {
+          await this.saveFailedCredentials(ip, deviceMac, sshFailedCreds, 'ssh')
+        }
+      }
+      // Save API failures if API was tried and failed
+      if (triedServices.has('api') && apiTriedCredentials.length > 0) {
+        await this.saveFailedCredentials(ip, deviceMac, apiTriedCredentials, 'api')
+      }
+    } else if (triedCredentials.length > 0 || apiTriedCredentials.length > 0) {
+      this.log('info', `${ip}: Not recording failed credentials (device has UNKNOWN MAC)`)
     }
 
     // Skip if we've already processed this MAC
@@ -2000,10 +2048,15 @@ export class NetworkScanner {
       this.log('success', `${ip}: Added as ${deviceType} (MAC: ${deviceMac}, ${accessStatus})`)
     }
 
-    // Record successful credential match if we connected via SSH
-    if (successfulCreds && successfulCreds.id && !deviceMac.startsWith('UNKNOWN-')) {
-      // Delete any existing match for this MAC (credential might have changed)
-      await db.delete(matchedDevices).where(eq(matchedDevices.mac, deviceMac)).catch(() => {})
+    // Record successful credential match for the service that worked
+    if (successfulCreds && successfulCreds.id && successfulService && !deviceMac.startsWith('UNKNOWN-')) {
+      // Delete any existing match for this MAC + service (credential might have changed)
+      await db.delete(matchedDevices)
+        .where(and(
+          eq(matchedDevices.mac, deviceMac),
+          eq(matchedDevices.service, successfulService)
+        ))
+        .catch(() => {})
 
       // Insert new match
       try {
@@ -2014,14 +2067,16 @@ export class NetworkScanner {
           mac: deviceMac,
           hostname: newDevice.hostname,
           ip,
+          service: successfulService,
         })
-        this.log('info', `${ip}: Recorded credential match (${successfulCreds.username})`)
+        this.log('info', `${ip}: Recorded ${successfulService} credential match (${successfulCreds.username})`)
       } catch (err) {
         console.error(`Failed to save matched device:`, err)
       }
 
       // Update our local cache for this scan
-      this.matchedCredentials.set(deviceMac, successfulCreds.id)
+      const cacheKey = `${deviceMac}:${successfulService}`
+      this.matchedCredentials.set(cacheKey, successfulCreds.id)
     } else if (successfulCreds && !successfulCreds.id) {
       this.log('info', `${ip}: Login with root credentials (not recorded in matched devices)`)
     }
