@@ -55,6 +55,7 @@ export function App() {
                     <Route path="/networks/:networkId" element={<NetworkTopology />} />
                     <Route path="/networks/:networkId/locations" element={<Locations />} />
                     <Route path="/credentials" element={<Credentials />} />
+                    <Route path="/locations" element={<Locations />} />
                     <Route
                       path="/users"
                       element={

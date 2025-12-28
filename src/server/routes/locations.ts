@@ -1,11 +1,40 @@
 import { Hono } from 'hono'
 import { db } from '../db/client'
-import { locations, devices } from '../db/schema'
+import { locations, devices, networks } from '../db/schema'
 import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { requireAdmin } from '../middleware/auth'
 
 export const locationRoutes = new Hono()
+
+// Get all locations across all networks (with device counts and network names)
+locationRoutes.get('/', async (c) => {
+  const allLocations = await db.select({
+    id: locations.id,
+    networkId: locations.networkId,
+    name: locations.name,
+    createdAt: locations.createdAt,
+  })
+  .from(locations)
+  .orderBy(locations.name)
+
+  // Get device counts and add network name
+  const locationsWithCounts = await Promise.all(
+    allLocations.map(async (location) => {
+      const [deviceList, network] = await Promise.all([
+        db.select({ id: devices.id }).from(devices).where(eq(devices.locationId, location.id)),
+        db.query.networks.findFirst({ where: eq(networks.id, location.networkId) })
+      ])
+      return {
+        ...location,
+        deviceCount: deviceList.length,
+        networkName: network?.name || 'Unknown'
+      }
+    })
+  )
+
+  return c.json(locationsWithCounts)
+})
 
 // Get all locations for a network (with device counts)
 locationRoutes.get('/:networkId', async (c) => {

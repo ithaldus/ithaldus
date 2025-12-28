@@ -37,34 +37,10 @@ stockImagesRoutes.get('/', requireAdmin, async (c) => {
   return c.json(images)
 })
 
-// Get stock image by ID (full data)
-// Any authenticated user can access
-stockImagesRoutes.get('/:id', async (c) => {
-  const id = c.req.param('id')
-
-  const image = await db.query.stockImages.findFirst({
-    where: eq(stockImages.id, id),
-  })
-
-  if (!image) {
-    return c.json({ error: 'Stock image not found' }, 404)
-  }
-
-  return c.json({
-    id: image.id,
-    vendor: image.vendor,
-    model: image.model,
-    data: image.data,
-    mimeType: image.mimeType,
-    deviceCount: image.deviceCount,
-    createdAt: image.createdAt,
-    updatedAt: image.updatedAt,
-  })
-})
-
 // Lookup stock image by vendor+model (case-insensitive)
 // Any authenticated user can access
 // Only returns images that have actual data (not placeholders)
+// NOTE: This route MUST be defined before /:id to avoid being caught by the param route
 stockImagesRoutes.get('/lookup', async (c) => {
   const vendor = c.req.query('vendor')
   const model = c.req.query('model')
@@ -89,6 +65,31 @@ stockImagesRoutes.get('/lookup', async (c) => {
     data: image.data,
     mimeType: image.mimeType,
     deviceCount: image.deviceCount,
+  })
+})
+
+// Get stock image by ID (full data)
+// Any authenticated user can access
+stockImagesRoutes.get('/:id', async (c) => {
+  const id = c.req.param('id')
+
+  const image = await db.query.stockImages.findFirst({
+    where: eq(stockImages.id, id),
+  })
+
+  if (!image) {
+    return c.json({ error: 'Stock image not found' }, 404)
+  }
+
+  return c.json({
+    id: image.id,
+    vendor: image.vendor,
+    model: image.model,
+    data: image.data,
+    mimeType: image.mimeType,
+    deviceCount: image.deviceCount,
+    createdAt: image.createdAt,
+    updatedAt: image.updatedAt,
   })
 })
 

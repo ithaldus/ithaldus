@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin, Loader2, Image } from 'lucide-react'
 import { Tooltip } from '../ui/Tooltip'
 import { useAuth } from '../../hooks/useAuth'
-import { api, type Network as NetworkType, onConnectionChange, isConnected } from '../../lib/api'
+import { api, type Network as NetworkType, type Location, onConnectionChange, isConnected } from '../../lib/api'
 import { Logo } from '../Logo'
 
 interface ShellProps {
@@ -21,6 +21,7 @@ export function Shell({ children }: ShellProps) {
   const [networks, setNetworks] = useState<NetworkType[]>([])
   const [scanningNetworks, setScanningNetworks] = useState<Set<string>>(new Set())
   const [serverConnected, setServerConnected] = useState(() => isConnected())
+  const [networkLocations, setNetworkLocations] = useState<Map<string, Location[]>>(new Map())
 
   // Extract networkId from URL path
   const networkMatch = location.pathname.match(/^\/networks\/([^/]+)/)
@@ -75,6 +76,17 @@ export function Shell({ children }: ShellProps) {
     return onConnectionChange(setServerConnected)
   }, [])
 
+  // Fetch locations for current network when it changes
+  useEffect(() => {
+    if (currentNetworkId && !networkLocations.has(currentNetworkId)) {
+      api.locations.list(currentNetworkId).then(locs => {
+        setNetworkLocations(prev => new Map(prev).set(currentNetworkId, locs))
+      }).catch(err => {
+        console.error('Failed to load locations:', err)
+      })
+    }
+  }, [currentNetworkId, networkLocations])
+
   // Logo color based on connection status
   const logoColor = serverConnected ? 'text-cyan-400' : 'text-slate-600'
 
@@ -98,6 +110,7 @@ export function Shell({ children }: ShellProps) {
   const navItems = [
     { to: '/networks', label: 'Networks', icon: Network },
     { to: '/credentials', label: 'Credentials', icon: Key },
+    { to: '/locations', label: 'Locations', icon: MapPin },
     ...(user?.role === 'admin'
       ? [
           { to: '/users', label: 'Users', icon: Users },
@@ -224,10 +237,11 @@ export function Shell({ children }: ShellProps) {
                         )}
                       </NavLink>
 
-                      {/* Locations - only for current network */}
-                      {currentNetworkId === network.id && (
+                      {/* Locations under active network */}
+                      {currentNetworkId === network.id && networkLocations.get(network.id)?.map(loc => (
                         <NavLink
-                          to={`/networks/${network.id}/locations`}
+                          key={loc.id}
+                          to={`/locations?network=${network.id}&highlight=${loc.id}`}
                           onClick={() => setMobileMenuOpen(false)}
                           className={({ isActive }) =>
                             `w-full flex items-center gap-2 px-3 py-1.5 ml-5 rounded-lg transition-colors duration-150 text-sm ${
@@ -238,9 +252,12 @@ export function Shell({ children }: ShellProps) {
                           }
                         >
                           <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                          <span>Locations</span>
+                          <span className="truncate flex-1">{loc.name}</span>
+                          <span className="text-xs bg-slate-700 px-1.5 py-0.5 rounded">
+                            {loc.deviceCount || 0}
+                          </span>
                         </NavLink>
-                      )}
+                      ))}
                     </div>
                   ))}
                 </div>

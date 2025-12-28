@@ -12,6 +12,8 @@ interface DebugConsoleProps {
   onToggle: () => void
   width?: number
   onWidthChange?: (width: number) => void
+  filter?: string
+  onFilterChange?: (filter: string) => void
 }
 
 const levelColors = {
@@ -43,6 +45,8 @@ export function DebugConsole({
   onToggle,
   width = 400,
   onWidthChange,
+  filter: controlledFilter,
+  onFilterChange,
 }: DebugConsoleProps) {
   const consoleRef = useRef<HTMLDivElement>(null)
   const resizeRef = useRef<HTMLDivElement>(null)
@@ -51,7 +55,11 @@ export function DebugConsole({
     const stored = localStorage.getItem('debug-console-auto-expand')
     return stored === 'true'
   })
-  const [filter, setFilter] = useState('')
+  const [internalFilter, setInternalFilter] = useState('')
+
+  // Use controlled filter if provided, otherwise use internal state
+  const filter = controlledFilter !== undefined ? controlledFilter : internalFilter
+  const setFilter = onFilterChange || setInternalFilter
   const [enabledLevels, setEnabledLevels] = useState<Set<LogLevel>>(() => {
     const stored = localStorage.getItem('debug-console-levels')
     if (stored) {

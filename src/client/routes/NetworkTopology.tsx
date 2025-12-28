@@ -37,6 +37,7 @@ interface VisibilityToggles {
 export function NetworkTopology() {
   const { networkId } = useParams<{ networkId: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
 
@@ -50,7 +51,6 @@ export function NetworkTopology() {
   const [channels, setChannels] = useState<ChannelInfo[]>([])
   const [consoleOpen, setConsoleOpen] = useState(false)
   const [consoleWidth, setConsoleWidth] = useState(400)
-  const [searchParams, setSearchParams] = useSearchParams()
   const [lastScannedAt, setLastScannedAt] = useState<string | null>(null)
   const [scanError, setScanError] = useState<string | null>(null)
   const topologyRef = useRef<HTMLDivElement>(null)
@@ -75,10 +75,40 @@ export function NetworkTopology() {
     }
   })
 
-  // Device filter state
-  const [deviceFilter, setDeviceFilter] = useState('')
+  // Device filter state - initialized from URL param
+  const [deviceFilter, setDeviceFilter] = useState(() => searchParams.get('filter') || '')
+  // Debug console filter - initialized from URL param (same as device filter by default)
+  const [logFilter, setLogFilter] = useState(() => searchParams.get('logFilter') || searchParams.get('filter') || '')
   // Expand/collapse all interfaces - null means use default behavior
   const [expandAll, setExpandAll] = useState<boolean | null>(null)
+
+  // Sync device filter with URL
+  const updateDeviceFilter = useCallback((value: string) => {
+    setDeviceFilter(value)
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev)
+      if (value) {
+        newParams.set('filter', value)
+      } else {
+        newParams.delete('filter')
+      }
+      return newParams
+    }, { replace: true })
+  }, [setSearchParams])
+
+  // Sync log filter with URL
+  const updateLogFilter = useCallback((value: string) => {
+    setLogFilter(value)
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev)
+      if (value) {
+        newParams.set('logFilter', value)
+      } else {
+        newParams.delete('logFilter')
+      }
+      return newParams
+    }, { replace: true })
+  }, [setSearchParams])
 
   // Device type filter - which types to show (all enabled by default)
   const [enabledDeviceTypes, setEnabledDeviceTypes] = useState<Set<DeviceType>>(() => {
@@ -977,13 +1007,13 @@ export function NetworkTopology() {
             <input
               type="text"
               value={deviceFilter}
-              onChange={(e) => setDeviceFilter(e.target.value)}
+              onChange={(e) => updateDeviceFilter(e.target.value)}
               placeholder="Filter by IP, MAC, hostname, vendor, model, serial..."
               className="w-full pl-9 pr-9 py-2 text-sm bg-slate-800 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
             {deviceFilter && (
               <button
-                onClick={() => setDeviceFilter('')}
+                onClick={() => updateDeviceFilter('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
               >
                 <X className="w-4 h-4" />
@@ -1044,7 +1074,7 @@ export function NetworkTopology() {
             <p className="text-sm text-slate-500 dark:text-slate-500">
               Try a different search term or{' '}
               <button
-                onClick={() => setDeviceFilter('')}
+                onClick={() => updateDeviceFilter('')}
                 className="text-cyan-500 hover:text-cyan-400"
               >
                 clear the filter
@@ -1083,6 +1113,8 @@ export function NetworkTopology() {
         onToggle={() => setConsoleOpen(!consoleOpen)}
         width={consoleWidth}
         onWidthChange={setConsoleWidth}
+        filter={logFilter}
+        onFilterChange={updateLogFilter}
       />
 
       {/* Device Modal */}
