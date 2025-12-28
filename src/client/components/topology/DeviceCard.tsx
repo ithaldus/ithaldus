@@ -75,6 +75,8 @@ interface DeviceCardProps {
   showSerialNumber?: boolean
   showAssetTag?: boolean
   showMac?: boolean
+  filterActive?: boolean
+  expandAll?: boolean | null  // true = expand all, false = collapse all, null = default
   onDeviceClick?: (device: TopologyDevice) => void
 }
 
@@ -187,6 +189,8 @@ export function DeviceCard({
   showSerialNumber = true,
   showAssetTag = true,
   showMac = false,
+  filterActive = false,
+  expandAll = null,
   onDeviceClick,
 }: DeviceCardProps) {
   const [isExpanded, setIsExpanded] = useState(true)
@@ -541,7 +545,11 @@ export function DeviceCard({
 
                 {/* Interface Label */}
                 {(() => {
-                  const isCollapsed = collapsedInterfaces.has(ifaceName)
+                  // Determine collapsed state based on expandAll override, filter, or default
+                  const isCollapsed = expandAll === true ? false
+                    : expandAll === false ? true
+                    : filterActive ? false
+                    : collapsedInterfaces.has(ifaceName)
                   const isVirtual = isVirtualInterface(ifaceName)
                   const childCount = children.length
 
@@ -614,7 +622,7 @@ export function DeviceCard({
                 })()}
 
                 {/* Child Devices - only render if interface is not collapsed */}
-                {!collapsedInterfaces.has(ifaceName) && (
+                {(expandAll === true || (expandAll !== false && (filterActive || !collapsedInterfaces.has(ifaceName)))) && (
                   <div className="space-y-1 ml-3 pb-1">
                     {showVirtualSwitch ? (
                       /* Virtual switch placeholder - inferred when multiple inaccessible devices on one interface */
@@ -641,6 +649,8 @@ export function DeviceCard({
                               showSerialNumber={showSerialNumber}
                               showAssetTag={showAssetTag}
                               showMac={showMac}
+                              filterActive={filterActive}
+                              expandAll={expandAll}
                               onDeviceClick={onDeviceClick}
                             />
                           ))}
@@ -660,6 +670,8 @@ export function DeviceCard({
                           showSerialNumber={showSerialNumber}
                           showAssetTag={showAssetTag}
                           showMac={showMac}
+                          filterActive={filterActive}
+                          expandAll={expandAll}
                           onDeviceClick={onDeviceClick}
                         />
                       ))

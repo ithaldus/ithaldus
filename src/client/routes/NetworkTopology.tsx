@@ -13,7 +13,11 @@ import {
   Monitor,
   AlertTriangle,
   X,
+  Search,
+  ChevronsDownUp,
+  ChevronsUpDown,
 } from 'lucide-react'
+import { useMemo } from 'react'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import { DeviceCard } from '../components/topology/DeviceCard'
@@ -75,6 +79,11 @@ export function NetworkTopology() {
       mac: false,
     }
   })
+
+  // Device filter state
+  const [deviceFilter, setDeviceFilter] = useState('')
+  // Expand/collapse all interfaces - null means use default behavior
+  const [expandAll, setExpandAll] = useState<boolean | null>(null)
 
   // WebSocket ref
   const wsRef = useRef<WebSocket | null>(null)
@@ -428,6 +437,63 @@ export function NetworkTopology() {
 
   const deviceCount = countDevices(devices, visibility.endDevices)
 
+  // Filter devices by search term (matches IP, MAC, hostname, vendor, model, serial, comment, assetTag)
+  const deviceMatchesFilter = (device: TopologyDevice, filter: string): boolean => {
+    const lowerFilter = filter.toLowerCase()
+    return [
+      device.ip,
+      device.mac,
+      device.hostname,
+      device.vendor,
+      device.model,
+      device.serialNumber,
+      device.comment,
+      device.assetTag,
+    ].some(field => field?.toLowerCase().includes(lowerFilter))
+  }
+
+  // Recursively filter topology tree, keeping matching devices and their ancestors
+  const filterTopologyTree = (
+    deviceList: TopologyDevice[],
+    filter: string
+  ): TopologyDevice[] => {
+    if (!filter.trim()) return deviceList
+
+    const filterDevice = (device: TopologyDevice): TopologyDevice | null => {
+      // Check if this device matches
+      const selfMatches = deviceMatchesFilter(device, filter)
+
+      // Recursively filter children
+      const filteredChildren = device.children
+        .map(filterDevice)
+        .filter((d): d is TopologyDevice => d !== null)
+
+      // Include device if it matches OR has matching descendants
+      if (selfMatches || filteredChildren.length > 0) {
+        return {
+          ...device,
+          // If device matches, show all its children; otherwise only show filtered path
+          children: selfMatches ? device.children : filteredChildren,
+        }
+      }
+
+      return null
+    }
+
+    return deviceList.map(filterDevice).filter((d): d is TopologyDevice => d !== null)
+  }
+
+  // Apply filter to devices
+  const filteredDevices = useMemo(() => {
+    return filterTopologyTree(devices, deviceFilter)
+  }, [devices, deviceFilter])
+
+  // Count filtered devices
+  const filteredDeviceCount = useMemo(() => {
+    if (!deviceFilter.trim()) return null
+    return countDevices(filteredDevices, visibility.endDevices)
+  }, [filteredDevices, deviceFilter, visibility.endDevices])
+
   async function exportPDF() {
     if (!topologyRef.current || !network) return
 
@@ -601,9 +667,11 @@ export function NetworkTopology() {
             <div className="flex items-center gap-1.5">
               <Monitor className="w-3.5 h-3.5" />
               <span>
-                {!visibility.endDevices && deviceCount !== totalDeviceCount
-                  ? `${deviceCount} / ${totalDeviceCount} devices`
-                  : `${totalDeviceCount} devices`
+                {filteredDeviceCount !== null
+                  ? `${filteredDeviceCount} / ${totalDeviceCount} devices`
+                  : !visibility.endDevices && deviceCount !== totalDeviceCount
+                    ? `${deviceCount} / ${totalDeviceCount} devices`
+                    : `${totalDeviceCount} devices`
                 }
               </span>
             </div>
@@ -614,6 +682,52 @@ export function NetworkTopology() {
               <span>Scanned {formatLastScanned(lastScannedAt)}</span>
             </div>
           )}
+        </div>
+
+        {/* Filter input and expand/collapse buttons */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={deviceFilter}
+              onChange={(e) => setDeviceFilter(e.target.value)}
+              placeholder="Filter by IP, MAC, hostname, vendor, model, serial..."
+              className="w-full pl-9 pr-9 py-2 text-sm bg-slate-800 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+            />
+            {deviceFilter && (
+              <button
+                onClick={() => setDeviceFilter('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <Tooltip content={expandAll === true ? "Reset to default" : "Expand all interfaces"} position="bottom">
+            <button
+              onClick={() => setExpandAll(expandAll === true ? null : true)}
+              className={`p-2 rounded-lg border transition-colors ${
+                expandAll === true
+                  ? 'bg-cyan-900/30 border-cyan-700 text-cyan-400'
+                  : 'bg-slate-800 border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500'
+              }`}
+            >
+              <ChevronsUpDown className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content={expandAll === false ? "Reset to default" : "Collapse all interfaces"} position="bottom">
+            <button
+              onClick={() => setExpandAll(expandAll === false ? null : false)}
+              className={`p-2 rounded-lg border transition-colors ${
+                expandAll === false
+                  ? 'bg-cyan-900/30 border-cyan-700 text-cyan-400'
+                  : 'bg-slate-800 border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500'
+              }`}
+            >
+              <ChevronsDownUp className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -633,9 +747,27 @@ export function NetworkTopology() {
                 : 'No scan has been performed on this network yet.'}
             </p>
           </div>
+        ) : filteredDevices.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-4">
+              <Search className="w-8 h-8 text-slate-400" />
+            </div>
+            <p className="text-slate-600 dark:text-slate-400 mb-2">
+              No devices match your filter.
+            </p>
+            <p className="text-sm text-slate-500 dark:text-slate-500">
+              Try a different search term or{' '}
+              <button
+                onClick={() => setDeviceFilter('')}
+                className="text-cyan-500 hover:text-cyan-400"
+              >
+                clear the filter
+              </button>
+            </p>
+          </div>
         ) : (
           <div className="space-y-4">
-            {devices.map((device) => (
+            {filteredDevices.map((device) => (
               <DeviceCard
                 key={device.id}
                 device={device}
@@ -647,6 +779,8 @@ export function NetworkTopology() {
                 showSerialNumber={visibility.serialNumber}
                 showAssetTag={visibility.assetTag}
                 showMac={visibility.mac}
+                filterActive={!!deviceFilter.trim()}
+                expandAll={expandAll}
                 onDeviceClick={handleDeviceClick}
               />
             ))}

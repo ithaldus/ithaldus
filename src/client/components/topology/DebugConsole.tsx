@@ -64,6 +64,16 @@ export function DebugConsole({
     return new Set(['info', 'success', 'warn', 'error'] as LogLevel[])
   })
   const [copied, setCopied] = useState(false)
+  const [isAtBottom, setIsAtBottom] = useState(true)
+
+  // Track scroll position to determine if user is at bottom
+  const handleScroll = useCallback(() => {
+    if (!consoleRef.current) return
+    const { scrollTop, scrollHeight, clientHeight } = consoleRef.current
+    // Consider "at bottom" if within 20px of the bottom
+    const atBottom = scrollHeight - scrollTop - clientHeight < 20
+    setIsAtBottom(atBottom)
+  }, [])
 
   // Persist level filter preference
   useEffect(() => {
@@ -113,12 +123,12 @@ export function DebugConsole({
     localStorage.setItem('debug-console-auto-expand', String(autoExpand))
   }, [autoExpand])
 
-  // Auto-scroll to bottom when new logs arrive
+  // Auto-scroll to bottom when new logs arrive (only if already at bottom)
   useEffect(() => {
-    if (consoleRef.current) {
+    if (consoleRef.current && isAtBottom) {
       consoleRef.current.scrollTop = consoleRef.current.scrollHeight
     }
-  }, [filteredLogs])
+  }, [filteredLogs, isAtBottom])
 
   // Calculate required width based on longest log message
   const calculateRequiredWidth = useCallback(() => {
@@ -362,6 +372,7 @@ export function DebugConsole({
         {/* Log Content */}
         <div
           ref={consoleRef}
+          onScroll={handleScroll}
           className={`flex-1 overflow-y-auto p-3 font-mono text-xs leading-relaxed ${
             autoExpand ? 'overflow-x-auto' : 'overflow-x-hidden'
           }`}
