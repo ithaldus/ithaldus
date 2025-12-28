@@ -2029,11 +2029,19 @@ export class NetworkScanner {
         } else if (macVendor === 'Ruckus' || isRkscliDevice(banner)) {
           // Ruckus detected from MAC or banner - use rkscli/Unleashed shell driver
           // Requires special shell-based login for rkscli devices
+          // Pass all credentials since Ruckus often has different SSH vs CLI auth
           this.log('info', `${ip}: Ruckus detected from ${macVendor === 'Ruckus' ? 'MAC OUI' : 'banner'}, using shell mode`)
+          // Put the successful SSH credential first, then add all others
+          const ruckusCredentials = [
+            { username: successfulCreds!.username, password: successfulCreds!.password },
+            ...this.credentialsList
+              .filter(c => c.username !== successfulCreds!.username || c.password !== successfulCreds!.password)
+              .map(c => ({ username: c.username, password: c.password }))
+          ]
           deviceInfo = await getRuckusInfo(
             connectedClient,
             banner,
-            { username: successfulCreds!.username, password: successfulCreds!.password },
+            ruckusCredentials,
             (level, msg) => this.log(level, `${ip}: ${msg}`)
           )
           vendorInfo = { vendor: 'Ruckus', driver: isRkscliDevice(banner) ? 'ruckus-smartzone' : 'ruckus-unleashed' }

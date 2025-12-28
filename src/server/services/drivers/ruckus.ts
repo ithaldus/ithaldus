@@ -129,7 +129,14 @@ async function ruckusRkscliExecMultiple(
 
       stream.on('close', () => {
         clearTimeout(timer)
-        if (log) log('info', `Shell closed with ${results.length} results`)
+        if (log) {
+          log('info', `Shell closed with ${results.length} results`)
+          // Debug: dump final buffer if no results
+          if (results.length === 0 && buffer.length > 0) {
+            const escaped = buffer.replace(/\x1b/g, '\\x1b').replace(/\r/g, '\\r').replace(/\n/g, '\\n')
+            log('warn', `No results! Final buffer (${buffer.length}b): ${escaped.substring(0, 500)}`)
+          }
+        }
 
         // Fill in any missing results with empty strings
         while (results.length < commands.length) {
@@ -147,10 +154,23 @@ async function ruckusRkscliExecMultiple(
   })
 }
 
+// Helper to check if line ends with a Ruckus prompt
+function isRuckusPrompt(line: string): { isPrompt: boolean; isEnable: boolean } {
+  const trimmed = line.trim()
+  // Ruckus prompts: "hostname>" (user mode) or "hostname#" (enable mode)
+  // Also matches: "ruckus>", "ruckus#", "AP-Name>", "AP-Name#"
+  const enableMatch = /^[\w-]+#\s*$/.test(trimmed)
+  const userMatch = /^[\w-]+>\s*$/.test(trimmed)
+  return { isPrompt: enableMatch || userMatch, isEnable: enableMatch }
+}
+
 // Ruckus Unleashed shell executor (Cisco-like CLI with enable mode)
+// Also handles rkscli-style login if detected
+// Accepts array of credentials to try for CLI login (Ruckus often has different SSH vs CLI auth)
 async function ruckusUnleashedExecMultiple(
   client: Client,
   commands: string[],
+  credentialsList: Array<{ username: string; password: string }>,
   timeout = 30000,
   log?: (level: 'info' | 'warn' | 'error', msg: string) => void
 ): Promise<string[]> {
@@ -175,6 +195,11 @@ async function ruckusUnleashedExecMultiple(
       let currentOutput = ''
       const results: string[] = []
       let inEnableMode = false
+      let enableSent = false
+      // For rkscli-style login detection
+      let isRkscliMode = false
+      let credentialIndex = 0
+      let loginPhase: 'waiting' | 'waiting_for_prompt' | 'username_sent' | 'password_sent' | 'authenticated' = 'waiting'
 
       const sendNextCommand = () => {
         currentCommandIndex++
@@ -190,23 +215,86 @@ async function ruckusUnleashedExecMultiple(
         }
       }
 
+      const tryNextCredential = () => {
+        if (credentialIndex < credentialsList.length) {
+          const cred = credentialsList[credentialIndex]
+          if (log) log('info', `Trying CLI credential ${credentialIndex + 1}/${credentialsList.length}: ${cred.username}`)
+          loginPhase = 'username_sent'
+          stream.write(cred.username + '\n')
+        } else {
+          if (log) log('warn', `All ${credentialsList.length} CLI credentials failed`)
+          stream.end()
+        }
+      }
+
       stream.on('data', (data: Buffer) => {
         const chunk = data.toString()
         buffer += chunk
 
-        // Waiting for initial prompt (could be "ruckus>" or "ruckus#")
+        // Waiting for initial prompt
         if (currentCommandIndex === -1) {
-          // First need to enter enable mode
-          if (!inEnableMode && buffer.includes('>')) {
-            if (log) log('info', `Initial prompt detected, entering enable mode`)
-            inEnableMode = true
-            stream.write('enable\n')
+          // Check for rkscli prompt first (login succeeded!)
+          if (isRkscliMode && buffer.includes('rkscli:')) {
+            const cred = credentialsList[credentialIndex]
+            if (log) log('info', `rkscli prompt detected! CLI login successful with ${cred.username}`)
+            loginPhase = 'authenticated'
+            buffer = ''  // Clear buffer for command output
+            sendNextCommand()
             return
           }
-          // Now in enable mode (or already there), look for # prompt
-          if (buffer.includes('#')) {
-            if (log) log('info', `Enable mode prompt detected, starting commands`)
-            sendNextCommand()
+
+          // Check for login failed - prepare for retry
+          if (isRkscliMode && loginPhase === 'password_sent' && buffer.includes('Login incorrect')) {
+            if (log) log('info', `Login failed for ${credentialsList[credentialIndex].username}`)
+            credentialIndex++
+            loginPhase = 'waiting_for_prompt'  // Wait for next "Please login:"
+            buffer = ''  // Clear buffer to avoid re-triggering on old data
+            return
+          }
+
+          // Check for rkscli-style login prompt
+          if (buffer.includes('Please login:')) {
+            if (!isRkscliMode) {
+              if (log) log('info', `Detected rkscli-style login prompt, switching modes`)
+              isRkscliMode = true
+            }
+            if (loginPhase === 'waiting' || loginPhase === 'waiting_for_prompt') {
+              buffer = ''  // Clear buffer before sending credentials
+              tryNextCredential()
+            }
+            return
+          }
+
+          // Check for password prompt (rkscli mode)
+          if (isRkscliMode && loginPhase === 'username_sent' && buffer.toLowerCase().includes('password')) {
+            const cred = credentialsList[credentialIndex]
+            if (log) log('info', `Password prompt detected, sending password for ${cred.username}`)
+            loginPhase = 'password_sent'
+            buffer = ''  // Clear buffer
+            stream.write(cred.password + '\n')
+            return
+          }
+
+          // Check for Cisco-like prompts (Unleashed mode)
+          if (!isRkscliMode) {
+            const lines = buffer.split('\n')
+            const lastLine = lines[lines.length - 1] || ''
+            const { isPrompt, isEnable } = isRuckusPrompt(lastLine)
+
+            if (isPrompt) {
+              if (isEnable) {
+                // Already in enable mode
+                if (log) log('info', `Already in enable mode (prompt: "${lastLine.trim()}"), starting commands`)
+                inEnableMode = true
+                buffer = ''  // Clear buffer for command output
+                sendNextCommand()
+              } else if (!enableSent) {
+                // In user mode, need to enter enable mode
+                if (log) log('info', `User mode prompt detected (prompt: "${lastLine.trim()}"), entering enable mode`)
+                enableSent = true
+                stream.write('enable\n')
+              }
+            }
           }
           return
         }
@@ -215,10 +303,19 @@ async function ruckusUnleashedExecMultiple(
         currentOutput += chunk
 
         // Check if we got the prompt back (command finished)
-        // Ruckus prompts: "hostname#" or "ruckus#"
         const lines = currentOutput.split('\n')
         const lastLine = lines[lines.length - 1] || ''
-        if (/[\w-]+[>#]\s*$/.test(lastLine)) {
+
+        // Different prompt detection based on mode
+        let commandComplete = false
+        if (isRkscliMode) {
+          commandComplete = lastLine.includes('rkscli:')
+        } else {
+          const { isPrompt } = isRuckusPrompt(lastLine)
+          commandComplete = isPrompt
+        }
+
+        if (commandComplete) {
           // Command complete - parse output
           // Remove first line (echoed command) and last line (prompt)
           const outputLines = currentOutput.split('\n')
@@ -235,7 +332,14 @@ async function ruckusUnleashedExecMultiple(
 
       stream.on('close', () => {
         clearTimeout(timer)
-        if (log) log('info', `Shell closed with ${results.length} results`)
+        if (log) {
+          log('info', `Shell closed with ${results.length} results`)
+          // Debug: dump final buffer if no results
+          if (results.length === 0 && buffer.length > 0) {
+            const escaped = buffer.replace(/\x1b/g, '\\x1b').replace(/\r/g, '\\r').replace(/\n/g, '\\n')
+            log('warn', `No results! Final buffer (${buffer.length}b): ${escaped.substring(0, 500)}`)
+          }
+        }
 
         // Fill in any missing results with empty strings
         while (results.length < commands.length) {
@@ -350,10 +454,23 @@ async function getRuckusRkscliInfo(
 }
 
 // Get device info from Ruckus Unleashed access points
-async function getRuckusUnleashedInfo(client: Client, log?: (level: LogLevel, message: string) => void): Promise<DeviceInfo> {
+// Also handles rkscli devices that don't match banner detection
+// Accepts array of credentials to try for CLI login
+// Banner is used as fallback for model/serial when CLI commands fail
+async function getRuckusUnleashedInfo(
+  client: Client,
+  banner: string,
+  credentialsList: Array<{ username: string; password: string }>,
+  log?: (level: LogLevel, message: string) => void
+): Promise<DeviceInfo> {
   const shellLog = log ? (level: 'info' | 'warn' | 'error', msg: string) => log(level, msg) : undefined
 
+  // Parse banner for fallback model/serial info
+  const bannerInfo = parseRuckusBanner(banner)
+
   // Commands to gather device information
+  // Note: These are Unleashed-style commands; if rkscli mode is detected at runtime,
+  // we should use different commands, but for now we try these
   const commands = [
     'show sysinfo',                    // System info: Name, IP, MAC, Model, Serial, Version
     'show current-active-clients all', // Connected clients with MAC addresses
@@ -363,7 +480,7 @@ async function getRuckusUnleashedInfo(client: Client, log?: (level: LogLevel, me
   let clientsRaw = ''
 
   try {
-    const results = await ruckusUnleashedExecMultiple(client, commands, 30000, shellLog)
+    const results = await ruckusUnleashedExecMultiple(client, commands, credentialsList, 30000, shellLog)
     sysInfoRaw = results[0] || ''
     clientsRaw = results[1] || ''
   } catch (e) {
@@ -379,7 +496,7 @@ async function getRuckusUnleashedInfo(client: Client, log?: (level: LogLevel, me
   const sysInfo = stripControlChars(sysInfoRaw)
   const clientsInfo = stripControlChars(clientsRaw)
 
-  // Parse system information
+  // Parse system information from CLI
   let hostname: string | null = null
   let model: string | null = null
   let serialNumber: string | null = null
@@ -394,6 +511,16 @@ async function getRuckusUnleashedInfo(client: Client, log?: (level: LogLevel, me
   if (modelMatch) model = `Ruckus ${modelMatch[1]}`
   if (serialMatch) serialNumber = serialMatch[1]
   if (versionMatch) version = versionMatch[1]
+
+  // Use banner info as fallback if CLI didn't provide model/serial
+  if (!model && bannerInfo.model) {
+    model = bannerInfo.model
+    if (log) log('info', `Using model from SSH banner: ${model}`)
+  }
+  if (!serialNumber && bannerInfo.serialNumber) {
+    serialNumber = bannerInfo.serialNumber
+    if (log) log('info', `Using serial from SSH banner: ${serialNumber}`)
+  }
 
   // Create interface for the wireless AP
   const interfaces: InterfaceInfo[] = [
@@ -470,32 +597,39 @@ export function isRkscliDevice(banner: string): boolean {
 }
 
 // Ruckus driver that auto-detects CLI mode
+// Accepts array of credentials - Ruckus often has different SSH vs CLI auth
+// Banner is parsed for model/serial as fallback when CLI commands fail
 export async function getRuckusInfo(
   client: Client,
   banner: string,
-  credentials: { username: string; password: string },
+  credentialsList: Array<{ username: string; password: string }>,
   log?: (level: LogLevel, message: string) => void
 ): Promise<DeviceInfo> {
   if (isRkscliDevice(banner)) {
     if (log) log('info', `Detected rkscli CLI mode from banner`)
-    return getRuckusRkscliInfo(client, banner, credentials, log)
+    // For rkscli with banner, use first credential (SSH credential) for the shell login
+    return getRuckusRkscliInfo(client, banner, credentialsList[0], log)
   } else {
-    if (log) log('info', `Using Unleashed CLI mode`)
-    return getRuckusUnleashedInfo(client, log)
+    // Try Unleashed mode, which will auto-detect rkscli at runtime if needed
+    // Pass banner for fallback model/serial extraction
+    if (log) log('info', `Using Unleashed CLI mode (will auto-detect rkscli if needed)`)
+    return getRuckusUnleashedInfo(client, banner, credentialsList, log)
   }
 }
 
-// Ruckus Unleashed driver (for standalone/master mode APs)
-export const ruckusUnleashedDriver: Driver = {
+// Note: Ruckus drivers are not used directly via the Driver interface because
+// they require credentials and banner parsing. Use getRuckusInfo() instead,
+// which auto-detects CLI mode and handles authentication.
+//
+// Export driver definitions for reference/documentation only.
+export const ruckusUnleashedDriver = {
   name: 'ruckus-unleashed',
-  getDeviceInfo: getRuckusUnleashedInfo,
+  description: 'Ruckus Unleashed APs with Cisco-like CLI',
 }
 
-// Ruckus SmartZone driver (for APs managed by SmartZone controller or rkscli)
-// Note: This driver needs banner and credentials, so it's used differently in the scanner
-export const ruckusSmartZoneDriver: Driver = {
+export const ruckusSmartZoneDriver = {
   name: 'ruckus-smartzone',
-  getDeviceInfo: getRuckusUnleashedInfo,  // Fallback - actual usage is via getRuckusInfo()
+  description: 'Ruckus SmartZone/rkscli APs with shell-based login',
 }
 
 // Export the banner parser for use in scanner
