@@ -229,6 +229,32 @@ function sanitizeHostname(output: string): string | null {
   return trimmed
 }
 
+// Extract Ruckus model from hostname patterns like "Name (H550)" or "Ruckus-R510"
+// Common Ruckus model prefixes: H (indoor), R (indoor), T (outdoor), E (outdoor)
+function extractRuckusModelFromHostname(hostname: string | null | undefined): string | null {
+  if (!hostname) return null
+
+  // Pattern 1: "Name (H550)" or "Name (R510)"
+  const parenMatch = hostname.match(/\(([HRTE]\d{3}[a-z]?)\)/i)
+  if (parenMatch) {
+    return `Ruckus ${parenMatch[1].toUpperCase()}`
+  }
+
+  // Pattern 2: "Ruckus-H550" or "Ruckus_R510"
+  const prefixMatch = hostname.match(/ruckus[-_]?([HRTE]\d{3}[a-z]?)/i)
+  if (prefixMatch) {
+    return `Ruckus ${prefixMatch[1].toUpperCase()}`
+  }
+
+  // Pattern 3: Just the model "H550" or "R510" at the end
+  const endMatch = hostname.match(/\b([HRTE]\d{3}[a-z]?)\s*$/i)
+  if (endMatch) {
+    return `Ruckus ${endMatch[1].toUpperCase()}`
+  }
+
+  return null
+}
+
 // Detect vendor from SSH banner or device output
 function detectVendor(banner: string, output: string): { vendor: string | null; driver: string | null } {
   const combined = (banner + ' ' + output).toLowerCase()
@@ -2228,6 +2254,13 @@ export class NetworkScanner {
     const ruckusCliWorked = vendor !== 'Ruckus' || (deviceInfo?.hostname != null || deviceInfo?.version != null)
     const isAccessible = !!connectedClient && ruckusCliWorked
 
+    // For Ruckus devices, try to extract model from MNDP/CDP hostname if CLI didn't return one
+    // Hostnames often contain model like "Name (H550)" or "Ruckus-R510"
+    let deviceModel = deviceInfo?.model || snmpInfo?.description || discoveryData?.model || null
+    if (!deviceModel && vendor === 'Ruckus') {
+      deviceModel = extractRuckusModelFromHostname(discoveryData?.hostname)
+    }
+
     const newDevice: DiscoveredDevice = {
       id: deviceId,
       mac: deviceMac,
@@ -2235,7 +2268,7 @@ export class NetworkScanner {
       ip,
       type: deviceType,
       vendor,
-      model: deviceInfo?.model || snmpInfo?.description || discoveryData?.model || null,
+      model: deviceModel,
       serialNumber: deviceInfo?.serialNumber || null,
       firmwareVersion: deviceInfo?.version || discoveryData?.version || null,
       accessible: isAccessible,
