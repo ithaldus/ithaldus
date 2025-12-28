@@ -850,11 +850,11 @@ export class NetworkScanner {
   // Helper: Release stale IP claim before inserting a new device
   // This handles DHCP IP reuse: when a different device gets an IP previously held by another device
   // We set the old device's IP to NULL if it wasn't seen in the current scan
-  private async releaseStaleIpClaim(ip: string | null): Promise<void> {
+  private async releaseStaleIpClaim(ip: string | null, excludeDeviceId?: string): Promise<void> {
     if (!ip) return
 
     const existingDevice = await this.findDeviceByIp(ip)
-    if (existingDevice && !this.isDeviceProcessed(existingDevice.id)) {
+    if (existingDevice && existingDevice.id !== excludeDeviceId && !this.isDeviceProcessed(existingDevice.id)) {
       // Found a device with this IP that was NOT seen in the current scan
       // This is a stale claim - another device now has this IP
       await db.update(devices)
@@ -1267,6 +1267,9 @@ export class NetworkScanner {
     const existingBridgeDevice = await this.findDeviceByMac(neighbor.mac)
 
     if (existingBridgeDevice) {
+      // Release any stale IP claim from another device before updating (handles DHCP IP reuse)
+      await this.releaseStaleIpClaim(neighborIp, existingBridgeDevice.id)
+
       // Update existing device, preserve user fields
       // Update model/firmware only if we have new info and the device wasn't previously accessible
       const updateData: Record<string, unknown> = {
@@ -1692,6 +1695,9 @@ export class NetworkScanner {
 
       let actualDeviceId: string
       if (existingDevice) {
+        // Release any stale IP claim from another device before updating (handles DHCP IP reuse)
+        await this.releaseStaleIpClaim(ip, existingDevice.id)
+
         // Update existing device, preserve user fields
         // Update model/firmware only if device wasn't accessible (no SSH-derived info)
         const updateData: Record<string, unknown> = {
@@ -2171,7 +2177,9 @@ export class NetworkScanner {
     }
 
     // Determine hostname for type detection (combine all sources)
-    const hostnameForDetection = deviceInfo?.hostname || snmpInfo?.hostname || discoveryData?.hostname || this.getMdnsHostname(ip)
+    // Priority: SSH > MNDP/CDP/LLDP identity > SNMP sysName > mDNS
+    // MNDP identity is preferred over SNMP because it's explicitly configured by network admins
+    const hostnameForDetection = deviceInfo?.hostname || discoveryData?.hostname || snmpInfo?.hostname || this.getMdnsHostname(ip)
 
     // Determine device type - prioritize SSH-based detection, then vendor-based
     let deviceType: string
@@ -2188,11 +2196,11 @@ export class NetworkScanner {
     // These are different things and should not be confused
     const actualUpstreamInterface = upstreamInterface
 
-    // Create device record - use SNMP/MNDP as fallback if no SSH access
+    // Create device record - use MNDP/SNMP as fallback if no SSH access
     const newDevice: DiscoveredDevice = {
       id: deviceId,
       mac: deviceMac,
-      hostname: deviceInfo?.hostname || snmpInfo?.hostname || discoveryData?.hostname || null,
+      hostname: deviceInfo?.hostname || discoveryData?.hostname || snmpInfo?.hostname || null,
       ip,
       type: deviceType,
       vendor,
@@ -2213,6 +2221,9 @@ export class NetworkScanner {
 
     let actualDeviceId: string
     if (existingDevice) {
+      // Release any stale IP claim from another device before updating (handles DHCP IP reuse)
+      await this.releaseStaleIpClaim(ip, existingDevice.id)
+
       // Update existing device, preserve user-managed fields (comment, nomad, type)
       await db.update(devices)
         .set({
