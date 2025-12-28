@@ -23,6 +23,8 @@ export interface TopologyDevice {
   parentInterfaceId: string | null
   upstreamInterface: string | null
   comment: string | null
+  locationId: string | null
+  locationName: string | null
   nomad: boolean
   lastSeenAt: string
   macCount: number

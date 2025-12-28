@@ -1,5 +1,5 @@
 import { db } from '../db/client'
-import { devices, interfaces, networks, dhcpLeases, deviceMacs } from '../db/schema'
+import { devices, interfaces, networks, dhcpLeases, deviceMacs, locations } from '../db/schema'
 import { eq, sql } from 'drizzle-orm'
 import type { TopologyResponse, TopologyDevice, TopologyInterface } from './types'
 
@@ -42,6 +42,10 @@ export async function buildTopology(networkId: string): Promise<TopologyResponse
     : []
   const macCountMap = new Map(macCounts.map(m => [m.deviceId, m.count]))
 
+  // Get locations for this network
+  const networkLocations = await db.select().from(locations).where(eq(locations.networkId, networkId))
+  const locationMap = new Map(networkLocations.map(l => [l.id, l.name]))
+
   // Build device map with interfaces, using DHCP hostname if device doesn't have one
   const deviceMap = new Map<string, TopologyDevice>()
 
@@ -63,6 +67,7 @@ export async function buildTopology(networkId: string): Promise<TopologyResponse
     deviceMap.set(device.id, {
       ...device,
       hostname,
+      locationName: device.locationId ? locationMap.get(device.locationId) || null : null,
       macCount: macCountMap.get(device.id) ?? 0,
       interfaces: deviceInterfaces as TopologyInterface[],
       children: [],

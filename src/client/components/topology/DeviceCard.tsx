@@ -542,14 +542,17 @@ export function DeviceCard({
           <div className="shrink-0 w-5" />
         </div>
 
-        {/* Comment - styled as speech bubble */}
-        {device.comment && (
+        {/* Location + Comment - styled as speech bubble */}
+        {(device.locationName || device.comment) && (
           <span className="relative inline-flex items-center gap-1 px-2 py-0.5 text-[10px] text-slate-700 dark:text-slate-200 bg-amber-100 dark:bg-amber-900/40 rounded-lg whitespace-nowrap border border-amber-200 dark:border-amber-800/50">
             {/* Speech bubble tail */}
             <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[6px] border-r-amber-200 dark:border-r-amber-800/50" />
             <span className="absolute -left-[5px] top-1/2 -translate-y-1/2 w-0 h-0 border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent border-r-[5px] border-r-amber-100 dark:border-r-amber-900/40" />
-            <MessageCircle className="w-3 h-3 shrink-0 text-amber-500 dark:text-amber-400" />
-            <HighlightText text={device.comment} filter={filterText} />
+            {device.locationName && <MapPin className="w-3 h-3 shrink-0 text-amber-500 dark:text-amber-400" />}
+            {device.comment && <MessageCircle className="w-3 h-3 shrink-0 text-amber-500 dark:text-amber-400" />}
+            {device.locationName && <HighlightText text={device.locationName} filter={filterText} />}
+            {device.locationName && device.comment && <span>,</span>}
+            {device.comment && <HighlightText text={device.comment} filter={filterText} />}
           </span>
         )}
       </div>

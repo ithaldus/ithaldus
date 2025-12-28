@@ -472,6 +472,7 @@ export interface Scan {
 export interface TopologyDevice extends Device {
   interfaces: Interface[]
   children: TopologyDevice[]
+  locationName?: string | null
 }
 
 export interface TopologyResponse {
