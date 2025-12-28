@@ -184,6 +184,22 @@ export const deviceImages = sqliteTable('device_images', {
   index('idx_device_images_device').on(table.deviceId),
 ])
 
+// Stock images table (gallery of device photos by vendor+model)
+// Used as fallback when a device has no custom image uploaded
+export const stockImages = sqliteTable('stock_images', {
+  id: text('id').primaryKey(),
+  vendor: text('vendor').notNull(),
+  model: text('model').notNull(),
+  mimeType: text('mime_type'),  // NULL for placeholders (no image yet)
+  data: text('data'),  // NULL for placeholders, base64-encoded when set
+  deviceCount: integer('device_count').notNull().default(0),  // Approximate count of devices using this model
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at'),
+}, (table) => [
+  // Unique constraint: one entry per vendor+model combo
+  uniqueIndex('idx_stock_images_vendor_model').on(table.vendor, table.model),
+])
+
 // Failed credentials (credential-device pairs that failed SSH login)
 // Used to skip known-bad credentials on future scans
 export const failedCredentials = sqliteTable('failed_credentials', {
@@ -226,5 +242,7 @@ export type ScanLog = typeof scanLogs.$inferSelect
 export type NewScanLog = typeof scanLogs.$inferInsert
 export type DeviceImage = typeof deviceImages.$inferSelect
 export type NewDeviceImage = typeof deviceImages.$inferInsert
+export type StockImage = typeof stockImages.$inferSelect
+export type NewStockImage = typeof stockImages.$inferInsert
 export type FailedCredential = typeof failedCredentials.$inferSelect
 export type NewFailedCredential = typeof failedCredentials.$inferInsert

@@ -269,6 +269,28 @@ export const api = {
       request<{ success: boolean }>(`/locations/${networkId}/${locationId}`, { method: 'DELETE' }),
   },
 
+  // Stock Images (device image gallery by vendor+model)
+  stockImages: {
+    list: () =>
+      request<StockImageMeta[]>(`/stock-images`),
+    get: (id: string) =>
+      request<StockImage>(`/stock-images/${id}`),
+    lookup: (vendor: string, model: string) =>
+      request<StockImage | null>(`/stock-images/lookup?vendor=${encodeURIComponent(vendor)}&model=${encodeURIComponent(model)}`).catch(() => null),
+    create: (vendor: string, model: string, data?: string, mimeType?: string) =>
+      request<{ success: boolean; id: string }>(`/stock-images`, {
+        method: 'POST',
+        body: JSON.stringify({ vendor, model, data, mimeType }),
+      }),
+    update: (id: string, data: { vendor?: string; model?: string; data?: string; mimeType?: string }) =>
+      request<{ success: boolean }>(`/stock-images/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ success: boolean }>(`/stock-images/${id}`, { method: 'DELETE' }),
+  },
+
   // Scan
   scan: {
     start: (networkId: string) =>
@@ -398,6 +420,29 @@ export interface DeviceImage {
   data: string
   mimeType: string
   createdAt: string
+}
+
+// Stock image metadata (returned from list, without image data)
+export interface StockImageMeta {
+  id: string
+  vendor: string
+  model: string
+  hasImage: boolean
+  deviceCount: number
+  createdAt: string
+  updatedAt: string | null
+}
+
+// Full stock image (with image data)
+export interface StockImage {
+  id: string
+  vendor: string
+  model: string
+  data: string | null
+  mimeType: string | null
+  deviceCount: number
+  createdAt: string
+  updatedAt: string | null
 }
 
 export interface DeviceLog {

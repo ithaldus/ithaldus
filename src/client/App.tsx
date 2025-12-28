@@ -8,6 +8,7 @@ import { NetworkTopology } from './routes/NetworkTopology'
 import { Locations } from './routes/Locations'
 import { Credentials } from './routes/Credentials'
 import { Users } from './routes/Users'
+import { StockImages } from './routes/StockImages'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -59,6 +60,14 @@ export function App() {
                       element={
                         <AdminRoute>
                           <Users />
+                        </AdminRoute>
+                      }
+                    />
+                    <Route
+                      path="/stock-images"
+                      element={
+                        <AdminRoute>
+                          <StockImages />
                         </AdminRoute>
                       }
                     />

@@ -148,6 +148,20 @@
       "when": 1766972800000,
       "tag": "0020_device_macs",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1767052800000,
+      "tag": "0021_unique_device_ip",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1767139200000,
+      "tag": "0022_stock_images",
+      "breakpoints": true
     }
   ]
 }

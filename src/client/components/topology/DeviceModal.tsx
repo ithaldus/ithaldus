@@ -32,7 +32,7 @@ import {
 } from 'lucide-react'
 import { VendorLogo } from './VendorLogo'
 import { ImageCropper } from '../ImageCropper'
-import { api, type TopologyDevice, type Interface, type DeviceType, type Location, type DeviceImage, type DeviceLog, type DeviceMac } from '../../lib/api'
+import { api, type TopologyDevice, type Interface, type DeviceType, type Location, type DeviceImage, type DeviceLog, type DeviceMac, type StockImage } from '../../lib/api'
 
 // Device type options for the dropdown - exported for use in filters
 export const deviceTypeOptions: { value: DeviceType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -136,6 +136,7 @@ export function DeviceModal({
   const [assetTag, setAssetTag] = useState(device.assetTag || '')
   const [isSavingAssetTag, setIsSavingAssetTag] = useState(false)
   const [deviceImage, setDeviceImage] = useState<DeviceImage | null>(null)
+  const [stockImage, setStockImage] = useState<StockImage | null>(null)
   const [loadingImage, setLoadingImage] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imageHovered, setImageHovered] = useState(false)
@@ -203,22 +204,34 @@ export function DeviceModal({
     }
   }, [networkId])
 
-  // Fetch device image on mount
+  // Fetch device image on mount, with stock image fallback
   useEffect(() => {
     async function fetchImage() {
       setLoadingImage(true)
       setImageAspectRatio(null) // Reset aspect ratio when fetching new image
+      setStockImage(null) // Reset stock image
       try {
         const image = await api.devices.getImage(device.id)
         setDeviceImage(image)
       } catch (err) {
-        // No image or error - that's fine
+        // No device image - try stock image fallback if vendor+model known
+        setDeviceImage(null)
+        if (device.vendor && device.model) {
+          try {
+            const stock = await api.stockImages.lookup(device.vendor, device.model)
+            if (stock && stock.data) {
+              setStockImage(stock)
+            }
+          } catch {
+            // No stock image either - that's fine
+          }
+        }
       } finally {
         setLoadingImage(false)
       }
     }
     fetchImage()
-  }, [device.id])
+  }, [device.id, device.vendor, device.model])
 
   // Fetch device logs on mount
   useEffect(() => {
@@ -437,6 +450,7 @@ export function DeviceModal({
       // Fetch the updated image
       const image = await api.devices.getImage(device.id)
       setDeviceImage(image)
+      setStockImage(null) // Clear stock image since we now have a custom one
       setImageAspectRatio(null) // Reset so it recalculates
       onImageChange?.(device.id, true)
     } catch (err) {
@@ -457,6 +471,13 @@ export function DeviceModal({
       setDeviceImage(null)
       setImageAspectRatio(null)
       onImageChange?.(device.id, false)
+      // Try to fetch stock image fallback
+      if (device.vendor && device.model) {
+        const stock = await api.stockImages.lookup(device.vendor, device.model)
+        if (stock && stock.data) {
+          setStockImage(stock)
+        }
+      }
     } catch (err) {
       console.error('Failed to delete image:', err)
     }
@@ -565,6 +586,41 @@ export function DeviceModal({
                           Remove
                         </button>
                       </>
+                    )}
+                  </div>
+                </>
+              ) : stockImage ? (
+                <>
+                  <img
+                    src={`data:${stockImage.mimeType};base64,${stockImage.data}`}
+                    alt="Device"
+                    className="w-full h-full object-cover cursor-pointer"
+                    onClick={() => setShowFullImage(true)}
+                    onLoad={(e) => {
+                      const img = e.currentTarget
+                      if (img.naturalWidth && img.naturalHeight) {
+                        const natural = img.naturalWidth / img.naturalHeight
+                        const clamped = Math.max(0.75, Math.min(3, natural))
+                        setImageAspectRatio(clamped)
+                      }
+                    }}
+                  />
+                  {/* Stock image badge */}
+                  <div className="absolute bottom-2 right-2 px-2 py-1 bg-amber-500/90 text-white text-xs font-medium rounded-md shadow-sm pointer-events-none">
+                    Stock image
+                  </div>
+                  {/* Hover overlay */}
+                  <div className={`absolute inset-0 bg-black/60 flex items-center justify-center gap-4 transition-opacity pointer-events-none ${imageHovered ? 'opacity-100' : 'opacity-0'}`}>
+                    {uploadingImage ? (
+                      <Loader2 className="w-6 h-6 text-white animate-spin" />
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
+                        className="pointer-events-auto flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium transition-colors"
+                      >
+                        <ImagePlus className="w-4 h-4" />
+                        Upload custom
+                      </button>
                     )}
                   </div>
                 </>
@@ -1206,7 +1262,7 @@ export function DeviceModal({
       )}
 
       {/* Full-size Image Lightbox */}
-      {showFullImage && deviceImage && (
+      {showFullImage && (deviceImage || stockImage) && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90"
           onClick={() => setShowFullImage(false)}
@@ -1222,11 +1278,20 @@ export function DeviceModal({
             <X className="w-6 h-6" />
           </button>
           <img
-            src={`data:${deviceImage.mimeType};base64,${deviceImage.data}`}
+            src={deviceImage
+              ? `data:${deviceImage.mimeType};base64,${deviceImage.data}`
+              : `data:${stockImage!.mimeType};base64,${stockImage!.data}`
+            }
             alt="Device"
             className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
+          {/* Stock image badge in lightbox */}
+          {!deviceImage && stockImage && (
+            <div className="absolute bottom-4 right-4 px-3 py-1.5 bg-amber-500/90 text-white text-sm font-medium rounded-lg shadow-lg">
+              Stock image
+            </div>
+          )}
         </div>
       )}
 

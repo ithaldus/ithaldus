@@ -19,6 +19,7 @@ import { scanMdns, type MdnsDevice } from './mdns'
 import { snmpQuery, type SnmpDeviceInfo } from './snmp'
 import { limitConcurrency } from './concurrency'
 import { wsManager } from './websocket'
+import { ensureStockImageEntry } from '../routes/stock-images'
 
 export type { LogLevel }
 
@@ -1136,7 +1137,7 @@ export class NetworkScanner {
         neighbor.mac,
         depth,  // Pass current depth - scanDevice will use this for the neighbor
         // Pass all parent MACs for uplink detection (device may have bridge/port/vlan MACs)
-        parentDevice.interfaces.map(i => i.mac).filter((m): m is string => m !== null)
+        parentDevice.interfaces.map(i => i.mac).filter((m): m is string => !!m)
       )
     })
 
@@ -1323,6 +1324,11 @@ export class NetworkScanner {
 
       // Add MAC to deviceMacs table
       await this.addMacToDevice(endDeviceId, neighbor.mac, 'bridge-host')
+
+      // Ensure stock image entry exists for this vendor+model
+      if (endDeviceVendor && neighbor.model) {
+        await ensureStockImageEntry(endDeviceVendor, neighbor.model)
+      }
 
       this.log('success', `${parentIp}: Added bridge host as ${endDevice.type} on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
 
@@ -1740,6 +1746,11 @@ export class NetworkScanner {
         // Add MAC to deviceMacs table (skip UNKNOWN MACs)
         if (!deviceMac.startsWith('UNKNOWN-')) {
           await this.addMacToDevice(deviceId, deviceMac, 'arp')
+        }
+
+        // Ensure stock image entry exists for this vendor+model
+        if (vendor && discoveryData?.model) {
+          await ensureStockImageEntry(vendor, discoveryData.model)
         }
 
         actualDeviceId = deviceId
@@ -2258,6 +2269,11 @@ export class NetworkScanner {
       // Add MAC to deviceMacs table (skip UNKNOWN MACs)
       if (!deviceMac.startsWith('UNKNOWN-')) {
         await this.addMacToDevice(deviceId, deviceMac, 'ssh')
+      }
+
+      // Ensure stock image entry exists for this vendor+model
+      if (newDevice.vendor && newDevice.model) {
+        await ensureStockImageEntry(newDevice.vendor, newDevice.model)
       }
 
       actualDeviceId = deviceId

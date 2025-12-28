@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { NavLink, useNavigate, useParams, useLocation } from 'react-router-dom'
-import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin, Loader2 } from 'lucide-react'
+import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin, Loader2, Image } from 'lucide-react'
 import { Tooltip } from '../ui/Tooltip'
 import { useAuth } from '../../hooks/useAuth'
 import { api, type Network as NetworkType, onConnectionChange, isConnected } from '../../lib/api'
@@ -99,7 +99,10 @@ export function Shell({ children }: ShellProps) {
     { to: '/networks', label: 'Networks', icon: Network },
     { to: '/credentials', label: 'Credentials', icon: Key },
     ...(user?.role === 'admin'
-      ? [{ to: '/users', label: 'Users', icon: Users }]
+      ? [
+          { to: '/users', label: 'Users', icon: Users },
+          { to: '/stock-images', label: 'Stock Images', icon: Image },
+        ]
       : []),
   ]
 

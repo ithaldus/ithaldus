@@ -574,7 +574,7 @@ async function getZyxelInfo(
 
   if (parentMacs.length > 0) {
     // Find the port where we see any of the parent device's MACs
-    const parentMacsUpper = new Set(parentMacs.map(m => m.toUpperCase()))
+    const parentMacsUpper = new Set(parentMacs.filter(m => !!m).map(m => m.toUpperCase()))
     const parentNeighbor = neighbors.find(n => parentMacsUpper.has(n.mac.toUpperCase()))
     if (parentNeighbor) {
       ownUpstreamInterface = parentNeighbor.interface
