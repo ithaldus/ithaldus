@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { api, type Credential, type Network, type MatchedDevice } from '../lib/api'
 import { Plus, Upload, Key, Globe, Eye, EyeOff, List, RotateCcw } from 'lucide-react'
@@ -8,6 +9,9 @@ type ExtendedCredential = Credential & { matchedDevices?: MatchedDevice[] }
 
 export function Credentials() {
   const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const highlightId = searchParams.get('highlight')
+  const highlightRef = useRef<HTMLDivElement>(null)
   const [credentials, setCredentials] = useState<ExtendedCredential[]>([])
   const [networks, setNetworks] = useState<Network[]>([])
   const [loading, setLoading] = useState(true)
@@ -24,6 +28,18 @@ export function Credentials() {
   useEffect(() => {
     loadData()
   }, [])
+
+  // Scroll to highlighted credential and clear URL param after a delay
+  useEffect(() => {
+    if (highlightId && highlightRef.current && !loading) {
+      highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Clear highlight from URL after animation completes
+      const timer = setTimeout(() => {
+        setSearchParams({}, { replace: true })
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [highlightId, loading, setSearchParams])
 
   async function loadData() {
     try {
@@ -412,19 +428,24 @@ export function Credentials() {
           </div>
         ) : (
           <div className="space-y-3">
-            {sortedCredentials.map((credential) => (
-              <CredentialCard
-                key={credential.id}
-                credential={credential}
-                allCredentials={filteredCredentials}
-                networks={networks}
-                showAllPasswords={showAllPasswords}
-                showNetworkBadge={selectedNetworkId === 'all'}
-                onEdit={isAdmin ? handleEdit : undefined}
-                onDelete={isAdmin ? handleDelete : undefined}
-                onMove={isAdmin ? handleMove : undefined}
-              />
-            ))}
+            {sortedCredentials.map((credential) => {
+              const isHighlighted = credential.id === highlightId
+              return (
+                <div key={credential.id} ref={isHighlighted ? highlightRef : undefined}>
+                  <CredentialCard
+                    credential={credential}
+                    allCredentials={filteredCredentials}
+                    networks={networks}
+                    showAllPasswords={showAllPasswords}
+                    showNetworkBadge={selectedNetworkId === 'all'}
+                    isHighlighted={isHighlighted}
+                    onEdit={isAdmin ? handleEdit : undefined}
+                    onDelete={isAdmin ? handleDelete : undefined}
+                    onMove={isAdmin ? handleMove : undefined}
+                  />
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

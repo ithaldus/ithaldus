@@ -201,7 +201,7 @@ export const api = {
       if (options?.fields?.length) params.set('fields', options.fields.join(','))
       if (options?.include?.length) params.set('include', options.include.join(','))
       const query = params.toString()
-      return request<Partial<Device> & { interfaces?: Interface[]; workingCredential?: { username: string } | null }>(`/devices/${id}${query ? `?${query}` : ''}`)
+      return request<Partial<Device> & { interfaces?: Interface[]; workingCredential?: { id: string; username: string } | null }>(`/devices/${id}${query ? `?${query}` : ''}`)
     },
     updateComment: (id: string, comment: string) =>
       request<{ success: boolean }>(`/devices/${id}/comment`, {
@@ -235,7 +235,7 @@ export const api = {
         body: JSON.stringify({ username, password }),
       }),
     getImage: (id: string) =>
-      request<DeviceImage>(`/devices/${id}/image`).catch(() => null),
+      request<DeviceImage>(`/devices/${id}/image`),
     uploadImage: (id: string, data: string, mimeType: string) =>
       request<{ success: boolean; id: string }>(`/devices/${id}/image`, {
         method: 'POST',
@@ -251,6 +251,8 @@ export const api = {
 
   // Locations
   locations: {
+    listAll: () =>
+      request<(Location & { networkName: string })[]>(`/locations`),
     list: (networkId: string) =>
       request<Location[]>(`/locations/${networkId}`),
     get: (networkId: string, locationId: string) =>

@@ -12,12 +12,13 @@ interface CredentialCardProps {
   networks?: NetworkType[]
   showAllPasswords?: boolean
   showNetworkBadge?: boolean
+  isHighlighted?: boolean
   onEdit?: (id: string, username: string, password: string) => void
   onDelete?: (id: string) => void
   onMove?: (id: string, networkId: string | null) => void
 }
 
-export function CredentialCard({ credential, allCredentials, networks = [], showAllPasswords = false, showNetworkBadge = false, onEdit, onDelete, onMove }: CredentialCardProps) {
+export function CredentialCard({ credential, allCredentials, networks = [], showAllPasswords = false, showNetworkBadge = false, isHighlighted = false, onEdit, onDelete, onMove }: CredentialCardProps) {
   const [showPasswordLocal, setShowPasswordLocal] = useState(false)
   const showPassword = showAllPasswords || showPasswordLocal
   const [showMoveMenu, setShowMoveMenu] = useState(false)
@@ -57,8 +58,10 @@ export function CredentialCard({ credential, allCredentials, networks = [], show
   const deviceCount = matchedDevices.length
 
   return (
-    <div className={`rounded-lg border ${
-      deviceCount > 0
+    <div className={`rounded-lg border transition-all duration-500 ${
+      isHighlighted
+        ? 'bg-cyan-100 dark:bg-cyan-900/40 border-cyan-400 dark:border-cyan-600 ring-2 ring-cyan-400 dark:ring-cyan-500 ring-offset-2 dark:ring-offset-slate-950'
+        : deviceCount > 0
         ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900'
         : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
     }`}>

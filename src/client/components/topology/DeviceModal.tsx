@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import {
   X,
   Router,
@@ -124,7 +125,7 @@ export function DeviceModal({
   const [testPassword, setTestPassword] = useState('')
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle')
   const [testError, setTestError] = useState('')
-  const [workingCredential, setWorkingCredential] = useState<{ username: string } | null>(null)
+  const [workingCredential, setWorkingCredential] = useState<{ id: string; username: string } | null>(null)
   const [loadingCredential, setLoadingCredential] = useState(false)
   const [deviceType, setDeviceType] = useState<DeviceType>(device.type || 'end-device')
   const [isSavingType, setIsSavingType] = useState(false)
@@ -806,10 +807,14 @@ export function DeviceModal({
                 {loadingCredential ? (
                   <span className="text-sm text-slate-400 dark:text-slate-500">Loading...</span>
                 ) : workingCredential ? (
-                  <span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400">
+                  <Link
+                    to={`/credentials?highlight=${workingCredential.id}`}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:underline"
+                    onClick={onClose}
+                  >
                     <Key className="w-3.5 h-3.5" />
                     {workingCredential.username}
-                  </span>
+                  </Link>
                 ) : device.accessible ? (
                   <span className="text-sm text-cyan-600 dark:text-cyan-400">Root credentials</span>
                 ) : openPorts.includes(22) ? (

@@ -88,7 +88,7 @@ devicesRoutes.get('/:id', async (c) => {
 
   // Only fetch credential if requested
   if (include.includes('credential')) {
-    let workingCredential: { username: string } | null = null
+    let workingCredential: { id: string; username: string } | null = null
     // Find matched credential by deviceId (preferred) or primary MAC (fallback)
     const matched = await db.query.matchedDevices.findFirst({
       where: eq(matchedDevices.deviceId, id),
@@ -100,7 +100,7 @@ devicesRoutes.get('/:id', async (c) => {
         where: eq(credentials.id, matched.credentialId),
       })
       if (cred) {
-        workingCredential = { username: cred.username }
+        workingCredential = { id: cred.id, username: cred.username }
       }
     }
     result.workingCredential = workingCredential
