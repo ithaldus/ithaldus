@@ -295,8 +295,8 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     const mac = macMatch[1].toUpperCase()
     const ifMatch = line.match(/interface=(\S+)/)
     const addrMatch = line.match(/address=(\d+\.\d+\.\d+\.\d+)/)
-    // Identity can contain spaces when quoted
-    const identityMatch = line.match(/identity="([^"]*)"/) || line.match(/identity=(\S+)/)
+    // Identity can contain spaces - match quoted, or unquoted until next key= or end of line
+    const identityMatch = line.match(/identity="([^"]*)"/) || line.match(/identity=([^=]+?)(?:\s+\w+=|$)/)
     const versionMatch = line.match(/version=(\S+)/)
     // Board can contain special characters
     const boardMatch = line.match(/board="([^"]*)"/) || line.match(/board=(\S+)/)
@@ -305,7 +305,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
       interface: ifMatch ? ifMatch[1] : 'unknown',
       ip: addrMatch ? addrMatch[1] : null,
       mac,
-      identity: identityMatch ? decodeMikrotikString(identityMatch[1]) : null,
+      identity: identityMatch ? decodeMikrotikString(identityMatch[1]).trim() : null,
       version: versionMatch ? versionMatch[1] : null,
       board: boardMatch ? boardMatch[1] : null,
     })
