@@ -317,7 +317,8 @@ async function getZyxelInfo(
   client: Client,
   log?: (level: LogLevel, message: string) => void,
   credentials?: { username: string; password: string },
-  deviceIp?: string  // Pass IP explicitly for jump host connections
+  deviceIp?: string,  // Pass IP explicitly for jump host connections
+  parentMac?: string | null  // Parent device's MAC for reliable uplink detection
 ): Promise<DeviceInfo> {
   // Zyxel switches use a Cisco-like CLI and only support interactive shell (not exec)
   // Run ALL commands in a SINGLE shell session (connection closes after shell exits)
@@ -566,32 +567,48 @@ async function getZyxelInfo(
     }
   }
 
-  // Detect uplink interface by finding the port with the most MAC addresses
-  // The uplink port typically sees all devices from the rest of the network
-  const macCountByPort: Map<string, number> = new Map()
-  for (const neighbor of neighbors) {
-    const count = macCountByPort.get(neighbor.interface) || 0
-    macCountByPort.set(neighbor.interface, count + 1)
-  }
-
+  // Detect uplink interface - prefer finding the port with the parent's MAC
+  // This is more reliable than counting MACs (which fails when sub-switches have more devices)
   let ownUpstreamInterface: string | null = null
-  let maxMacs = 0
-  for (const [port, count] of macCountByPort) {
-    if (count > maxMacs) {
-      maxMacs = count
-      ownUpstreamInterface = port
+
+  if (parentMac) {
+    // Find the port where we see the parent device's MAC
+    const parentNeighbor = neighbors.find(n => n.mac.toUpperCase() === parentMac.toUpperCase())
+    if (parentNeighbor) {
+      ownUpstreamInterface = parentNeighbor.interface
+      if (log) log('info', `Uplink detected via parent MAC ${parentMac} on ${ownUpstreamInterface}`)
     }
   }
 
-  // Only consider it an uplink if it has significantly more MACs than other ports
-  // (at least 3 MACs and more than twice the average of other ports)
-  if (ownUpstreamInterface && maxMacs >= 3) {
-    const otherPorts = [...macCountByPort.entries()].filter(([p]) => p !== ownUpstreamInterface)
-    const avgOther = otherPorts.length > 0
-      ? otherPorts.reduce((sum, [, c]) => sum + c, 0) / otherPorts.length
-      : 0
-    if (maxMacs <= avgOther * 2) {
-      ownUpstreamInterface = null  // Not clearly an uplink
+  // Fallback: detect by finding the port with the most MAC addresses
+  // The uplink port typically sees all devices from the rest of the network
+  if (!ownUpstreamInterface) {
+    const macCountByPort: Map<string, number> = new Map()
+    for (const neighbor of neighbors) {
+      const count = macCountByPort.get(neighbor.interface) || 0
+      macCountByPort.set(neighbor.interface, count + 1)
+    }
+
+    let maxMacs = 0
+    for (const [port, count] of macCountByPort) {
+      if (count > maxMacs) {
+        maxMacs = count
+        ownUpstreamInterface = port
+      }
+    }
+
+    // Only consider it an uplink if it has significantly more MACs than other ports
+    // (at least 3 MACs and more than twice the average of other ports)
+    if (ownUpstreamInterface && maxMacs >= 3) {
+      const otherPorts = [...macCountByPort.entries()].filter(([p]) => p !== ownUpstreamInterface)
+      const avgOther = otherPorts.length > 0
+        ? otherPorts.reduce((sum, [, c]) => sum + c, 0) / otherPorts.length
+        : 0
+      if (maxMacs <= avgOther * 2) {
+        ownUpstreamInterface = null  // Not clearly an uplink
+      } else if (log) {
+        log('info', `Uplink detected via MAC count (${maxMacs} MACs) on ${ownUpstreamInterface}`)
+      }
     }
   }
 

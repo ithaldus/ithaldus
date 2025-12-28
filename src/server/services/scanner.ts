@@ -764,6 +764,7 @@ export class NetworkScanner {
   private startTime: number = 0
   private deviceCount: number = 0
   private processedMacs: Set<string> = new Set()
+  private deviceDepths: Map<string, number> = new Map()  // MAC -> depth level (0 = root, 1 = direct child, etc.)
   private credentialsList: CredentialInfo[] = []
   private matchedCredentials: Map<string, string> = new Map()  // MAC -> credentialId
   private failedCredentialsMap: Map<string, Set<string>> = new Map()  // MAC -> Set of failed credentialIds
@@ -927,22 +928,35 @@ export class NetworkScanner {
     neighbors: Array<{ mac: string; ip: string | null; interface: string; type?: string }>,
     parentDevice: DiscoveredDevice,
     localUpstreamInterface: string | null,
-    parentIp: string
+    parentIp: string,
+    depth: number = 1  // Depth level of the neighbors (parent's depth + 1)
   ): Promise<void> {
     // Separate neighbors into scannable (has IP) and bridge-only (no IP)
     const toScan: Array<{ neighbor: typeof neighbors[0]; parentIface: DiscoveredInterface | undefined }> = []
     const bridgeHosts: Array<{ neighbor: typeof neighbors[0]; parentIface: DiscoveredInterface | undefined }> = []
+    // Bridge hosts that need their parent updated (already processed but seen from a closer device)
+    const bridgeHostsToReparent: Array<{ neighbor: typeof neighbors[0]; parentIface: DiscoveredInterface | undefined }> = []
 
     for (const neighbor of neighbors) {
-      // Skip already processed
-      if (this.processedMacs.has(neighbor.mac)) continue
-
       const parentIface = parentDevice.interfaces.find(i => i.name === neighbor.interface)
 
+      // For devices with IPs, skip if already processed
       if (neighbor.ip) {
-        toScan.push({ neighbor, parentIface })
-      } else if (neighbor.type === 'bridge-host' && neighbor.interface !== localUpstreamInterface) {
-        bridgeHosts.push({ neighbor, parentIface })
+        if (!this.processedMacs.has(neighbor.mac)) {
+          toScan.push({ neighbor, parentIface })
+        }
+        continue
+      }
+
+      // For bridge-hosts (no IP), check if this is a closer parent
+      if (neighbor.type === 'bridge-host' && neighbor.interface !== localUpstreamInterface) {
+        if (this.processedMacs.has(neighbor.mac)) {
+          // Already processed - but we should update the parent if this is a downstream switch
+          // (i.e., we're seeing this device from a more specific location)
+          bridgeHostsToReparent.push({ neighbor, parentIface })
+        } else {
+          bridgeHosts.push({ neighbor, parentIface })
+        }
       }
     }
 
@@ -952,10 +966,46 @@ export class NetworkScanner {
         // Mark as processed early to prevent duplicates
         if (this.processedMacs.has(neighbor.mac)) return
         this.processedMacs.add(neighbor.mac)
+        this.deviceDepths.set(neighbor.mac, depth)  // Track depth for later re-parenting checks
 
         await this.addBridgeHost(neighbor, parentIface, parentIp)
       })
       await limitConcurrency(bridgeTasks, 10, this.signal)
+    }
+
+    // Re-parent bridge hosts that were seen from a closer device
+    // This happens when a MAC was first seen from the root router, then later from an intermediate switch
+    // Only re-parent if the new depth is greater (device is seen from a more specific/closer location)
+    if (bridgeHostsToReparent.length > 0) {
+      const reparentTasks = bridgeHostsToReparent.map(({ neighbor, parentIface }) => async () => {
+        const existingDepth = this.deviceDepths.get(neighbor.mac)
+
+        // Don't re-parent devices that were added at depth 0 (root) or have no recorded depth
+        // These are network infrastructure devices that shouldn't be moved
+        if (existingDepth === undefined || existingDepth === 0) {
+          return  // Skip - this is a root device or was never properly tracked
+        }
+
+        // Only re-parent if we're deeper in the tree (closer to the actual device)
+        if (depth <= existingDepth) {
+          return  // Skip - current parent is at same or deeper level
+        }
+
+        // Update the parent interface to the current (closer) device's interface
+        await db.update(devices)
+          .set({
+            parentInterfaceId: parentIface?.id || null,
+            upstreamInterface: neighbor.interface,
+            lastSeenAt: new Date().toISOString(),
+          })
+          .where(eq(devices.mac, neighbor.mac))
+
+        // Update depth tracking
+        this.deviceDepths.set(neighbor.mac, depth)
+
+        this.log('info', `${parentIp}: Re-parented bridge host to ${neighbor.interface} (MAC: ${neighbor.mac}, depth ${existingDepth} → ${depth})`)
+      })
+      await limitConcurrency(reparentTasks, 10, this.signal)
     }
 
     // Scan devices with IPs (slower, requires SSH)
@@ -971,7 +1021,9 @@ export class NetworkScanner {
         neighbor.ip!,
         parentIface?.id || null,
         neighbor.interface,
-        neighbor.mac
+        neighbor.mac,
+        depth,  // Pass current depth - scanDevice will use this for the neighbor
+        parentDevice.mac  // Pass parent MAC for uplink detection on switches
       )
     })
 
@@ -1326,7 +1378,9 @@ export class NetworkScanner {
     ip: string,
     parentInterfaceId: string | null,
     upstreamInterface: string | null,
-    knownMac: string | null = null  // MAC from neighbor info, if known
+    knownMac: string | null = null,  // MAC from neighbor info, if known
+    depth: number = 0,  // Depth level in the topology tree (0 = root)
+    parentMac: string | null = null  // Parent device's MAC (for uplink detection)
   ): Promise<void> {
     // Check if scan was cancelled
     if (this.aborted) {
@@ -1625,7 +1679,8 @@ export class NetworkScanner {
             connectedClient,
             (level, msg) => this.log(level, `${ip}: ${msg}`),
             { username: successfulCreds!.username, password: successfulCreds!.password },
-            ip  // Pass IP explicitly for jump host connections
+            ip,  // Pass IP explicitly for jump host connections
+            parentMac  // Pass parent MAC for uplink detection
           )
           vendorInfo = { vendor: 'Zyxel', driver: 'zyxel' }
           this.log('info', `${ip}: Detected Zyxel ${deviceInfo.model || 'switch'}${deviceInfo.serialNumber ? ' (S/N: ' + deviceInfo.serialNumber + ')' : ''}`)
@@ -1732,6 +1787,7 @@ export class NetworkScanner {
       return
     }
     this.processedMacs.add(deviceMac)
+    this.deviceDepths.set(deviceMac, depth)  // Track depth for re-parenting decisions
 
     // Use MAC OUI vendor detection as fallback if SSH detection failed
     const vendor = vendorInfo.vendor || detectVendorFromMac(deviceMac)
@@ -1910,14 +1966,21 @@ export class NetworkScanner {
       this.log('info', `${ip}: Found ${deviceInfo.neighbors.length} neighbors`)
 
       // Detect which interface on THIS device connects upstream
-      // It's the interface that has the IP we used to connect to this device
-      const localUpstreamInterface = deviceInfo.interfaces.find(i => i.ip === ip)?.name
+      // Prefer the driver-detected uplink (e.g., Zyxel analyzes MAC counts)
+      // Fall back to finding the interface that has the IP we used to connect
+      const localUpstreamInterface = deviceInfo.ownUpstreamInterface ||
+        deviceInfo.interfaces.find(i => i.ip === ip)?.name || null
+
+      if (localUpstreamInterface) {
+        this.log('info', `${ip}: Uplink interface detected: ${localUpstreamInterface}${deviceInfo.ownUpstreamInterface ? ' (from driver)' : ' (from IP)'}`)
+      }
 
       await this.scanNeighborsParallel(
         deviceInfo.neighbors,
         newDevice,
-        localUpstreamInterface || null,
-        ip
+        localUpstreamInterface,
+        ip,
+        depth + 1  // Neighbors are one level deeper
       )
     }
 
