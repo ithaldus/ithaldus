@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { api, type Network, type TopologyDevice, type LogMessage, type ScanUpdateMessage, type ChannelInfo } from '../lib/api'
+import { api, type Network, type TopologyDevice, type LogMessage, type ScanUpdateMessage, type ChannelInfo, type DeviceType } from '../lib/api'
 import {
   ArrowLeft,
   Square,
@@ -19,7 +19,7 @@ import {
 import { useMemo } from 'react'
 import { DeviceCard } from '../components/topology/DeviceCard'
 import { DebugConsole } from '../components/topology/DebugConsole'
-import { DeviceModal } from '../components/topology/DeviceModal'
+import { DeviceModal, deviceTypeOptions } from '../components/topology/DeviceModal'
 import { Tooltip } from '../components/ui/Tooltip'
 
 type ScanStatus = 'idle' | 'running' | 'completed' | 'error'
@@ -80,6 +80,47 @@ export function NetworkTopology() {
   const [deviceFilter, setDeviceFilter] = useState('')
   // Expand/collapse all interfaces - null means use default behavior
   const [expandAll, setExpandAll] = useState<boolean | null>(null)
+
+  // Device type filter - which types to show (all enabled by default)
+  const [enabledDeviceTypes, setEnabledDeviceTypes] = useState<Set<DeviceType>>(() => {
+    const stored = localStorage.getItem('topology-device-types')
+    if (stored) {
+      try {
+        return new Set(JSON.parse(stored) as DeviceType[])
+      } catch {
+        // ignore
+      }
+    }
+    return new Set(deviceTypeOptions.map(opt => opt.value))
+  })
+
+  // Save device type filter preferences
+  useEffect(() => {
+    localStorage.setItem('topology-device-types', JSON.stringify(Array.from(enabledDeviceTypes)))
+  }, [enabledDeviceTypes])
+
+  function toggleDeviceType(type: DeviceType) {
+    setEnabledDeviceTypes(prev => {
+      const next = new Set(prev)
+      if (next.has(type)) {
+        next.delete(type)
+      } else {
+        next.add(type)
+      }
+      return next
+    })
+  }
+
+  function enableAllDeviceTypes() {
+    setEnabledDeviceTypes(new Set(deviceTypeOptions.map(opt => opt.value)))
+  }
+
+  function disableAllDeviceTypes() {
+    setEnabledDeviceTypes(new Set())
+  }
+
+  const allDeviceTypesEnabled = enabledDeviceTypes.size === deviceTypeOptions.length
+  const noDeviceTypesEnabled = enabledDeviceTypes.size === 0
 
   // WebSocket ref
   const wsRef = useRef<WebSocket | null>(null)
@@ -452,20 +493,30 @@ export function NetworkTopology() {
   // Only shows matching devices and paths leading to them - hides non-matching children
   const filterTopologyTree = (
     deviceList: TopologyDevice[],
-    filter: string
+    filter: string,
+    typeFilter: Set<DeviceType>
   ): TopologyDevice[] => {
-    if (!filter.trim()) return deviceList
+    const hasTextFilter = filter.trim().length > 0
+    const hasTypeFilter = typeFilter.size < deviceTypeOptions.length
+
+    // If no filters active, return as-is
+    if (!hasTextFilter && !hasTypeFilter) return deviceList
 
     const filterDevice = (device: TopologyDevice): TopologyDevice | null => {
-      // Check if this device matches
-      const selfMatches = deviceMatchesFilter(device, filter)
+      // Check if this device matches text filter
+      const matchesText = !hasTextFilter || deviceMatchesFilter(device, filter)
+
+      // Check if this device matches type filter
+      const deviceType = device.type || 'end-device'
+      const matchesType = typeFilter.has(deviceType)
 
       // Recursively filter children - only keep children that match or lead to matches
       const filteredChildren = device.children
         .map(filterDevice)
         .filter((d): d is TopologyDevice => d !== null)
 
-      // Include device if it matches OR has matching descendants
+      // Include device if it matches BOTH filters OR has matching descendants
+      const selfMatches = matchesText && matchesType
       if (selfMatches || filteredChildren.length > 0) {
         return {
           ...device,
@@ -480,16 +531,19 @@ export function NetworkTopology() {
     return deviceList.map(filterDevice).filter((d): d is TopologyDevice => d !== null)
   }
 
-  // Apply filter to devices
+  // Apply filters to devices
   const filteredDevices = useMemo(() => {
-    return filterTopologyTree(devices, deviceFilter)
-  }, [devices, deviceFilter])
+    return filterTopologyTree(devices, deviceFilter, enabledDeviceTypes)
+  }, [devices, deviceFilter, enabledDeviceTypes])
+
+  // Check if any filter is active
+  const isFilterActive = deviceFilter.trim().length > 0 || enabledDeviceTypes.size < deviceTypeOptions.length
 
   // Count filtered devices
   const filteredDeviceCount = useMemo(() => {
-    if (!deviceFilter.trim()) return null
+    if (!isFilterActive) return null
     return countDevices(filteredDevices, visibility.endDevices)
-  }, [filteredDevices, deviceFilter, visibility.endDevices])
+  }, [filteredDevices, isFilterActive, visibility.endDevices])
 
   function exportPDF() {
     if (!topologyRef.current || !network) return
@@ -814,6 +868,43 @@ export function NetworkTopology() {
                   `}
                 >
                   {label}
+                </button>
+              </Tooltip>
+            ))}
+          </div>
+
+          {/* Device Type Filter Pill */}
+          <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76] overflow-hidden">
+            {/* All/None toggle */}
+            <Tooltip content={allDeviceTypesEnabled ? "Hide all device types" : "Show all device types"}>
+              <button
+                onClick={allDeviceTypesEnabled ? disableAllDeviceTypes : enableAllDeviceTypes}
+                className={`
+                  px-2 py-2 text-xs font-medium transition-colors
+                  ${allDeviceTypesEnabled
+                    ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
+                    : noDeviceTypesEnabled
+                      ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                      : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                  }
+                `}
+              >
+                {allDeviceTypesEnabled ? '✓' : noDeviceTypesEnabled ? '✗' : '~'}
+              </button>
+            </Tooltip>
+            {deviceTypeOptions.map(({ value, label, icon: Icon }) => (
+              <Tooltip key={value} content={`${label} — ${enabledDeviceTypes.has(value) ? 'Click to hide' : 'Click to show'}`}>
+                <button
+                  onClick={() => toggleDeviceType(value)}
+                  className={`
+                    px-2 py-2 text-xs transition-colors
+                    ${enabledDeviceTypes.has(value)
+                      ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
+                      : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-600 dark:hover:text-slate-300'
+                    }
+                  `}
+                >
+                  <Icon className="w-3.5 h-3.5" />
                 </button>
               </Tooltip>
             ))}
