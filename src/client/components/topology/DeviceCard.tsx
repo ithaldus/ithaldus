@@ -76,8 +76,32 @@ interface DeviceCardProps {
   showAssetTag?: boolean
   showMac?: boolean
   filterActive?: boolean
+  filterText?: string  // The filter text to highlight
   expandAll?: boolean | null  // true = expand all, false = collapse all, null = default
   onDeviceClick?: (device: TopologyDevice) => void
+}
+
+// Highlight matching text in yellow
+function HighlightText({ text, filter }: { text: string; filter?: string }) {
+  if (!filter || !text) return <>{text}</>
+
+  const lowerText = text.toLowerCase()
+  const lowerFilter = filter.toLowerCase()
+  const index = lowerText.indexOf(lowerFilter)
+
+  if (index === -1) return <>{text}</>
+
+  const before = text.slice(0, index)
+  const match = text.slice(index, index + filter.length)
+  const after = text.slice(index + filter.length)
+
+  return (
+    <>
+      {before}
+      <span className="bg-yellow-300 dark:bg-yellow-500/50 text-slate-900 dark:text-white rounded-sm px-0.5">{match}</span>
+      {after}
+    </>
+  )
 }
 
 const deviceTypeIcons: Record<string, typeof Router> = {
@@ -190,6 +214,7 @@ export function DeviceCard({
   showAssetTag = true,
   showMac = false,
   filterActive = false,
+  filterText = '',
   expandAll = null,
   onDeviceClick,
 }: DeviceCardProps) {
@@ -354,7 +379,7 @@ export function DeviceCard({
 
           {/* Hostname/IP */}
           <span className="font-medium text-slate-900 dark:text-slate-100">
-            {displayName}
+            <HighlightText text={displayName} filter={filterText} />
           </span>
 
           {/* Vendor + Model + MAC Pill */}
@@ -362,7 +387,9 @@ export function DeviceCard({
             <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
               {showVendor && (device.vendor || device.model) && (
                 <span className="px-1.5 h-full flex items-center bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                  {device.vendor}{device.vendor && device.model && ' '}{device.model}
+                  {device.vendor && <HighlightText text={device.vendor} filter={filterText} />}
+                  {device.vendor && device.model && ' '}
+                  {device.model && <HighlightText text={device.model} filter={filterText} />}
                 </span>
               )}
               {showMac && device.mac && (
@@ -371,7 +398,7 @@ export function DeviceCard({
                     <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
                   )}
                   <span className="px-1 h-full flex items-center bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-500 font-mono">
-                    {device.mac}
+                    <HighlightText text={device.mac} filter={filterText} />
                   </span>
                 </>
               )}
@@ -394,7 +421,7 @@ export function DeviceCard({
                       onClick={(e) => handleCopy(device.ip!, e)}
                       className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                     >
-                      {device.ip}
+                      <HighlightText text={device.ip} filter={filterText} />
                     </button>
                   </Tooltip>
                 </span>
@@ -404,7 +431,7 @@ export function DeviceCard({
                     onClick={(e) => handleCopy(device.ip!, e)}
                     className="shrink-0 h-[18px] px-1 inline-flex items-center text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                   >
-                    {device.ip}
+                    <HighlightText text={device.ip} filter={filterText} />
                   </button>
                 </Tooltip>
               )
@@ -425,7 +452,7 @@ export function DeviceCard({
                 </span>
                 <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
                 <span className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
-                  {device.serialNumber}
+                  <HighlightText text={device.serialNumber} filter={filterText} />
                 </span>
               </span>
             )}
@@ -438,7 +465,7 @@ export function DeviceCard({
                 </span>
                 <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
                 <span className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
-                  {device.assetTag}
+                  <HighlightText text={device.assetTag} filter={filterText} />
                 </span>
               </span>
             )}
@@ -517,7 +544,7 @@ export function DeviceCard({
             <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[6px] border-r-amber-200 dark:border-r-amber-800/50" />
             <span className="absolute -left-[5px] top-1/2 -translate-y-1/2 w-0 h-0 border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent border-r-[5px] border-r-amber-100 dark:border-r-amber-900/40" />
             <MessageCircle className="w-3 h-3 shrink-0 text-amber-500 dark:text-amber-400" />
-            {device.comment}
+            <HighlightText text={device.comment} filter={filterText} />
           </span>
         )}
       </div>
@@ -650,6 +677,7 @@ export function DeviceCard({
                               showAssetTag={showAssetTag}
                               showMac={showMac}
                               filterActive={filterActive}
+                              filterText={filterText}
                               expandAll={expandAll}
                               onDeviceClick={onDeviceClick}
                             />
@@ -671,6 +699,7 @@ export function DeviceCard({
                           showAssetTag={showAssetTag}
                           showMac={showMac}
                           filterActive={filterActive}
+                          filterText={filterText}
                           expandAll={expandAll}
                           onDeviceClick={onDeviceClick}
                         />

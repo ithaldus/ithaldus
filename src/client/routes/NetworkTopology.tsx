@@ -453,6 +453,7 @@ export function NetworkTopology() {
   }
 
   // Recursively filter topology tree, keeping matching devices and their ancestors
+  // Only shows matching devices and paths leading to them - hides non-matching children
   const filterTopologyTree = (
     deviceList: TopologyDevice[],
     filter: string
@@ -463,7 +464,7 @@ export function NetworkTopology() {
       // Check if this device matches
       const selfMatches = deviceMatchesFilter(device, filter)
 
-      // Recursively filter children
+      // Recursively filter children - only keep children that match or lead to matches
       const filteredChildren = device.children
         .map(filterDevice)
         .filter((d): d is TopologyDevice => d !== null)
@@ -472,8 +473,8 @@ export function NetworkTopology() {
       if (selfMatches || filteredChildren.length > 0) {
         return {
           ...device,
-          // If device matches, show all its children; otherwise only show filtered path
-          children: selfMatches ? device.children : filteredChildren,
+          // Only show filtered children - hide non-matching descendants
+          children: filteredChildren,
         }
       }
 
@@ -780,6 +781,7 @@ export function NetworkTopology() {
                 showAssetTag={visibility.assetTag}
                 showMac={visibility.mac}
                 filterActive={!!deviceFilter.trim()}
+                filterText={deviceFilter.trim()}
                 expandAll={expandAll}
                 onDeviceClick={handleDeviceClick}
               />
