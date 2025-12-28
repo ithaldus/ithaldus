@@ -397,10 +397,13 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     // Prefer on-interface over interface for more accurate port info
     const onIfMatch = line.match(/on-interface=(\S+)/)
     const ifMatch = line.match(/interface=(\S+)/)
+    // Check for local=true format OR 'L' flag in terse output (e.g., "19 DL  mac-address=...")
+    // The 'L' flag appears in the flags column before mac-address, indicating router's own MAC
     const localMatch = line.match(/local=(\S+)/)
+    const hasLocalFlag = /^\s*\d+\s+\S*L/.test(line)
 
-    // Skip router's own MACs (local=true)
-    if (localMatch && localMatch[1] === 'true') {
+    // Skip router's own MACs (either local=true or L flag)
+    if ((localMatch && localMatch[1] === 'true') || hasLocalFlag) {
       continue
     }
 
@@ -522,10 +525,13 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     const macMatch = line.match(/mac-address=(\S+)/)
     const onIfMatch = line.match(/on-interface=(\S+)/)
     const ifMatch = line.match(/interface=(\S+)/)
+    // Check for local=true format OR 'L' flag in terse output (e.g., "19 DL  mac-address=...")
+    // The 'L' flag appears in the flags column before mac-address, indicating router's own MAC
     const localMatch = line.match(/local=(\S+)/)
+    const hasLocalFlag = /^\s*\d+\s+\S*L/.test(line)  // Match "19 DL " or "19  L " etc.
 
-    // Skip router's own MACs
-    if (localMatch && localMatch[1] === 'true') {
+    // Skip router's own MACs (either local=true or L flag)
+    if ((localMatch && localMatch[1] === 'true') || hasLocalFlag) {
       continue
     }
 
@@ -595,10 +601,12 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     for (const line of refreshLines) {
       const macMatch = line.match(/mac-address=(\S+)/)
       const onIfMatch = line.match(/on-interface=(\S+)/)
+      // Check for local=true format OR 'L' flag in terse output
       const localMatch = line.match(/local=(\S+)/)
+      const hasLocalFlag = /^\s*\d+\s+\S*L/.test(line)
 
-      // Skip router's own MACs
-      if (localMatch && localMatch[1] === 'true') continue
+      // Skip router's own MACs (either local=true or L flag)
+      if ((localMatch && localMatch[1] === 'true') || hasLocalFlag) continue
       if (!macMatch || !onIfMatch) continue
 
       const mac = macMatch[1].toUpperCase()
