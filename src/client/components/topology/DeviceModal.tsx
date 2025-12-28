@@ -810,7 +810,6 @@ export function DeviceModal({
                   <Link
                     to={`/credentials?highlight=${workingCredential.id}`}
                     className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:underline"
-                    onClick={onClose}
                   >
                     <Key className="w-3.5 h-3.5" />
                     {workingCredential.username}

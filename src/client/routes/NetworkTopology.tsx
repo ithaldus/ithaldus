@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { api, type Network, type TopologyDevice, type LogMessage, type ScanUpdateMessage, type ChannelInfo, type DeviceType } from '../lib/api'
 import {
@@ -16,7 +16,6 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
 } from 'lucide-react'
-import { useMemo } from 'react'
 import { DeviceCard } from '../components/topology/DeviceCard'
 import { DebugConsole } from '../components/topology/DebugConsole'
 import { DeviceModal, deviceTypeOptions } from '../components/topology/DeviceModal'
@@ -51,7 +50,7 @@ export function NetworkTopology() {
   const [channels, setChannels] = useState<ChannelInfo[]>([])
   const [consoleOpen, setConsoleOpen] = useState(false)
   const [consoleWidth, setConsoleWidth] = useState(400)
-  const [selectedDevice, setSelectedDevice] = useState<TopologyDevice | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
   const [lastScannedAt, setLastScannedAt] = useState<string | null>(null)
   const [scanError, setScanError] = useState<string | null>(null)
   const topologyRef = useRef<HTMLDivElement>(null)
@@ -98,6 +97,24 @@ export function NetworkTopology() {
   useEffect(() => {
     localStorage.setItem('topology-device-types', JSON.stringify(Array.from(enabledDeviceTypes)))
   }, [enabledDeviceTypes])
+
+  // Derive selected device from URL param
+  const selectedDeviceId = searchParams.get('device')
+  const selectedDevice = useMemo(() => {
+    if (!selectedDeviceId) return null
+    // Search recursively through device tree
+    function findDevice(devices: TopologyDevice[]): TopologyDevice | null {
+      for (const device of devices) {
+        if (device.id === selectedDeviceId) return device
+        if (device.children) {
+          const found = findDevice(device.children)
+          if (found) return found
+        }
+      }
+      return null
+    }
+    return findDevice(devices)
+  }, [selectedDeviceId, devices])
 
   function toggleDeviceType(type: DeviceType) {
     setEnabledDeviceTypes(prev => {
@@ -313,7 +330,7 @@ export function NetworkTopology() {
   }
 
   function handleDeviceClick(device: TopologyDevice) {
-    setSelectedDevice(device)
+    setSearchParams({ device: device.id })
   }
 
   function handleCommentUpdate(deviceId: string, comment: string) {
@@ -330,9 +347,6 @@ export function NetworkTopology() {
       })
     }
     setDevices(updateDevice(devices))
-    if (selectedDevice?.id === deviceId) {
-      setSelectedDevice({ ...selectedDevice, comment })
-    }
   }
 
   function handleNomadToggle(deviceId: string) {
@@ -349,9 +363,6 @@ export function NetworkTopology() {
       })
     }
     setDevices(updateDevice(devices))
-    if (selectedDevice?.id === deviceId) {
-      setSelectedDevice({ ...selectedDevice, nomad: !selectedDevice.nomad })
-    }
   }
 
   function handleSkipLoginToggle(deviceId: string) {
@@ -368,9 +379,6 @@ export function NetworkTopology() {
       })
     }
     setDevices(updateDevice(devices))
-    if (selectedDevice?.id === deviceId) {
-      setSelectedDevice({ ...selectedDevice, skipLogin: !selectedDevice.skipLogin })
-    }
   }
 
   function handleTypeChange(deviceId: string, type: string) {
@@ -387,9 +395,6 @@ export function NetworkTopology() {
       })
     }
     setDevices(updateDevice(devices))
-    if (selectedDevice?.id === deviceId) {
-      setSelectedDevice({ ...selectedDevice, type: type as any })
-    }
   }
 
   function handleLocationChange(deviceId: string, locationId: string | null) {
@@ -406,9 +411,6 @@ export function NetworkTopology() {
       })
     }
     setDevices(updateDevice(devices))
-    if (selectedDevice?.id === deviceId) {
-      setSelectedDevice({ ...selectedDevice, locationId })
-    }
   }
 
   function handleAssetTagChange(deviceId: string, assetTag: string | null) {
@@ -425,9 +427,6 @@ export function NetworkTopology() {
       })
     }
     setDevices(updateDevice(devices))
-    if (selectedDevice?.id === deviceId) {
-      setSelectedDevice({ ...selectedDevice, assetTag })
-    }
   }
 
   function formatLastScanned(date: string | null): string {
@@ -1092,7 +1091,7 @@ export function NetworkTopology() {
           device={selectedDevice}
           networkId={networkId}
           isAdmin={isAdmin}
-          onClose={() => setSelectedDevice(null)}
+          onClose={() => setSearchParams({})}
           onCommentUpdate={handleCommentUpdate}
           onNomadToggle={handleNomadToggle}
           onSkipLoginToggle={handleSkipLoginToggle}
