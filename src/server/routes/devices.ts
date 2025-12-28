@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { Client } from 'ssh2'
 import sharp from 'sharp'
 import { db } from '../db/client'
-import { devices, interfaces, credentials, matchedDevices, deviceImages, scanLogs, scans } from '../db/schema'
+import { devices, interfaces, credentials, matchedDevices, deviceImages, scanLogs, scans, deviceMacs } from '../db/schema'
 import { eq, desc, like, or } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { requireAdmin } from '../middleware/auth'
@@ -89,17 +89,18 @@ devicesRoutes.get('/:id', async (c) => {
   // Only fetch credential if requested
   if (include.includes('credential')) {
     let workingCredential: { username: string } | null = null
-    if (device.mac) {
-      const matched = await db.query.matchedDevices.findFirst({
-        where: eq(matchedDevices.mac, device.mac),
+    // Find matched credential by deviceId (preferred) or primary MAC (fallback)
+    const matched = await db.query.matchedDevices.findFirst({
+      where: eq(matchedDevices.deviceId, id),
+    }) ?? (device.primaryMac ? await db.query.matchedDevices.findFirst({
+      where: eq(matchedDevices.mac, device.primaryMac),
+    }) : null)
+    if (matched?.credentialId) {
+      const cred = await db.query.credentials.findFirst({
+        where: eq(credentials.id, matched.credentialId),
       })
-      if (matched?.credentialId) {
-        const cred = await db.query.credentials.findFirst({
-          where: eq(credentials.id, matched.credentialId),
-        })
-        if (cred) {
-          workingCredential = { username: cred.username }
-        }
+      if (cred) {
+        workingCredential = { username: cred.username }
       }
     }
     result.workingCredential = workingCredential
@@ -318,7 +319,8 @@ devicesRoutes.post('/:id/test-credentials', requireAdmin, async (c) => {
     await db.insert(matchedDevices).values({
       id: nanoid(),
       credentialId,
-      mac: device.mac,
+      deviceId: id,
+      mac: device.primaryMac,  // Keep for backwards compatibility
       hostname: device.hostname,
       ip: device.ip,
     }).catch(() => {
@@ -419,6 +421,26 @@ devicesRoutes.delete('/:id/image', async (c) => {
   return c.json({ success: true })
 })
 
+// Get all MAC addresses for a device
+devicesRoutes.get('/:id/macs', async (c) => {
+  const id = c.req.param('id')
+
+  const device = await db.query.devices.findFirst({
+    where: eq(devices.id, id),
+  })
+
+  if (!device) {
+    return c.json({ error: 'Device not found' }, 404)
+  }
+
+  const macs = await db.select()
+    .from(deviceMacs)
+    .where(eq(deviceMacs.deviceId, id))
+    .orderBy(desc(deviceMacs.isPrimary), deviceMacs.mac)
+
+  return c.json(macs)
+})
+
 // Get device-related logs from all scans
 devicesRoutes.get('/:id/logs', async (c) => {
   const id = c.req.param('id')
@@ -431,10 +453,22 @@ devicesRoutes.get('/:id/logs', async (c) => {
     return c.json({ error: 'Device not found' }, 404)
   }
 
+  // Get all MACs for this device (for comprehensive log search)
+  const deviceMacList = await db.select({ mac: deviceMacs.mac })
+    .from(deviceMacs)
+    .where(eq(deviceMacs.deviceId, id))
+
   // Build search patterns based on device identifiers
   const patterns: string[] = []
   if (device.ip) patterns.push(`%${device.ip}%`)
-  if (device.mac) patterns.push(`%${device.mac}%`)
+  // Include all known MACs for this device
+  for (const { mac } of deviceMacList) {
+    patterns.push(`%${mac}%`)
+  }
+  // Fallback to primary MAC if no MACs in deviceMacs table
+  if (deviceMacList.length === 0 && device.primaryMac) {
+    patterns.push(`%${device.primaryMac}%`)
+  }
   if (device.hostname) patterns.push(`%${device.hostname}%`)
 
   if (patterns.length === 0) {

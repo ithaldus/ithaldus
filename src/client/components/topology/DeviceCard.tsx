@@ -340,7 +340,7 @@ export function DeviceCard({
     return `${protocol}://${device.ip}${port === 80 || port === 443 ? '' : ':' + port}`
   }
 
-  const displayName = device.hostname || device.ip || device.mac
+  const displayName = device.hostname || device.ip || device.primaryMac
 
   return (
     <div className="relative">
@@ -383,7 +383,7 @@ export function DeviceCard({
           </span>
 
           {/* Vendor + Model + MAC Pill */}
-          {(showVendor && (device.vendor || device.model)) || (showMac && device.mac) ? (
+          {(showVendor && (device.vendor || device.model)) || (showMac && device.primaryMac) ? (
             <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
               {showVendor && (device.vendor || device.model) && (
                 <span className="px-1.5 h-full flex items-center bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
@@ -392,13 +392,18 @@ export function DeviceCard({
                   {device.model && <HighlightText text={device.model} filter={filterText} />}
                 </span>
               )}
-              {showMac && device.mac && (
+              {showMac && device.primaryMac && (
                 <>
                   {showVendor && (device.vendor || device.model) && (
                     <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
                   )}
                   <span className="px-1 h-full flex items-center bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-500 font-mono">
-                    <HighlightText text={device.mac} filter={filterText} />
+                    <HighlightText text={device.primaryMac} filter={filterText} />
+                    {device.macCount && device.macCount > 1 && (
+                      <span className="ml-1 px-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                        +{device.macCount - 1}
+                      </span>
+                    )}
                   </span>
                 </>
               )}

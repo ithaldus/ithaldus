@@ -9,7 +9,6 @@ import {
   ChevronRight,
   Clock,
   Radar,
-  Loader2,
   Monitor,
   AlertTriangle,
   X,
@@ -18,8 +17,6 @@ import {
   ChevronsUpDown,
 } from 'lucide-react'
 import { useMemo } from 'react'
-import html2canvas from 'html2canvas'
-import jsPDF from 'jspdf'
 import { DeviceCard } from '../components/topology/DeviceCard'
 import { DebugConsole } from '../components/topology/DebugConsole'
 import { DeviceModal } from '../components/topology/DeviceModal'
@@ -56,7 +53,6 @@ export function NetworkTopology() {
   const [consoleWidth, setConsoleWidth] = useState(400)
   const [selectedDevice, setSelectedDevice] = useState<TopologyDevice | null>(null)
   const [lastScannedAt, setLastScannedAt] = useState<string | null>(null)
-  const [exporting, setExporting] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
   const topologyRef = useRef<HTMLDivElement>(null)
   const [visibility, setVisibility] = useState<VisibilityToggles>(() => {
@@ -442,7 +438,7 @@ export function NetworkTopology() {
     const lowerFilter = filter.toLowerCase()
     return [
       device.ip,
-      device.mac,
+      device.primaryMac,
       device.hostname,
       device.vendor,
       device.model,
@@ -495,57 +491,260 @@ export function NetworkTopology() {
     return countDevices(filteredDevices, visibility.endDevices)
   }, [filteredDevices, deviceFilter, visibility.endDevices])
 
-  async function exportPDF() {
+  function exportPDF() {
     if (!topologyRef.current || !network) return
 
-    setExporting(true)
-    try {
-      // Capture the topology container
-      const canvas = await html2canvas(topologyRef.current, {
-        backgroundColor: '#0f172a', // dark mode background
-        scale: 2, // Higher quality
-        useCORS: true,
-        logging: false,
-      })
-
-      // Calculate PDF dimensions based on canvas aspect ratio
-      const imgWidth = 297 // A4 landscape width in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-
-      // Create PDF in landscape orientation
-      const pdf = new jsPDF({
-        orientation: imgHeight > imgWidth ? 'portrait' : 'landscape',
-        unit: 'mm',
-        format: [imgWidth, Math.max(imgHeight, 210)], // At least A4 height
-      })
-
-      // Add title
-      pdf.setFontSize(16)
-      pdf.setTextColor(0, 180, 216) // Cyan color
-      pdf.text(`${network.name} - Network Topology`, 14, 15)
-
-      // Add metadata
-      pdf.setFontSize(10)
-      pdf.setTextColor(128, 128, 128)
-      const now = new Date().toLocaleString()
-      pdf.text(`Exported: ${now}`, 14, 22)
-      if (lastScannedAt) {
-        pdf.text(`Last scanned: ${formatLastScanned(lastScannedAt)}`, 14, 28)
-      }
-
-      // Add the topology image
-      const imgData = canvas.toDataURL('image/png')
-      pdf.addImage(imgData, 'PNG', 7, 35, imgWidth - 14, imgHeight - 35)
-
-      // Save the PDF
-      const filename = `${network.name.replace(/[^a-z0-9]/gi, '_')}_topology_${new Date().toISOString().split('T')[0]}.pdf`
-      pdf.save(filename)
-    } catch (err) {
-      console.error('Failed to export PDF:', err)
-      alert('Failed to export PDF. Please try again.')
-    } finally {
-      setExporting(false)
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      alert('Please allow popups to export PDF')
+      return
     }
+
+    // Get all stylesheets from the current document
+    const styleSheets = Array.from(document.styleSheets)
+      .map(sheet => {
+        try {
+          return Array.from(sheet.cssRules).map(rule => rule.cssText).join('\n')
+        } catch {
+          // External stylesheets may throw CORS errors
+          if (sheet.href) {
+            return `@import url("${sheet.href}");`
+          }
+          return ''
+        }
+      })
+      .join('\n')
+
+    // Clone the topology content
+    const content = topologyRef.current.cloneNode(true) as HTMLElement
+
+    // Build the print document
+    const now = new Date().toLocaleString()
+    const scannedInfo = lastScannedAt ? `Last scanned: ${formatLastScanned(lastScannedAt)}` : ''
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${network.name} - Network Topology</title>
+          <style>
+            ${styleSheets}
+
+            @page {
+              size: A4 portrait;
+              margin: 10mm;
+            }
+
+            @media print {
+              * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+              }
+            }
+
+            body {
+              margin: 0;
+              padding: 0;
+              background: white !important;
+              color: #1e293b;
+              font-family: Inter, system-ui, sans-serif;
+            }
+
+            .print-header {
+              padding: 0 0 12px 0;
+              border-bottom: 1px solid #e2e8f0;
+              margin-bottom: 12px;
+            }
+
+            .print-title {
+              color: #0891b2;
+              font-size: 18px;
+              font-weight: 600;
+              margin: 0 0 4px 0;
+            }
+
+            .print-meta {
+              color: #64748b;
+              font-size: 11px;
+            }
+
+            .print-content {
+              background: white !important;
+              padding: 0;
+            }
+
+            /* Override dark mode styles for print - light theme */
+            .dark\\:bg-slate-800, .dark\\:bg-slate-900, .dark\\:bg-slate-950,
+            .bg-slate-800, .bg-slate-900, .bg-slate-950,
+            .dark\\:bg-slate-800\\/50, .dark\\:bg-slate-900\\/50,
+            .bg-slate-50, .dark\\:bg-slate-950 {
+              background-color: white !important;
+            }
+
+            .dark\\:bg-cyan-900\\/30, .dark\\:bg-cyan-950\\/50 {
+              background-color: #ecfeff !important;
+            }
+
+            .dark\\:bg-amber-900\\/30, .dark\\:bg-amber-950\\/50 {
+              background-color: #fffbeb !important;
+            }
+
+            .dark\\:bg-red-900\\/30, .dark\\:bg-red-950\\/50 {
+              background-color: #fef2f2 !important;
+            }
+
+            .dark\\:bg-green-900\\/30, .dark\\:bg-green-950\\/50 {
+              background-color: #f0fdf4 !important;
+            }
+
+            .dark\\:bg-violet-900\\/30, .dark\\:bg-violet-950\\/50 {
+              background-color: #f5f3ff !important;
+            }
+
+            .dark\\:bg-orange-900\\/30, .dark\\:bg-orange-950\\/50 {
+              background-color: #fff7ed !important;
+            }
+
+            .dark\\:text-white, .dark\\:text-slate-100, .dark\\:text-slate-200 {
+              color: #1e293b !important;
+            }
+
+            .dark\\:text-slate-300, .dark\\:text-slate-400 {
+              color: #475569 !important;
+            }
+
+            .dark\\:text-slate-500 {
+              color: #64748b !important;
+            }
+
+            .dark\\:text-cyan-300, .dark\\:text-cyan-400 {
+              color: #0891b2 !important;
+            }
+
+            .dark\\:text-amber-300, .dark\\:text-amber-400 {
+              color: #d97706 !important;
+            }
+
+            .dark\\:text-red-300, .dark\\:text-red-400 {
+              color: #dc2626 !important;
+            }
+
+            .dark\\:text-green-300, .dark\\:text-green-400 {
+              color: #16a34a !important;
+            }
+
+            .dark\\:border-slate-700, .dark\\:border-slate-800 {
+              border-color: #e2e8f0 !important;
+            }
+
+            .dark\\:border-cyan-800, .dark\\:border-\\[\\#0f5e76\\] {
+              border-color: #0891b2 !important;
+            }
+
+            /* Device cards and all slate backgrounds */
+            [class*="bg-slate-8"], [class*="bg-slate-9"], [class*="bg-slate-5"] {
+              background-color: white !important;
+            }
+
+            /* Add subtle border to cards for visual separation */
+            .print-content > div > div {
+              border: 1px solid #e2e8f0 !important;
+              border-radius: 8px;
+              margin-bottom: 8px;
+            }
+
+            /* Badges */
+            [class*="bg-cyan-900"], [class*="bg-cyan-950"] {
+              background-color: #ecfeff !important;
+              color: #0891b2 !important;
+            }
+
+            [class*="bg-amber-900"], [class*="bg-amber-950"] {
+              background-color: #fffbeb !important;
+              color: #d97706 !important;
+            }
+
+            [class*="bg-red-900"], [class*="bg-red-950"] {
+              background-color: #fef2f2 !important;
+              color: #dc2626 !important;
+            }
+
+            [class*="bg-green-900"], [class*="bg-green-950"] {
+              background-color: #f0fdf4 !important;
+              color: #16a34a !important;
+            }
+
+            [class*="bg-violet-900"], [class*="bg-violet-950"] {
+              background-color: #f5f3ff !important;
+              color: #7c3aed !important;
+            }
+
+            [class*="bg-orange-900"], [class*="bg-orange-950"] {
+              background-color: #fff7ed !important;
+              color: #ea580c !important;
+            }
+
+            [class*="bg-blue-900"], [class*="bg-blue-950"] {
+              background-color: #eff6ff !important;
+              color: #2563eb !important;
+            }
+
+            /* Text colors */
+            [class*="text-white"], [class*="text-slate-1"], [class*="text-slate-2"] {
+              color: #1e293b !important;
+            }
+
+            [class*="text-slate-3"], [class*="text-slate-4"] {
+              color: #475569 !important;
+            }
+
+            [class*="text-cyan-3"], [class*="text-cyan-4"] {
+              color: #0891b2 !important;
+            }
+
+            /* Monospace text */
+            .font-mono {
+              color: #334155 !important;
+            }
+
+            /* Catch-all: force white background on everything except colored badges */
+            * {
+              background-color: white !important;
+            }
+
+            /* Re-apply colored badge backgrounds */
+            [class*="bg-cyan-9"], [class*="bg-cyan-5"] { background-color: #ecfeff !important; }
+            [class*="bg-amber-9"], [class*="bg-amber-5"] { background-color: #fffbeb !important; }
+            [class*="bg-red-9"], [class*="bg-red-5"] { background-color: #fef2f2 !important; }
+            [class*="bg-green-9"], [class*="bg-green-5"] { background-color: #f0fdf4 !important; }
+            [class*="bg-violet-9"], [class*="bg-violet-5"] { background-color: #f5f3ff !important; }
+            [class*="bg-orange-9"], [class*="bg-orange-5"] { background-color: #fff7ed !important; }
+            [class*="bg-blue-9"], [class*="bg-blue-5"] { background-color: #eff6ff !important; }
+            [class*="bg-yellow-9"], [class*="bg-yellow-5"] { background-color: #fefce8 !important; }
+          </style>
+        </head>
+        <body>
+          <div class="print-header">
+            <h1 class="print-title">${network.name} - Network Topology</h1>
+            <div class="print-meta">
+              Exported: ${now}${scannedInfo ? ` • ${scannedInfo}` : ''}
+            </div>
+          </div>
+          <div class="print-content">
+            ${content.innerHTML}
+          </div>
+        </body>
+      </html>
+    `)
+
+    printWindow.document.close()
+
+    // Wait for styles to load, then print
+    setTimeout(() => {
+      printWindow.print()
+    }, 500)
   }
 
   if (loading) {
@@ -623,15 +822,11 @@ export function NetworkTopology() {
           {/* Export PDF */}
           <button
             onClick={exportPDF}
-            disabled={exporting || devices.length === 0}
+            disabled={devices.length === 0}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors"
           >
-            {exporting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileDown className="w-4 h-4" />
-            )}
-            {exporting ? 'Exporting...' : 'Export'}
+            <FileDown className="w-4 h-4" />
+            Export
           </button>
 
           {/* Start/Stop Scan */}

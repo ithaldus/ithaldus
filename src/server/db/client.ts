@@ -15,5 +15,6 @@ try {
 
 const sqlite = new Database(dbPath)
 sqlite.exec('PRAGMA journal_mode = WAL')
+sqlite.exec('PRAGMA foreign_keys = ON')
 
 export const db = drizzle(sqlite, { schema })

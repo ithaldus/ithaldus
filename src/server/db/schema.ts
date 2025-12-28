@@ -59,12 +59,14 @@ export const matchedDevices = sqliteTable('matched_devices', {
   id: text('id').primaryKey(),
   credentialId: text('credential_id').references(() => credentials.id, { onDelete: 'cascade' }),
   networkId: text('network_id').references(() => networks.id, { onDelete: 'cascade' }),
-  mac: text('mac').notNull(),
+  deviceId: text('device_id').references(() => devices.id, { onDelete: 'cascade' }),  // FK to device
+  mac: text('mac'),  // Kept for backwards compatibility, may be null for new records
   hostname: text('hostname'),
   ip: text('ip'),
   service: text('service').default('ssh'),  // Service type: ssh, api, web, etc.
 }, (table) => [
   index('idx_matched_devices_network').on(table.networkId),
+  index('idx_matched_devices_device').on(table.deviceId),
 ])
 
 // Interfaces table (ports on devices)
@@ -72,6 +74,7 @@ export const interfaces = sqliteTable('interfaces', {
   id: text('id').primaryKey(),
   deviceId: text('device_id').notNull(),
   name: text('name').notNull(),
+  mac: text('mac'),  // Interface MAC address (if known)
   ip: text('ip'),
   bridge: text('bridge'),
   vlan: text('vlan'),
@@ -86,7 +89,7 @@ export const interfaces = sqliteTable('interfaces', {
 // Devices table (global by MAC, current topology position)
 export const devices = sqliteTable('devices', {
   id: text('id').primaryKey(),
-  mac: text('mac').notNull().unique(),
+  primaryMac: text('primary_mac').notNull(),  // Primary MAC address (for display, not unique - uniqueness in deviceMacs)
   // Current topology position
   parentInterfaceId: text('parent_interface_id').references(() => interfaces.id),
   networkId: text('network_id').references(() => networks.id),
@@ -112,10 +115,25 @@ export const devices = sqliteTable('devices', {
   skipLogin: integer('skip_login', { mode: 'boolean' }).notNull().default(false),
   lastSeenAt: text('last_seen_at').notNull(),
 }, (table) => [
-  index('idx_devices_mac').on(table.mac),
+  index('idx_devices_primary_mac').on(table.primaryMac),
   index('idx_devices_network').on(table.networkId),
   index('idx_devices_parent').on(table.parentInterfaceId),
   index('idx_devices_location').on(table.locationId),
+])
+
+// Device MACs table (multiple MACs per device)
+// A single physical device can have multiple MAC addresses (one per interface)
+export const deviceMacs = sqliteTable('device_macs', {
+  id: text('id').primaryKey(),
+  deviceId: text('device_id').notNull().references(() => devices.id, { onDelete: 'cascade' }),
+  mac: text('mac').notNull().unique(),  // MAC is globally unique across all devices
+  source: text('source', { enum: ['ssh', 'arp', 'dhcp', 'mndp', 'cdp', 'lldp', 'bridge-host'] }).notNull(),
+  interfaceName: text('interface_name'),  // Which interface this MAC belongs to (if known)
+  isPrimary: integer('is_primary', { mode: 'boolean' }).notNull().default(false),
+  createdAt: text('created_at').notNull(),
+}, (table) => [
+  index('idx_device_macs_device').on(table.deviceId),
+  index('idx_device_macs_mac').on(table.mac),
 ])
 
 // Scans table (scan history per network)
@@ -171,11 +189,13 @@ export const deviceImages = sqliteTable('device_images', {
 export const failedCredentials = sqliteTable('failed_credentials', {
   id: text('id').primaryKey(),
   credentialId: text('credential_id').notNull().references(() => credentials.id, { onDelete: 'cascade' }),
-  mac: text('mac').notNull(),  // Device MAC address
+  deviceId: text('device_id').references(() => devices.id, { onDelete: 'cascade' }),  // FK to device
+  mac: text('mac'),  // Kept for backwards compatibility, may be null for new records
   service: text('service').default('ssh'),  // Service type: ssh, api, web, etc.
   failedAt: text('failed_at').notNull(),
 }, (table) => [
   index('idx_failed_credentials_credential').on(table.credentialId),
+  index('idx_failed_credentials_device').on(table.deviceId),
   index('idx_failed_credentials_mac').on(table.mac),
 ])
 
@@ -196,6 +216,8 @@ export type Interface = typeof interfaces.$inferSelect
 export type NewInterface = typeof interfaces.$inferInsert
 export type Device = typeof devices.$inferSelect
 export type NewDevice = typeof devices.$inferInsert
+export type DeviceMac = typeof deviceMacs.$inferSelect
+export type NewDeviceMac = typeof deviceMacs.$inferInsert
 export type Scan = typeof scans.$inferSelect
 export type NewScan = typeof scans.$inferInsert
 export type DhcpLease = typeof dhcpLeases.$inferSelect

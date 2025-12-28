@@ -254,7 +254,7 @@ export function CredentialCard({ credential, allCredentials, networks = [], show
           <div className="space-y-2">
             {matchedDevices.map((device) => (
               <div
-                key={device.mac}
+                key={device.id}
                 className="flex items-center gap-2 text-sm"
               >
                 {device.vendor ? (

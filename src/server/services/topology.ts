@@ -1,6 +1,6 @@
 import { db } from '../db/client'
-import { devices, interfaces, networks, dhcpLeases } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { devices, interfaces, networks, dhcpLeases, deviceMacs } from '../db/schema'
+import { eq, sql } from 'drizzle-orm'
 import type { TopologyResponse, TopologyDevice, TopologyInterface } from './types'
 
 // Build the complete topology tree for a network
@@ -31,6 +31,17 @@ export async function buildTopology(networkId: string): Promise<TopologyResponse
     ? await db.select().from(interfaces)
     : []
 
+  // Get MAC counts per device
+  const macCounts = deviceIds.length > 0
+    ? await db.select({
+        deviceId: deviceMacs.deviceId,
+        count: sql<number>`count(*)`.as('count'),
+      })
+      .from(deviceMacs)
+      .groupBy(deviceMacs.deviceId)
+    : []
+  const macCountMap = new Map(macCounts.map(m => [m.deviceId, m.count]))
+
   // Build device map with interfaces, using DHCP hostname if device doesn't have one
   const deviceMap = new Map<string, TopologyDevice>()
 
@@ -41,8 +52,8 @@ export async function buildTopology(networkId: string): Promise<TopologyResponse
     // Try MAC first, then fall back to IP (for devices without real MAC addresses)
     let hostname = device.hostname
     if (!hostname) {
-      if (device.mac) {
-        hostname = macToHostname.get(device.mac.toUpperCase()) || null
+      if (device.primaryMac) {
+        hostname = macToHostname.get(device.primaryMac.toUpperCase()) || null
       }
       if (!hostname && device.ip) {
         hostname = ipToHostname.get(device.ip) || null
@@ -52,6 +63,7 @@ export async function buildTopology(networkId: string): Promise<TopologyResponse
     deviceMap.set(device.id, {
       ...device,
       hostname,
+      macCount: macCountMap.get(device.id) ?? 0,
       interfaces: deviceInterfaces as TopologyInterface[],
       children: [],
     })

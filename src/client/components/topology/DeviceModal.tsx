@@ -32,10 +32,10 @@ import {
 } from 'lucide-react'
 import { VendorLogo } from './VendorLogo'
 import { ImageCropper } from '../ImageCropper'
-import { api, type TopologyDevice, type Interface, type DeviceType, type Location, type DeviceImage, type DeviceLog } from '../../lib/api'
+import { api, type TopologyDevice, type Interface, type DeviceType, type Location, type DeviceImage, type DeviceLog, type DeviceMac } from '../../lib/api'
 
-// Device type options for the dropdown
-const deviceTypeOptions: { value: DeviceType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+// Device type options for the dropdown - exported for use in filters
+export const deviceTypeOptions: { value: DeviceType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: 'router', label: 'Router', icon: Router },
   { value: 'switch', label: 'Switch', icon: Network },
   { value: 'access-point', label: 'Access Point', icon: Wifi },
@@ -146,6 +146,8 @@ export function DeviceModal({
   const [showFullImage, setShowFullImage] = useState(false)
   const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null)
   const [imageToCrop, setImageToCrop] = useState<string | null>(null) // base64 data URL for cropping
+  const [deviceMacs, setDeviceMacs] = useState<DeviceMac[]>([])
+  const [loadingMacs, setLoadingMacs] = useState(false)
 
   // Close modal on ESC key (without saving - use blur or X button to save)
   useEffect(() => {
@@ -174,6 +176,22 @@ export function DeviceModal({
       }
     }
     fetchDeviceDetails()
+  }, [device.id])
+
+  // Fetch device MACs on mount
+  useEffect(() => {
+    async function fetchMacs() {
+      setLoadingMacs(true)
+      try {
+        const macs = await api.devices.getMacs(device.id)
+        setDeviceMacs(macs)
+      } catch (err) {
+        console.error('Failed to fetch device MACs:', err)
+      } finally {
+        setLoadingMacs(false)
+      }
+    }
+    fetchMacs()
   }, [device.id])
 
   // Fetch locations for the network
@@ -473,7 +491,7 @@ export function DeviceModal({
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 font-mono truncate">
                 {[
-                  device.mac,
+                  device.primaryMac,
                   device.ip,
                   device.model,
                   device.serialNumber,
@@ -792,6 +810,39 @@ export function DeviceModal({
             </div>
           )}
 
+          {/* MAC Addresses */}
+          {(loadingMacs || deviceMacs.length > 0) && (
+            <div>
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                MAC Addresses {!loadingMacs && `(${deviceMacs.length})`}
+              </label>
+              <div className="mt-2">
+                {loadingMacs ? (
+                  <span className="text-sm text-slate-400 dark:text-slate-500">Loading...</span>
+                ) : (
+                  <div className="flex flex-wrap gap-1">
+                    {deviceMacs.map((mac) => (
+                      <span
+                        key={mac.id}
+                        className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-mono ${
+                          mac.isPrimary
+                            ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                        }`}
+                        title={`Source: ${mac.source}${mac.interfaceName ? ` | Interface: ${mac.interfaceName}` : ''}`}
+                      >
+                        {mac.mac}
+                        {mac.isPrimary && (
+                          <span className="text-[9px] uppercase font-sans font-medium opacity-70">Primary</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Interfaces as compact pill strip */}
           {device.interfaces && device.interfaces.length > 0 && (
             <div>
@@ -952,6 +1003,30 @@ export function DeviceModal({
               />
             </button>
           </div>
+
+          {/* Delete Device Button - Admin only */}
+          {isAdmin && (
+            <div className="pt-2">
+              <button
+                onClick={async () => {
+                  if (!confirm(`Delete device "${device.hostname || device.ip || device.primaryMac}"? This cannot be undone.`)) return
+                  try {
+                    await api.devices.delete(device.id)
+                    onClose()
+                    // Trigger a refresh by reloading - the parent should handle this better
+                    window.location.reload()
+                  } catch (err) {
+                    console.error('Failed to delete device:', err)
+                    alert('Failed to delete device')
+                  }
+                }}
+                className="w-full px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Device
+              </button>
+            </div>
+          )}
 
           {/* Device Logs - Collapsible on smaller screens */}
           <div className="border-t border-slate-200 dark:border-slate-700 pt-4 2xl:hidden">

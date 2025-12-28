@@ -141,6 +141,13 @@
       "when": 1766885665067,
       "tag": "0019_certain_tempest",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1766972800000,
+      "tag": "0020_device_macs",
+      "breakpoints": true
     }
   ]
 }

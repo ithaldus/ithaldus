@@ -292,7 +292,7 @@ export function Locations() {
                             )}
                             <div className="flex-1 min-w-0">
                               <span className="font-medium text-slate-900 dark:text-white truncate">
-                                {device.hostname || device.ip || device.mac}
+                                {device.hostname || device.ip || device.primaryMac}
                               </span>
                               {device.model && (
                                 <span className="ml-2 text-sm text-slate-500 dark:text-slate-400">

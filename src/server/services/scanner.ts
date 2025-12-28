@@ -1,7 +1,7 @@
 import { Client } from 'ssh2'
 import getVendor from 'mac-oui-lookup'
 import { db } from '../db/client'
-import { devices, interfaces, networks, scans, credentials, dhcpLeases, matchedDevices, failedCredentials } from '../db/schema'
+import { devices, interfaces, networks, scans, credentials, dhcpLeases, matchedDevices, failedCredentials, deviceMacs } from '../db/schema'
 import { eq, isNull, or, and } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import {
@@ -765,12 +765,13 @@ export class NetworkScanner {
   private callbacks: ScanCallbacks
   private startTime: number = 0
   private deviceCount: number = 0
-  private processedMacs: Set<string> = new Set()
-  private deviceDepths: Map<string, number> = new Map()  // MAC -> depth level (0 = root, 1 = direct child, etc.)
+  private processedDevices: Set<string> = new Set()  // Device IDs that have been processed
+  private macToDeviceId: Map<string, string> = new Map()  // Cache: MAC -> deviceId for fast lookup
+  private deviceDepths: Map<string, number> = new Map()  // deviceId -> depth level (0 = root, 1 = direct child, etc.)
   private neighborDiscoveryData: Map<string, { hostname: string | null; model: string | null; version: string | null }> = new Map()  // MAC -> MNDP/CDP/LLDP data
   private credentialsList: CredentialInfo[] = []
-  private matchedCredentials: Map<string, string> = new Map()  // "MAC:service" -> credentialId
-  private failedCredentialsMap: Map<string, Set<string>> = new Map()  // "MAC:service" -> Set of failed credentialIds
+  private matchedCredentials: Map<string, string> = new Map()  // "deviceId:service" -> credentialId
+  private failedCredentialsMap: Map<string, Set<string>> = new Map()  // "deviceId:service" -> Set of failed credentialIds
   private aborted: boolean = false
   private abortController: AbortController = new AbortController()
   private jumpHostClient: Client | null = null  // Root device connection for jump host tunneling
@@ -814,6 +815,96 @@ export class NetworkScanner {
       action: info.action,
     }))
     wsManager.broadcastChannels(this.networkId, channels)
+  }
+
+  // Helper: Find device by any of its MACs (checks deviceMacs table)
+  private async findDeviceByMac(mac: string): Promise<typeof devices.$inferSelect | null> {
+    // First check cache
+    const cachedDeviceId = this.macToDeviceId.get(mac)
+    if (cachedDeviceId) {
+      return db.select().from(devices).where(eq(devices.id, cachedDeviceId)).get() ?? null
+    }
+
+    // Check deviceMacs table
+    const deviceMac = await db.select().from(deviceMacs).where(eq(deviceMacs.mac, mac)).get()
+    if (deviceMac) {
+      // Cache the mapping
+      this.macToDeviceId.set(mac, deviceMac.deviceId)
+      return db.select().from(devices).where(eq(devices.id, deviceMac.deviceId)).get() ?? null
+    }
+
+    return null
+  }
+
+  // Helper: Find device by IP in this network (for merging multi-MAC devices)
+  private async findDeviceByIp(ip: string): Promise<typeof devices.$inferSelect | null> {
+    return db.select().from(devices)
+      .where(and(
+        eq(devices.ip, ip),
+        eq(devices.networkId, this.networkId)
+      ))
+      .get() ?? null
+  }
+
+  // Helper: Release stale IP claim before inserting a new device
+  // This handles DHCP IP reuse: when a different device gets an IP previously held by another device
+  // We set the old device's IP to NULL if it wasn't seen in the current scan
+  private async releaseStaleIpClaim(ip: string | null): Promise<void> {
+    if (!ip) return
+
+    const existingDevice = await this.findDeviceByIp(ip)
+    if (existingDevice && !this.isDeviceProcessed(existingDevice.id)) {
+      // Found a device with this IP that was NOT seen in the current scan
+      // This is a stale claim - another device now has this IP
+      await db.update(devices)
+        .set({ ip: null })
+        .where(eq(devices.id, existingDevice.id))
+      this.log('info', `Released stale IP claim from ${existingDevice.hostname || existingDevice.primaryMac} for ${ip}`)
+    }
+  }
+
+  // Helper: Add MAC to existing device (creates entry in deviceMacs table)
+  private async addMacToDevice(
+    deviceId: string,
+    mac: string,
+    source: 'ssh' | 'arp' | 'dhcp' | 'mndp' | 'cdp' | 'lldp' | 'bridge-host',
+    interfaceName?: string
+  ): Promise<void> {
+    // Skip UNKNOWN MACs
+    if (mac.startsWith('UNKNOWN-')) return
+
+    // Check if MAC already exists in deviceMacs
+    const existing = await db.select().from(deviceMacs).where(eq(deviceMacs.mac, mac)).get()
+    if (existing) {
+      // MAC already tracked - update cache and return
+      this.macToDeviceId.set(mac, existing.deviceId)
+      return
+    }
+
+    // Insert new MAC
+    await db.insert(deviceMacs).values({
+      id: nanoid(),
+      deviceId,
+      mac,
+      source,
+      interfaceName: interfaceName ?? null,
+      isPrimary: false,
+      createdAt: new Date().toISOString(),
+    })
+
+    // Update cache
+    this.macToDeviceId.set(mac, deviceId)
+  }
+
+  // Helper: Check if a device (by ID) has been processed
+  private isDeviceProcessed(deviceId: string): boolean {
+    return this.processedDevices.has(deviceId)
+  }
+
+  // Helper: Mark a device as processed
+  private markDeviceProcessed(deviceId: string, depth: number): void {
+    this.processedDevices.add(deviceId)
+    this.deviceDepths.set(deviceId, depth)
   }
 
   // Call this to abort the scan
@@ -952,9 +1043,10 @@ export class NetworkScanner {
         })
       }
 
-      // For devices with IPs, skip if already processed
+      // For devices with IPs, skip if already processed (check by MAC -> device lookup)
       if (neighbor.ip) {
-        if (!this.processedMacs.has(neighbor.mac)) {
+        const existingDevice = await this.findDeviceByMac(neighbor.mac)
+        if (!existingDevice || !this.isDeviceProcessed(existingDevice.id)) {
           toScan.push({ neighbor, parentIface })
         }
         continue
@@ -962,7 +1054,8 @@ export class NetworkScanner {
 
       // For bridge-hosts (no IP), check if this is a closer parent
       if (neighbor.type === 'bridge-host' && neighbor.interface !== localUpstreamInterface) {
-        if (this.processedMacs.has(neighbor.mac)) {
+        const existingDevice = await this.findDeviceByMac(neighbor.mac)
+        if (existingDevice && this.isDeviceProcessed(existingDevice.id)) {
           // Already processed - but we should update the parent if this is a downstream switch
           // (i.e., we're seeing this device from a more specific location)
           bridgeHostsToReparent.push({ neighbor, parentIface })
@@ -975,12 +1068,15 @@ export class NetworkScanner {
     // Add bridge hosts (fast, parallel DB writes)
     if (bridgeHosts.length > 0) {
       const bridgeTasks = bridgeHosts.map(({ neighbor, parentIface }) => async () => {
-        // Mark as processed early to prevent duplicates
-        if (this.processedMacs.has(neighbor.mac)) return
-        this.processedMacs.add(neighbor.mac)
-        this.deviceDepths.set(neighbor.mac, depth)  // Track depth for later re-parenting checks
+        // Check if already processed by looking up device
+        const existingDevice = await this.findDeviceByMac(neighbor.mac)
+        if (existingDevice && this.isDeviceProcessed(existingDevice.id)) return
 
-        await this.addBridgeHost(neighbor, parentIface, parentIp)
+        // Add bridge host and mark as processed
+        const deviceId = await this.addBridgeHost(neighbor, parentIface, parentIp)
+        if (deviceId) {
+          this.markDeviceProcessed(deviceId, depth)
+        }
       })
       await limitConcurrency(bridgeTasks, 10, this.signal)
     }
@@ -990,7 +1086,10 @@ export class NetworkScanner {
     // Only re-parent if the new depth is greater (device is seen from a more specific/closer location)
     if (bridgeHostsToReparent.length > 0) {
       const reparentTasks = bridgeHostsToReparent.map(({ neighbor, parentIface }) => async () => {
-        const existingDepth = this.deviceDepths.get(neighbor.mac)
+        const existingDevice = await this.findDeviceByMac(neighbor.mac)
+        if (!existingDevice) return
+
+        const existingDepth = this.deviceDepths.get(existingDevice.id)
 
         // Don't re-parent devices that were added at depth 0 (root) or have no recorded depth
         // These are network infrastructure devices that shouldn't be moved
@@ -1010,10 +1109,10 @@ export class NetworkScanner {
             upstreamInterface: neighbor.interface,
             lastSeenAt: new Date().toISOString(),
           })
-          .where(eq(devices.mac, neighbor.mac))
+          .where(eq(devices.id, existingDevice.id))
 
         // Update depth tracking
-        this.deviceDepths.set(neighbor.mac, depth)
+        this.deviceDepths.set(existingDevice.id, depth)
 
         this.log('info', `${parentIp}: Re-parented bridge host to ${neighbor.interface} (MAC: ${neighbor.mac}, depth ${existingDepth} → ${depth})`)
       })
@@ -1027,7 +1126,8 @@ export class NetworkScanner {
 
     const tasks = toScan.map(({ neighbor, parentIface }) => async () => {
       // Double-check not already processed (could have been added by parallel scan)
-      if (this.processedMacs.has(neighbor.mac)) return
+      const existingDevice = await this.findDeviceByMac(neighbor.mac)
+      if (existingDevice && this.isDeviceProcessed(existingDevice.id)) return
 
       await this.scanDevice(
         neighbor.ip!,
@@ -1082,7 +1182,7 @@ export class NetworkScanner {
 
     let appliedCount = 0
     for (const device of devicesWithoutComment) {
-      const comment = commentsByMac.get(device.mac.toUpperCase())
+      const comment = commentsByMac.get(device.primaryMac.toUpperCase())
       if (comment) {
         await db.update(devices)
           .set({ comment })
@@ -1098,12 +1198,13 @@ export class NetworkScanner {
 
   /**
    * Add a bridge host as an end-device
+   * Returns the device ID (existing or newly created)
    */
   private async addBridgeHost(
     neighbor: NeighborInfo,
     parentIface: DiscoveredInterface | undefined,
     parentIp: string
-  ): Promise<void> {
+  ): Promise<string | null> {
     const endDeviceId = nanoid()
 
     // Try to look up hostname from various sources
@@ -1162,7 +1263,7 @@ export class NetworkScanner {
     }
 
     // Save to database - upsert by MAC, preserving user fields (comment, nomad, type)
-    const existingBridgeDevice = await db.select().from(devices).where(eq(devices.mac, neighbor.mac)).get()
+    const existingBridgeDevice = await this.findDeviceByMac(neighbor.mac)
 
     if (existingBridgeDevice) {
       // Update existing device, preserve user fields
@@ -1188,15 +1289,22 @@ export class NetworkScanner {
       }
       await db.update(devices)
         .set(updateData)
-        .where(eq(devices.mac, neighbor.mac))
+        .where(eq(devices.id, existingBridgeDevice.id))
 
       endDevice.id = existingBridgeDevice.id
       this.log('info', `${parentIp}: Updated bridge host on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
+
+      this.deviceCount++
+      this.callbacks.onDeviceDiscovered(endDevice)
+      return existingBridgeDevice.id
     } else {
+      // Release any stale IP claim before inserting (handles DHCP IP reuse)
+      await this.releaseStaleIpClaim(neighborIp)
+
       // Insert new device with MNDP/CDP/LLDP discovery data if available
       await db.insert(devices).values({
         id: endDeviceId,
-        mac: neighbor.mac,
+        primaryMac: neighbor.mac,
         parentInterfaceId: parentIface?.id || null,
         networkId: this.networkId,
         upstreamInterface: neighbor.interface,
@@ -1212,11 +1320,16 @@ export class NetworkScanner {
         driver: null,
         lastSeenAt: new Date().toISOString(),
       })
-      this.log('success', `${parentIp}: Added bridge host as ${endDevice.type} on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
-    }
 
-    this.deviceCount++
-    this.callbacks.onDeviceDiscovered(endDevice)
+      // Add MAC to deviceMacs table
+      await this.addMacToDevice(endDeviceId, neighbor.mac, 'bridge-host')
+
+      this.log('success', `${parentIp}: Added bridge host as ${endDevice.type} on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
+
+      this.deviceCount++
+      this.callbacks.onDeviceDiscovered(endDevice)
+      return endDeviceId
+    }
   }
 
   // Get hostname from mDNS cache for an IP
@@ -1236,14 +1349,20 @@ export class NetworkScanner {
     const now = new Date().toISOString()
     const cacheKey = `${deviceMac}:${service}`
 
+    // Try to find device ID for this MAC (may not exist yet)
+    const existingDevice = await this.findDeviceByMac(deviceMac)
+    const deviceId = existingDevice?.id ?? null
+
     for (const cred of triedCredentials) {
       if (!cred.id) continue  // Skip root credentials (no ID)
       try {
-        // Check if already recorded as failed for this service
+        // Check if already recorded as failed for this service (by deviceId or MAC)
         const existingFailed = await db.select().from(failedCredentials)
           .where(and(
             eq(failedCredentials.credentialId, cred.id),
-            eq(failedCredentials.mac, deviceMac),
+            deviceId
+              ? eq(failedCredentials.deviceId, deviceId)
+              : eq(failedCredentials.mac, deviceMac),
             eq(failedCredentials.service, service)
           ))
           .get()
@@ -1252,7 +1371,8 @@ export class NetworkScanner {
           await db.insert(failedCredentials).values({
             id: nanoid(),
             credentialId: cred.id,
-            mac: deviceMac,
+            deviceId,  // Set deviceId if available
+            mac: deviceMac,  // Keep MAC for backwards compatibility
             service,
             failedAt: now,
           })
@@ -1300,7 +1420,9 @@ export class NetworkScanner {
   async start() {
     this.startTime = Date.now()
     this.deviceCount = 0
-    this.processedMacs.clear()
+    this.processedDevices.clear()
+    this.macToDeviceId.clear()
+    this.deviceDepths.clear()
 
     try {
       // Get network details
@@ -1499,12 +1621,12 @@ export class NetworkScanner {
       const deviceId = nanoid()
       const deviceMac = knownMac || `UNKNOWN-${ip.replace(/\./g, '-')}`
 
-      // Skip if we've already processed this MAC
-      if (this.processedMacs.has(deviceMac)) {
+      // Skip if we've already processed this device (check by MAC -> device lookup)
+      const existingByMac = await this.findDeviceByMac(deviceMac)
+      if (existingByMac && this.isDeviceProcessed(existingByMac.id)) {
         this.log('info', `${ip}: Already processed (MAC: ${deviceMac})`)
         return
       }
-      this.processedMacs.add(deviceMac)
 
       // Try to look up hostname from various sources
       // Priority: DHCP hostname > mDNS hostname > MNDP/CDP/LLDP identity
@@ -1559,8 +1681,10 @@ export class NetworkScanner {
       }
 
       // Save to database - upsert by MAC, preserving user fields (comment, nomad, type)
-      const existingDevice = await db.select().from(devices).where(eq(devices.mac, deviceMac)).get()
+      // Use the existing device found by MAC if available
+      const existingDevice = existingByMac
 
+      let actualDeviceId: string
       if (existingDevice) {
         // Update existing device, preserve user fields
         // Update model/firmware only if device wasn't accessible (no SSH-derived info)
@@ -1584,15 +1708,19 @@ export class NetworkScanner {
         }
         await db.update(devices)
           .set(updateData)
-          .where(eq(devices.mac, deviceMac))
+          .where(eq(devices.id, existingDevice.id))
 
         newDevice.id = existingDevice.id
+        actualDeviceId = existingDevice.id
         this.log('info', `${ip}: Updated end-device (MAC: ${deviceMac}${hostname ? ', hostname: ' + hostname : ''})`)
       } else {
+        // Release any stale IP claim before inserting (handles DHCP IP reuse)
+        await this.releaseStaleIpClaim(ip)
+
         // Insert new device with MNDP/CDP/LLDP discovery data if available
         await db.insert(devices).values({
           id: deviceId,
-          mac: deviceMac,
+          primaryMac: deviceMac,
           parentInterfaceId,
           networkId: this.networkId,
           upstreamInterface,
@@ -1608,8 +1736,18 @@ export class NetworkScanner {
           driver: null,
           lastSeenAt: new Date().toISOString(),
         })
+
+        // Add MAC to deviceMacs table (skip UNKNOWN MACs)
+        if (!deviceMac.startsWith('UNKNOWN-')) {
+          await this.addMacToDevice(deviceId, deviceMac, 'arp')
+        }
+
+        actualDeviceId = deviceId
         this.log('success', `${ip}: Added as ${newDevice.type} (MAC: ${deviceMac}${hostname ? ', hostname: ' + hostname : ''})`)
       }
+
+      // Mark device as processed
+      this.markDeviceProcessed(actualDeviceId, depth)
 
       this.deviceCount++
       this.callbacks.onDeviceDiscovered(newDevice)
@@ -1628,7 +1766,7 @@ export class NetworkScanner {
     // Check if skipLogin is enabled for this device (by MAC)
     let shouldSkipLogin = false
     if (knownMac) {
-      const existingByMac = await db.select().from(devices).where(eq(devices.mac, knownMac)).get()
+      const existingByMac = await this.findDeviceByMac(knownMac)
       if (existingByMac?.skipLogin) {
         shouldSkipLogin = true
         this.log('info', `${ip}: Skipping SSH login (disabled in device settings)`)
@@ -1981,13 +2119,30 @@ export class NetworkScanner {
       this.log('info', `${ip}: Not recording failed credentials (device has UNKNOWN MAC)`)
     }
 
-    // Skip if we've already processed this MAC
-    if (this.processedMacs.has(deviceMac)) {
+    // Skip if we've already processed this device (check by MAC -> device lookup)
+    const existingDeviceByMac = await this.findDeviceByMac(deviceMac)
+    if (existingDeviceByMac && this.isDeviceProcessed(existingDeviceByMac.id)) {
       this.log('info', `${ip}: Already processed (MAC: ${deviceMac})`)
       return
     }
-    this.processedMacs.add(deviceMac)
-    this.deviceDepths.set(deviceMac, depth)  // Track depth for re-parenting decisions
+
+    // Check if there's already a device with this IP (multi-MAC device case)
+    // This handles devices like A26 that have multiple MACs but same IP
+    // IMPORTANT: Only merge if the existing device was seen in THIS scan to avoid
+    // incorrectly merging different DHCP devices that reuse the same IP over time
+    let existingDeviceByIp: typeof devices.$inferSelect | null = null
+    if (!existingDeviceByMac && !deviceMac.startsWith('UNKNOWN-')) {
+      existingDeviceByIp = await this.findDeviceByIp(ip)
+      if (existingDeviceByIp && !existingDeviceByIp.nomad && this.isDeviceProcessed(existingDeviceByIp.id)) {
+        // Found device with same IP that was ALREADY SEEN in this scan
+        // This is a multi-interface device (same device, different MACs, same management IP)
+        // Add the new MAC to this device
+        await this.addMacToDevice(existingDeviceByIp.id, deviceMac, 'ssh')
+        this.macToDeviceId.set(deviceMac, existingDeviceByIp.id)
+        this.log('info', `${ip}: Merged MAC ${deviceMac} with existing device (multi-interface device)`)
+        return  // Already processed, skip
+      }
+    }
 
     // Use MAC OUI vendor detection as fallback if SSH detection failed
     const vendor = vendorInfo.vendor || detectVendorFromMac(deviceMac)
@@ -2041,9 +2196,11 @@ export class NetworkScanner {
       interfaces: [],
     }
 
-    // Save device to database - upsert by MAC, preserving user fields (comment, nomad, type)
-    const existingDevice = await db.select().from(devices).where(eq(devices.mac, deviceMac)).get()
+    // Save device to database - upsert by MAC or IP, preserving user fields (comment, nomad, type)
+    // Use the existing device found by MAC or IP (multi-MAC devices)
+    const existingDevice = existingDeviceByMac || existingDeviceByIp
 
+    let actualDeviceId: string
     if (existingDevice) {
       // Update existing device, preserve user-managed fields (comment, nomad, type)
       await db.update(devices)
@@ -2065,17 +2222,21 @@ export class NetworkScanner {
           driver: newDevice.driver,
           lastSeenAt: new Date().toISOString(),
         })
-        .where(eq(devices.mac, deviceMac))
+        .where(eq(devices.id, existingDevice.id))
 
       newDevice.id = existingDevice.id
+      actualDeviceId = existingDevice.id
       this.deviceCount++
       const accessStatus = newDevice.accessible ? 'accessible' : 'not accessible (no SSH login)'
       this.log('info', `${ip}: Updated existing device (MAC: ${deviceMac}, ${accessStatus})`)
     } else {
+      // Release any stale IP claim before inserting (handles DHCP IP reuse)
+      await this.releaseStaleIpClaim(ip)
+
       // Insert new device
       await db.insert(devices).values({
         id: deviceId,
-        mac: deviceMac,
+        primaryMac: deviceMac,
         parentInterfaceId,
         networkId: this.networkId,
         upstreamInterface: actualUpstreamInterface,
@@ -2093,17 +2254,27 @@ export class NetworkScanner {
         driver: newDevice.driver,
         lastSeenAt: new Date().toISOString(),
       })
+
+      // Add MAC to deviceMacs table (skip UNKNOWN MACs)
+      if (!deviceMac.startsWith('UNKNOWN-')) {
+        await this.addMacToDevice(deviceId, deviceMac, 'ssh')
+      }
+
+      actualDeviceId = deviceId
       this.deviceCount++
       const accessStatus = newDevice.accessible ? 'accessible' : 'not accessible (no SSH login)'
       this.log('success', `${ip}: Added as ${deviceType} (MAC: ${deviceMac}, ${accessStatus})`)
     }
 
+    // Mark device as processed
+    this.markDeviceProcessed(actualDeviceId, depth)
+
     // Record successful credential match for the service that worked
     if (successfulCreds && successfulCreds.id && successfulService && !deviceMac.startsWith('UNKNOWN-')) {
-      // Delete any existing match for this MAC + service (credential might have changed)
+      // Delete any existing match for this device + service (credential might have changed)
       await db.delete(matchedDevices)
         .where(and(
-          eq(matchedDevices.mac, deviceMac),
+          eq(matchedDevices.deviceId, actualDeviceId),
           eq(matchedDevices.service, successfulService)
         ))
         .catch(() => {})
@@ -2114,7 +2285,8 @@ export class NetworkScanner {
           id: nanoid(),
           credentialId: successfulCreds.id,
           networkId: this.networkId,
-          mac: deviceMac,
+          deviceId: actualDeviceId,
+          mac: deviceMac,  // Keep for backwards compatibility
           hostname: newDevice.hostname,
           ip,
           service: successfulService,
@@ -2124,7 +2296,7 @@ export class NetworkScanner {
         console.error(`Failed to save matched device:`, err)
       }
 
-      // Update our local cache for this scan
+      // Update our local cache for this scan (use MAC for lookup compatibility)
       const cacheKey = `${deviceMac}:${successfulService}`
       this.matchedCredentials.set(cacheKey, successfulCreds.id)
     } else if (successfulCreds && !successfulCreds.id) {
@@ -2134,8 +2306,7 @@ export class NetworkScanner {
     // Note: Failed credentials are saved earlier (before "Already processed" check)
     // to handle race conditions when device is discovered from multiple sources
 
-    // Save interfaces (use the correct device ID - either existing or new)
-    const actualDeviceId = existingDevice ? existingDevice.id : deviceId
+    // Save interfaces
     if (deviceInfo) {
       for (const iface of deviceInfo.interfaces) {
         const ifaceId = nanoid()

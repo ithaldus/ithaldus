@@ -245,6 +245,8 @@ export const api = {
       request<{ success: boolean }>(`/devices/${id}/image`, { method: 'DELETE' }),
     getLogs: (id: string) =>
       request<{ logs: DeviceLog[] }>(`/devices/${id}/logs`),
+    getMacs: (id: string) =>
+      request<DeviceMac[]>(`/devices/${id}/macs`),
   },
 
   // Locations
@@ -335,7 +337,7 @@ export type DeviceType = 'router' | 'switch' | 'access-point' | 'end-device' | '
 
 export interface Device {
   id: string
-  mac: string
+  primaryMac: string
   parentInterfaceId: string | null
   networkId: string | null
   upstreamInterface: string | null
@@ -357,6 +359,17 @@ export interface Device {
   nomad: boolean
   skipLogin: boolean
   lastSeenAt: string
+  macCount?: number
+}
+
+export interface DeviceMac {
+  id: string
+  deviceId: string
+  mac: string
+  source: 'ssh' | 'arp' | 'dhcp' | 'mndp' | 'cdp' | 'lldp' | 'bridge-host'
+  interfaceName: string | null
+  isPrimary: boolean
+  createdAt: string
 }
 
 export interface Location {

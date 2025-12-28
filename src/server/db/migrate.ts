@@ -14,6 +14,7 @@ try {
 
 const db = new Database(dbPath)
 db.exec('PRAGMA journal_mode = WAL')
+db.exec('PRAGMA foreign_keys = ON')
 
 // Create migrations table if it doesn't exist
 db.exec(`

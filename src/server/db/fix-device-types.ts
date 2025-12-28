@@ -93,7 +93,7 @@ async function fixDeviceTypes() {
         .set({ type: newType })
         .where(eq(devices.id, device.id))
 
-      console.log(`Updated: ${device.hostname || device.ip || device.mac} (${device.vendor}) -> ${newType}`)
+      console.log(`Updated: ${device.hostname || device.ip || device.primaryMac} (${device.vendor}) -> ${newType}`)
       updated++
     } else {
       skipped++

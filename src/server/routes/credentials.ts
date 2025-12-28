@@ -35,19 +35,19 @@ credentialsRoutes.get('/', async (c) => {
   // Fetch all matched devices and group by credentialId
   const allMatched = await db.select().from(matchedDevices)
 
-  // Get all unique MACs from matched devices
-  const matchedMacs = [...new Set(allMatched.map(m => m.mac).filter(Boolean))]
+  // Get all unique device IDs from matched devices
+  const matchedDeviceIds = [...new Set(allMatched.map(m => m.deviceId).filter(Boolean))] as string[]
 
-  // Fetch device info (vendor) for matched MACs
-  let devicesByMac = new Map<string, { vendor: string | null }>()
-  if (matchedMacs.length > 0) {
+  // Fetch device info (vendor) for matched device IDs
+  let devicesById = new Map<string, { vendor: string | null }>()
+  if (matchedDeviceIds.length > 0) {
     const deviceInfos = await db.select({
-      mac: devices.mac,
+      id: devices.id,
       vendor: devices.vendor,
-    }).from(devices).where(inArray(devices.mac, matchedMacs))
+    }).from(devices).where(inArray(devices.id, matchedDeviceIds))
 
     for (const d of deviceInfos) {
-      devicesByMac.set(d.mac, { vendor: d.vendor })
+      devicesById.set(d.id, { vendor: d.vendor })
     }
   }
 
@@ -63,7 +63,7 @@ credentialsRoutes.get('/', async (c) => {
   for (const m of allMatched) {
     if (m.credentialId) {
       const list = matchedByCredId.get(m.credentialId) || []
-      const deviceInfo = devicesByMac.get(m.mac)
+      const deviceInfo = m.deviceId ? devicesById.get(m.deviceId) : null
       list.push({
         ...m,
         vendor: deviceInfo?.vendor || null,
@@ -214,15 +214,15 @@ credentialsRoutes.delete('/failed/clear', requireAdmin, async (c) => {
 
   if (networkId) {
     // Get all devices in this network
-    const networkDevices = await db.select({ mac: devices.mac })
+    const networkDevices = await db.select({ id: devices.id })
       .from(devices)
       .where(eq(devices.networkId, networkId))
 
-    const macs = networkDevices.map(d => d.mac)
+    const deviceIds = networkDevices.map(d => d.id)
 
-    if (macs.length > 0) {
+    if (deviceIds.length > 0) {
       const result = await db.delete(failedCredentials)
-        .where(inArray(failedCredentials.mac, macs))
+        .where(inArray(failedCredentials.deviceId, deviceIds))
       deletedCount = result.rowsAffected
     } else {
       deletedCount = 0

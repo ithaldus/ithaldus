@@ -10,7 +10,7 @@ export interface LogMessage {
 
 export interface TopologyDevice {
   id: string
-  mac: string
+  primaryMac: string
   hostname: string | null
   ip: string | null
   type: 'router' | 'switch' | 'access-point' | 'end-device' | null
@@ -25,6 +25,7 @@ export interface TopologyDevice {
   comment: string | null
   nomad: boolean
   lastSeenAt: string
+  macCount: number
   interfaces: TopologyInterface[]
   children: TopologyDevice[]
 }
