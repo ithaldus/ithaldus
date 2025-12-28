@@ -158,12 +158,6 @@ function getStatusInfo(device: TopologyDevice): { label: string; color: string }
       color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
     }
   }
-  if (!device.accessible && isLikelyNetworkDevice && !hasOpenPorts) {
-    return {
-      label: 'Unreachable',
-      color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
-    }
-  }
   return null
 }
 
@@ -509,7 +503,7 @@ export function DeviceCard({
               </span>
             )}
 
-            {/* Status Badge (No credentials / Unreachable) */}
+            {/* Status Badge (No credentials) */}
             {statusInfo && (
               <span className={`shrink-0 h-[18px] inline-flex items-center gap-1 px-1 text-[9px] font-medium rounded ${statusInfo.color}`}>
                 <AlertTriangle className="w-2.5 h-2.5" />
