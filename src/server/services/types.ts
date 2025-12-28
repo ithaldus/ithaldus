@@ -16,6 +16,7 @@ export interface TopologyDevice {
   type: 'router' | 'switch' | 'access-point' | 'end-device' | null
   vendor: string | null
   model: string | null
+  serialNumber: string | null
   firmwareVersion: string | null
   accessible: boolean | null
   openPorts: string | null
