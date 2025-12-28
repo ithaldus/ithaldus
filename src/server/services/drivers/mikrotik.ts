@@ -83,7 +83,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
   await Promise.all(scanPromises)
 
   // Now fetch all the data including refreshed ARP and bridge host tables
-  const [identity, resource, routerboard, addressList, interfaceList, arpTable, bridgeHosts, defaultRoute, bridgePorts, dhcpServers, bridgeVlans, vlanInterfaces] = await Promise.all([
+  const [identity, resource, routerboard, addressList, interfaceList, arpTable, bridgeHosts, defaultRoute, bridgePorts, dhcpServers, bridgeVlans, vlanInterfaces, dnsStatic] = await Promise.all([
     sshExec(client, '/system identity print').catch(() => ''),
     sshExec(client, '/system resource print').catch(() => ''),
     sshExec(client, '/system routerboard print').catch(() => ''),  // Serial number
@@ -96,6 +96,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     sshExec(client, '/ip dhcp-server print terse').catch(() => ''),  // DHCP server configuration
     sshExec(client, '/interface bridge vlan print terse').catch(() => ''),  // VLAN assignments per port
     sshExec(client, '/interface vlan print terse').catch(() => ''),  // VLAN interfaces with parent mapping
+    sshExec(client, '/ip dns static print terse').catch(() => ''),  // Static DNS entries for hostname resolution
   ])
 
   // Use the already-fetched DHCP leases
@@ -249,6 +250,30 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     }
   }
 
+  // Parse DNS static entries for hostname resolution
+  // Format: "0   name=printer.local address=192.168.1.100 ttl=1d"
+  // This helps identify devices with static IPs that have DNS entries
+  const dnsHostnameByIp: Map<string, string> = new Map()
+  const dnsStaticLines = dnsStatic.split('\n').filter(l => l.includes('name=') && l.includes('address='))
+  for (const line of dnsStaticLines) {
+    // Skip disabled entries
+    if (line.includes(' X ') || line.startsWith('X ')) continue
+    // Skip regexp entries (they have regexp= instead of name=)
+    if (line.includes('regexp=')) continue
+
+    const nameMatch = line.match(/name=(\S+)/)
+    const addressMatch = line.match(/address=(\d+\.\d+\.\d+\.\d+)/)
+    if (nameMatch && addressMatch) {
+      const dnsName = decodeMikrotikString(nameMatch[1])
+      // Remove common suffixes like .local, .lan, .home
+      const cleanName = dnsName.replace(/\.(local|lan|home|internal|localdomain)$/i, '')
+      dnsHostnameByIp.set(addressMatch[1], cleanName)
+    }
+  }
+  if (log && dnsHostnameByIp.size > 0) {
+    log('info', `Found ${dnsHostnameByIp.size} DNS static entries for hostname resolution`)
+  }
+
   // Parse interfaces - keep physical ports, bridges, and VLAN interfaces
   const interfaces: InterfaceInfo[] = []
   const interfaceLines = interfaceList.split('\n').filter(l => l.trim())
@@ -370,7 +395,10 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     if (macMatch) {
       const mac = macMatch[1].toUpperCase()
       const ip = ipMatch ? ipMatch[1] : null
-      const hostname = hostMatch ? decodeMikrotikString(hostMatch[1]) : null
+      // Prefer DHCP hostname, fall back to DNS static entry
+      const hostname = hostMatch
+        ? decodeMikrotikString(hostMatch[1])
+        : (ip ? dnsHostnameByIp.get(ip) : null) || null
       const comment = commentMatch ? decodeMikrotikString(commentMatch[1]) : null
 
       // Store ALL leases for database persistence (for hostname/comment lookup)
@@ -436,10 +464,11 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
       }
 
       if (!neighbors.find(n => n.mac === mac)) {
+        const ip = ipMatch ? ipMatch[1] : null
         neighbors.push({
           mac,
-          ip: ipMatch ? ipMatch[1] : null,
-          hostname: null,
+          ip,
+          hostname: ip ? dnsHostnameByIp.get(ip) || null : null,
           interface: interfaceName,
           type: 'arp',
         })
