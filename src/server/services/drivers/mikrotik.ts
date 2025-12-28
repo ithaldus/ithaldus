@@ -287,6 +287,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
   }
   const discoveredNeighbors: Map<string, DiscoveredNeighbor> = new Map()  // MAC -> discovery info
   const ipNeighborLines = ipNeighbors.split('\n').filter(l => l.includes('mac-address='))
+
   for (const line of ipNeighborLines) {
     const macMatch = line.match(/mac-address=(\S+)/)
     if (!macMatch) continue
@@ -639,6 +640,11 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
       // Add discovery metadata
       existing.version = discovered.version
       existing.model = discovered.board
+
+      // Debug: confirm enrichment happened
+      if (log && (discovered.board || discovered.version)) {
+        log('info', `Enriched ${mac}: model=${existing.model}, version=${existing.version}`)
+      }
     } else {
       // Add new neighbor discovered via MNDP/CDP/LLDP
       neighbors.push({
@@ -651,6 +657,11 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
         model: discovered.board,
       })
       addedCount++
+
+      // Debug: confirm new neighbor added with discovery data
+      if (log && (discovered.board || discovered.version)) {
+        log('info', `Added new MNDP neighbor ${mac}: model=${discovered.board}, version=${discovered.version}`)
+      }
     }
   }
 

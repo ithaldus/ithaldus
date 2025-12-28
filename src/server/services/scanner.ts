@@ -1998,8 +1998,14 @@ export class NetworkScanner {
       snmpInfo = await this.getSnmpInfo(ip)
     }
 
+    // Look up MNDP/CDP/LLDP discovery data for devices we couldn't SSH into
+    const discoveryData = !deviceInfo ? this.neighborDiscoveryData.get(deviceMac) : null
+    if (discoveryData && (discoveryData.model || discoveryData.version)) {
+      this.log('info', `${ip}: Using MNDP/CDP/LLDP discovery data (model=${discoveryData.model}, version=${discoveryData.version})`)
+    }
+
     // Determine hostname for type detection (combine all sources)
-    const hostnameForDetection = deviceInfo?.hostname || snmpInfo?.hostname || this.getMdnsHostname(ip)
+    const hostnameForDetection = deviceInfo?.hostname || snmpInfo?.hostname || discoveryData?.hostname || this.getMdnsHostname(ip)
 
     // Determine device type - prioritize SSH-based detection, then vendor-based
     let deviceType: string
@@ -2016,17 +2022,17 @@ export class NetworkScanner {
     // These are different things and should not be confused
     const actualUpstreamInterface = upstreamInterface
 
-    // Create device record - use SNMP info as fallback if no SSH access
+    // Create device record - use SNMP/MNDP as fallback if no SSH access
     const newDevice: DiscoveredDevice = {
       id: deviceId,
       mac: deviceMac,
-      hostname: deviceInfo?.hostname || snmpInfo?.hostname || null,
+      hostname: deviceInfo?.hostname || snmpInfo?.hostname || discoveryData?.hostname || null,
       ip,
       type: deviceType,
       vendor,
-      model: deviceInfo?.model || snmpInfo?.description || null,
+      model: deviceInfo?.model || snmpInfo?.description || discoveryData?.model || null,
       serialNumber: deviceInfo?.serialNumber || null,
-      firmwareVersion: deviceInfo?.version || null,
+      firmwareVersion: deviceInfo?.version || discoveryData?.version || null,
       accessible: !!connectedClient,
       openPorts,
       driver: vendorInfo.driver,
