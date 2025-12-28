@@ -113,6 +113,7 @@ export const devices = sqliteTable('devices', {
   assetTag: text('asset_tag'),
   nomad: integer('nomad', { mode: 'boolean' }).notNull().default(false),
   skipLogin: integer('skip_login', { mode: 'boolean' }).notNull().default(false),
+  vlans: text('vlans'),  // Comma-separated VLAN IDs this device was seen on
   lastSeenAt: text('last_seen_at').notNull(),
 }, (table) => [
   index('idx_devices_primary_mac').on(table.primaryMac),

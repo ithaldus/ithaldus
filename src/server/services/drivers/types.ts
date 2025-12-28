@@ -40,6 +40,8 @@ export interface NeighborInfo {
   vendor?: string | null
   model?: string | null
   version?: string | null
+  // VLAN IDs this MAC was seen on (from bridge host table on VLAN interfaces)
+  vlans?: string[]
 }
 
 // Driver interface that all vendor drivers must implement

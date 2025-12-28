@@ -520,6 +520,17 @@ export function DeviceCard({
                 </span>
               </Tooltip>
             )}
+
+            {/* VLAN Badges */}
+            {device.vlans && (
+              <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-mono text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 border border-blue-300/50 dark:border-blue-600/50">
+                {device.vlans.split(',').map((vlanId, idx) => (
+                  <span key={vlanId} className={`px-1 ${idx > 0 ? 'border-l border-blue-300/50 dark:border-blue-600/50' : ''}`}>
+                    {vlanId}
+                  </span>
+                ))}
+              </span>
+            )}
           </div>
 
           {/* End spacer for visual balance with chevron space */}

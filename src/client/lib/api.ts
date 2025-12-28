@@ -382,6 +382,7 @@ export interface Device {
   assetTag: string | null
   nomad: boolean
   skipLogin: boolean
+  vlans: string | null
   lastSeenAt: string
   macCount?: number
 }

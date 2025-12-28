@@ -795,7 +795,7 @@ export class NetworkScanner {
   private processedDevices: Set<string> = new Set()  // Device IDs that have been processed
   private macToDeviceId: Map<string, string> = new Map()  // Cache: MAC -> deviceId for fast lookup
   private deviceDepths: Map<string, number> = new Map()  // deviceId -> depth level (0 = root, 1 = direct child, etc.)
-  private neighborDiscoveryData: Map<string, { hostname: string | null; model: string | null; version: string | null }> = new Map()  // MAC -> MNDP/CDP/LLDP data
+  private neighborDiscoveryData: Map<string, { hostname: string | null; model: string | null; version: string | null; vlans: string[] | null }> = new Map()  // MAC -> MNDP/CDP/LLDP data
   private credentialsList: CredentialInfo[] = []
   private matchedCredentials: Map<string, string> = new Map()  // "deviceId:service" -> credentialId
   private failedCredentialsMap: Map<string, Set<string>> = new Map()  // "deviceId:service" -> Set of failed credentialIds
@@ -1062,11 +1062,12 @@ export class NetworkScanner {
       const parentIface = parentDevice.interfaces.find(i => i.name === neighbor.interface)
 
       // Cache MNDP/CDP/LLDP discovery data for later use in end-device creation
-      if (neighbor.hostname || neighbor.model || neighbor.version) {
+      if (neighbor.hostname || neighbor.model || neighbor.version || neighbor.vlans?.length) {
         this.neighborDiscoveryData.set(neighbor.mac, {
           hostname: neighbor.hostname || null,
           model: neighbor.model || null,
           version: neighbor.version || null,
+          vlans: neighbor.vlans || null,
         })
       }
 
@@ -1317,6 +1318,14 @@ export class NetworkScanner {
         if (neighbor.model) updateData.model = neighbor.model
         if (neighbor.version) updateData.firmwareVersion = neighbor.version
       }
+      // Merge VLANs (union of existing + new)
+      if (neighbor.vlans?.length) {
+        const existingVlans = existingBridgeDevice.vlans
+          ? new Set(existingBridgeDevice.vlans.split(','))
+          : new Set<string>()
+        neighbor.vlans.forEach(v => existingVlans.add(v))
+        updateData.vlans = Array.from(existingVlans).sort((a, b) => parseInt(a) - parseInt(b)).join(',')
+      }
       await db.update(devices)
         .set(updateData)
         .where(eq(devices.id, existingBridgeDevice.id))
@@ -1348,6 +1357,7 @@ export class NetworkScanner {
         openPorts: '[]',
         warningPorts: '[]',
         driver: null,
+        vlans: neighbor.vlans?.length ? neighbor.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',') : null,
         lastSeenAt: new Date().toISOString(),
       })
 
@@ -1744,6 +1754,14 @@ export class NetworkScanner {
           if (discoveryData.model) updateData.model = discoveryData.model
           if (discoveryData.version) updateData.firmwareVersion = discoveryData.version
         }
+        // Merge VLANs (union of existing + new)
+        if (discoveryData?.vlans?.length) {
+          const existingVlans = existingDevice.vlans
+            ? new Set(existingDevice.vlans.split(','))
+            : new Set<string>()
+          discoveryData.vlans.forEach(v => existingVlans.add(v))
+          updateData.vlans = Array.from(existingVlans).sort((a, b) => parseInt(a) - parseInt(b)).join(',')
+        }
         await db.update(devices)
           .set(updateData)
           .where(eq(devices.id, existingDevice.id))
@@ -1772,6 +1790,7 @@ export class NetworkScanner {
           openPorts: '[]',
           warningPorts: '[]',
           driver: null,
+          vlans: discoveryData?.vlans?.length ? discoveryData.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',') : null,
           lastSeenAt: new Date().toISOString(),
         })
 
@@ -2298,6 +2317,16 @@ export class NetworkScanner {
       await this.releaseStaleIpClaim(ip, existingDevice.id)
 
       // Update existing device, preserve user-managed fields (comment, nomad, type)
+      // Merge VLANs (union of existing + new from discovery data)
+      let mergedVlans: string | undefined
+      if (discoveryData?.vlans?.length) {
+        const existingVlans = existingDevice.vlans
+          ? new Set(existingDevice.vlans.split(','))
+          : new Set<string>()
+        discoveryData.vlans.forEach(v => existingVlans.add(v))
+        mergedVlans = Array.from(existingVlans).sort((a, b) => parseInt(a) - parseInt(b)).join(',')
+      }
+
       await db.update(devices)
         .set({
           parentInterfaceId,
@@ -2315,6 +2344,7 @@ export class NetworkScanner {
           openPorts: JSON.stringify(openPorts),
           warningPorts: JSON.stringify(warningPorts),
           driver: newDevice.driver,
+          ...(mergedVlans && { vlans: mergedVlans }),
           lastSeenAt: new Date().toISOString(),
         })
         .where(eq(devices.id, existingDevice.id))
@@ -2354,6 +2384,9 @@ export class NetworkScanner {
         openPorts: JSON.stringify(openPorts),
         warningPorts: JSON.stringify(warningPorts),
         driver: newDevice.driver,
+        vlans: discoveryData?.vlans?.length
+          ? discoveryData.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',')
+          : null,
         lastSeenAt: new Date().toISOString(),
       })
 

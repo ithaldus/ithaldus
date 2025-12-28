@@ -390,6 +390,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
   // Uses resolvePhysicalPort to walk up VLAN hierarchy
   const tempMacToPort: Map<string, string> = new Map()
   const macToLogicalInterface: Map<string, string> = new Map()  // Also track original logical interface
+  const macToVlans: Map<string, Set<string>> = new Map()  // Track VLAN IDs per MAC
   const bridgeLinesForDhcp = bridgeHosts.split('\n').filter(l => l.includes('mac-address='))
 
   for (const line of bridgeLinesForDhcp) {
@@ -414,6 +415,15 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
       if (rawInterface) {
         // Store the original logical interface
         macToLogicalInterface.set(mac, rawInterface)
+
+        // Track VLAN ID if this MAC was seen on a VLAN interface
+        const vlanId = vlanToId.get(rawInterface)
+        if (vlanId) {
+          if (!macToVlans.has(mac)) {
+            macToVlans.set(mac, new Set())
+          }
+          macToVlans.get(mac)!.add(vlanId)
+        }
 
         // Resolve to physical port by walking up VLAN/bridge hierarchy
         const physicalPort = resolvePhysicalPort(rawInterface)
@@ -475,6 +485,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
           hostname,
           interface: interfaceName,
           type: 'dhcp',
+          vlans: macToVlans.has(mac) ? Array.from(macToVlans.get(mac)!) : undefined,
         })
       }
     }
@@ -514,6 +525,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
           hostname: ip ? dnsHostnameByIp.get(ip) || null : null,
           interface: interfaceName,
           type: 'arp',
+          vlans: macToVlans.has(mac) ? Array.from(macToVlans.get(mac)!) : undefined,
         })
       }
     }
@@ -556,6 +568,10 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
         if (bridgeInterfaces.has(existing.interface) || existing.interface === 'unknown') {
           existing.interface = physicalPort
         }
+        // Merge VLANs if not already set
+        if (!existing.vlans && macToVlans.has(mac)) {
+          existing.vlans = Array.from(macToVlans.get(mac)!)
+        }
       } else {
         neighbors.push({
           mac,
@@ -563,6 +579,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
           hostname: null,
           interface: physicalPort,
           type: 'bridge-host',
+          vlans: macToVlans.has(mac) ? Array.from(macToVlans.get(mac)!) : undefined,
         })
       }
     }
@@ -648,6 +665,10 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
       // Add discovery metadata
       existing.version = discovered.version
       existing.model = discovered.board
+      // Merge VLANs if not already set
+      if (!existing.vlans && macToVlans.has(mac)) {
+        existing.vlans = Array.from(macToVlans.get(mac)!)
+      }
 
       // Debug: confirm enrichment happened
       if (log && (discovered.board || discovered.version)) {
@@ -663,6 +684,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
         type: 'mndp',
         version: discovered.version,
         model: discovered.board,
+        vlans: macToVlans.has(mac) ? Array.from(macToVlans.get(mac)!) : undefined,
       })
       addedCount++
 
