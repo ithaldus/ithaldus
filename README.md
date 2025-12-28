@@ -28,7 +28,7 @@ dev.cmd
 ./dev.sh
 ```
 
-Then open http://localhost:3000
+Then open http://localhost:3000 (or the port configured in `.env`)
 
 ## Available Commands
 
@@ -69,6 +69,34 @@ src/
     ├── routes/      # API routes
     └── middleware/  # Auth middleware
 ```
+
+## Running Multiple Instances
+
+You can run multiple instances of this project side by side (e.g., for parallel development). Each instance needs unique ports and a unique Docker project name.
+
+### Setup for Additional Instance
+
+1. Copy the project folder to a new location
+2. Edit the `.env` file in the new folder and change:
+   ```env
+   # Use different ports (e.g., 3100, 3101 for second instance)
+   PORT_WEB=3100
+   PORT_API=3101
+
+   # Give it a unique Docker project name
+   COMPOSE_PROJECT_NAME=topograph2
+
+   # Update APP_URL to match PORT_WEB
+   APP_URL=http://localhost:3100
+   ```
+
+3. Start the dev server normally: `./dev.sh` or `dev.cmd`
+4. Access at http://localhost:3100 (or your configured port)
+
+Each instance will have its own:
+- Docker containers (isolated by `COMPOSE_PROJECT_NAME`)
+- Docker volumes (including `node_modules`)
+- SQLite database (in the local `./data` folder)
 
 ## Development
 

@@ -27,7 +27,7 @@ docker compose logs -f dev
 docker compose down
 ```
 
-The dev server runs on http://localhost:3000.
+The dev server runs on http://localhost:3100 (configured via `PORT_WEB` in `.env`).
 
 ## Architecture
 
@@ -43,7 +43,7 @@ In development, two servers run in parallel:
 - **Vite** on port 5173 - serves frontend with HMR, proxies `/api/*` to Bun
 - **Bun API** on port 3001 - handles all `/api/*` requests
 
-Docker exposes port 5173 → host port 3000, so access the app at http://localhost:3000.
+Docker exposes port 5173 → host port (configured via `PORT_WEB`, defaults to 3000). This instance runs on port 3100.
 
 ### Project Structure
 ```
@@ -120,8 +120,13 @@ Enabled via `dark:` Tailwind variants. Set via `darkMode: 'class'` in config.
 
 Development uses `AUTH_BYPASS=true` for simplified login.
 
+Port configuration (for running multiple instances):
+- `PORT_WEB` - Web server port (default: 3000, this instance: 3100)
+- `PORT_API` - API/WebSocket port (default: 3001, this instance: 3101)
+- `COMPOSE_PROJECT_NAME` - Docker project name (this instance: topograph2)
+
 Production requires:
 - `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` - MS365 OAuth
 - `SESSION_SECRET` - Session encryption
-- `APP_URL` - Application URL
+- `APP_URL` - Application URL (should match PORT_WEB)
 - `DATABASE_URL` - SQLite file path

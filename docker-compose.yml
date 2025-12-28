@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     ports:
-      - "3000:5173"
-      - "3001:3001"  # API/WebSocket server for direct connections
+      - "${PORT_WEB:-3000}:5173"
+      - "${PORT_API:-3001}:3001"  # API/WebSocket server for direct connections
     volumes:
       # Mount source code for hot reloading
       - .:/app
@@ -22,7 +22,7 @@ services:
   app:
     build: .
     ports:
-      - "3000:3000"
+      - "${PORT_WEB:-3000}:3000"
     environment:
       - DATABASE_URL=file:/data/topograph.db
       - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
