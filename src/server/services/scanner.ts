@@ -1023,7 +1023,8 @@ export class NetworkScanner {
         neighbor.interface,
         neighbor.mac,
         depth,  // Pass current depth - scanDevice will use this for the neighbor
-        parentDevice.mac  // Pass parent MAC for uplink detection on switches
+        // Pass all parent MACs for uplink detection (device may have bridge/port/vlan MACs)
+        parentDevice.interfaces.map(i => i.mac).filter((m): m is string => m !== null)
       )
     })
 
@@ -1380,7 +1381,7 @@ export class NetworkScanner {
     upstreamInterface: string | null,
     knownMac: string | null = null,  // MAC from neighbor info, if known
     depth: number = 0,  // Depth level in the topology tree (0 = root)
-    parentMac: string | null = null  // Parent device's MAC (for uplink detection)
+    parentMacs: string[] = []  // Parent device's MACs (for uplink detection - may have bridge/port/vlan MACs)
   ): Promise<void> {
     // Check if scan was cancelled
     if (this.aborted) {
@@ -1680,7 +1681,7 @@ export class NetworkScanner {
             (level, msg) => this.log(level, `${ip}: ${msg}`),
             { username: successfulCreds!.username, password: successfulCreds!.password },
             ip,  // Pass IP explicitly for jump host connections
-            parentMac  // Pass parent MAC for uplink detection
+            parentMacs  // Pass parent MACs for uplink detection
           )
           vendorInfo = { vendor: 'Zyxel', driver: 'zyxel' }
           this.log('info', `${ip}: Detected Zyxel ${deviceInfo.model || 'switch'}${deviceInfo.serialNumber ? ' (S/N: ' + deviceInfo.serialNumber + ')' : ''}`)

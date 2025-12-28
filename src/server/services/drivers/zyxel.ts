@@ -318,7 +318,7 @@ async function getZyxelInfo(
   log?: (level: LogLevel, message: string) => void,
   credentials?: { username: string; password: string },
   deviceIp?: string,  // Pass IP explicitly for jump host connections
-  parentMac?: string | null  // Parent device's MAC for reliable uplink detection
+  parentMacs: string[] = []  // Parent device's MACs for reliable uplink detection (may have multiple: bridge, port, vlan)
 ): Promise<DeviceInfo> {
   // Zyxel switches use a Cisco-like CLI and only support interactive shell (not exec)
   // Run ALL commands in a SINGLE shell session (connection closes after shell exits)
@@ -567,16 +567,18 @@ async function getZyxelInfo(
     }
   }
 
-  // Detect uplink interface - prefer finding the port with the parent's MAC
+  // Detect uplink interface - prefer finding the port with any of the parent's MACs
   // This is more reliable than counting MACs (which fails when sub-switches have more devices)
+  // Parent may have multiple MACs: bridge MAC, physical port MAC, VLAN interface MAC, etc.
   let ownUpstreamInterface: string | null = null
 
-  if (parentMac) {
-    // Find the port where we see the parent device's MAC
-    const parentNeighbor = neighbors.find(n => n.mac.toUpperCase() === parentMac.toUpperCase())
+  if (parentMacs.length > 0) {
+    // Find the port where we see any of the parent device's MACs
+    const parentMacsUpper = new Set(parentMacs.map(m => m.toUpperCase()))
+    const parentNeighbor = neighbors.find(n => parentMacsUpper.has(n.mac.toUpperCase()))
     if (parentNeighbor) {
       ownUpstreamInterface = parentNeighbor.interface
-      if (log) log('info', `Uplink detected via parent MAC ${parentMac} on ${ownUpstreamInterface}`)
+      if (log) log('info', `Uplink detected via parent MAC ${parentNeighbor.mac} on ${ownUpstreamInterface}`)
     }
   }
 
