@@ -83,7 +83,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
   await Promise.all(scanPromises)
 
   // Now fetch all the data including refreshed ARP and bridge host tables
-  const [identity, resource, routerboard, addressList, interfaceList, arpTable, bridgeHosts, defaultRoute, bridgePorts, dhcpServers, bridgeVlans, vlanInterfaces, dnsStatic] = await Promise.all([
+  const [identity, resource, routerboard, addressList, interfaceList, arpTable, bridgeHosts, defaultRoute, bridgePorts, dhcpServers, bridgeVlans, vlanInterfaces, dnsStatic, ipNeighbors] = await Promise.all([
     sshExec(client, '/system identity print').catch(() => ''),
     sshExec(client, '/system resource print').catch(() => ''),
     sshExec(client, '/system routerboard print').catch(() => ''),  // Serial number
@@ -97,6 +97,7 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     sshExec(client, '/interface bridge vlan print terse').catch(() => ''),  // VLAN assignments per port
     sshExec(client, '/interface vlan print terse').catch(() => ''),  // VLAN interfaces with parent mapping
     sshExec(client, '/ip dns static print terse').catch(() => ''),  // Static DNS entries for hostname resolution
+    sshExec(client, '/ip neighbor print terse').catch(() => ''),  // MNDP/CDP/LLDP neighbor discovery
   ])
 
   // Use the already-fetched DHCP leases
@@ -272,6 +273,44 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
   }
   if (log && dnsHostnameByIp.size > 0) {
     log('info', `Found ${dnsHostnameByIp.size} DNS static entries for hostname resolution`)
+  }
+
+  // Parse IP neighbor discovery (MNDP/CDP/LLDP)
+  // Format: "0 interface=sfp24 address=192.168.2.1 mac-address=50:01:00:04:00:00 identity=some-ap version=7.18.2 board=CRS504-4XQ-IN"
+  interface DiscoveredNeighbor {
+    interface: string
+    ip: string | null
+    mac: string
+    identity: string | null
+    version: string | null
+    board: string | null
+  }
+  const discoveredNeighbors: Map<string, DiscoveredNeighbor> = new Map()  // MAC -> discovery info
+  const ipNeighborLines = ipNeighbors.split('\n').filter(l => l.includes('mac-address='))
+  for (const line of ipNeighborLines) {
+    const macMatch = line.match(/mac-address=(\S+)/)
+    if (!macMatch) continue
+
+    const mac = macMatch[1].toUpperCase()
+    const ifMatch = line.match(/interface=(\S+)/)
+    const addrMatch = line.match(/address=(\d+\.\d+\.\d+\.\d+)/)
+    // Identity can contain spaces when quoted
+    const identityMatch = line.match(/identity="([^"]*)"/) || line.match(/identity=(\S+)/)
+    const versionMatch = line.match(/version=(\S+)/)
+    // Board can contain special characters
+    const boardMatch = line.match(/board="([^"]*)"/) || line.match(/board=(\S+)/)
+
+    discoveredNeighbors.set(mac, {
+      interface: ifMatch ? ifMatch[1] : 'unknown',
+      ip: addrMatch ? addrMatch[1] : null,
+      mac,
+      identity: identityMatch ? decodeMikrotikString(identityMatch[1]) : null,
+      version: versionMatch ? versionMatch[1] : null,
+      board: boardMatch ? boardMatch[1] : null,
+    })
+  }
+  if (log && discoveredNeighbors.size > 0) {
+    log('info', `Found ${discoveredNeighbors.size} devices via MNDP/CDP/LLDP neighbor discovery`)
   }
 
   // Parse interfaces - keep physical ports, bridges, and VLAN interfaces
@@ -577,6 +616,49 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     if (log && resolvedCount > 0) {
       log('success', `Resolved ${resolvedCount} MAC addresses to physical ports`)
     }
+  }
+
+  // Enrich neighbors with MNDP/CDP/LLDP discovery data and add new discoveries
+  // This provides hostname, vendor, model, and version for devices we haven't logged into
+  const seenMacs = new Set(neighbors.map(n => n.mac))
+  let enrichedCount = 0
+  let addedCount = 0
+
+  for (const [mac, discovered] of discoveredNeighbors) {
+    const existing = neighbors.find(n => n.mac === mac)
+
+    if (existing) {
+      // Enrich existing neighbor with discovery data
+      if (!existing.hostname && discovered.identity) {
+        existing.hostname = discovered.identity
+        enrichedCount++
+      }
+      if (!existing.ip && discovered.ip) {
+        existing.ip = discovered.ip
+      }
+      // Add discovery metadata
+      existing.version = discovered.version
+      existing.model = discovered.board
+    } else {
+      // Add new neighbor discovered via MNDP/CDP/LLDP
+      neighbors.push({
+        mac,
+        ip: discovered.ip,
+        hostname: discovered.identity,
+        interface: discovered.interface,
+        type: 'mndp',
+        version: discovered.version,
+        model: discovered.board,
+      })
+      addedCount++
+    }
+  }
+
+  if (log && (enrichedCount > 0 || addedCount > 0)) {
+    const parts: string[] = []
+    if (enrichedCount > 0) parts.push(`enriched ${enrichedCount} existing neighbors`)
+    if (addedCount > 0) parts.push(`added ${addedCount} new neighbors`)
+    log('info', `MNDP/CDP/LLDP: ${parts.join(', ')}`)
   }
 
   // Detect own upstream interface using gateway MAC lookup

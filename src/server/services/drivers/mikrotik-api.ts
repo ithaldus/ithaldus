@@ -41,6 +41,7 @@ export async function getMikrotikInfoViaApi(
       dhcpLeaseData,
       dnsStaticData,
       vlanData,
+      ipNeighborData,
     ] = await Promise.all([
       conn.write('/system/identity/print').catch(() => []),
       conn.write('/system/resource/print').catch(() => []),
@@ -54,6 +55,7 @@ export async function getMikrotikInfoViaApi(
       conn.write('/ip/dhcp-server/lease/print').catch(() => []),
       conn.write('/ip/dns/static/print').catch(() => []),
       conn.write('/interface/vlan/print').catch(() => []),
+      conn.write('/ip/neighbor/print').catch(() => []),
     ])
 
     // Parse identity
@@ -246,6 +248,53 @@ export async function getMikrotikInfoViaApi(
         interface: port,
         type: 'bridge-host',
       })
+    }
+
+    // IP neighbors (MNDP/CDP/LLDP discovery)
+    // Enrich existing neighbors and add new ones discovered via neighbor protocols
+    let enrichedCount = 0
+    let addedCount = 0
+    for (const neighbor of ipNeighborData as Record<string, string>[]) {
+      if (!neighbor['mac-address']) continue
+      const mac = neighbor['mac-address'].toUpperCase()
+      const identity = neighbor.identity ? decodeMikrotikString(neighbor.identity) : null
+      const version = neighbor.version || null
+      const board = neighbor.board || null
+      const ip = neighbor.address || null
+      const interfaceName = neighbor.interface || 'unknown'
+
+      const existing = neighbors.find(n => n.mac === mac)
+      if (existing) {
+        // Enrich existing neighbor
+        if (!existing.hostname && identity) {
+          existing.hostname = identity
+          enrichedCount++
+        }
+        if (!existing.ip && ip) {
+          existing.ip = ip
+        }
+        existing.version = version
+        existing.model = board
+      } else {
+        // Add new neighbor from MNDP/CDP/LLDP
+        neighbors.push({
+          mac,
+          ip,
+          hostname: identity,
+          interface: interfaceName,
+          type: 'mndp',
+          version,
+          model: board,
+        })
+        seenMacs.add(mac)
+        addedCount++
+      }
+    }
+    if (log && (enrichedCount > 0 || addedCount > 0)) {
+      const parts: string[] = []
+      if (enrichedCount > 0) parts.push(`enriched ${enrichedCount} existing neighbors`)
+      if (addedCount > 0) parts.push(`added ${addedCount} new neighbors`)
+      log('info', `MNDP/CDP/LLDP: ${parts.join(', ')}`)
     }
 
     if (log) {

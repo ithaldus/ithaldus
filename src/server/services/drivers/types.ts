@@ -35,7 +35,11 @@ export interface NeighborInfo {
   ip: string | null
   hostname: string | null
   interface: string
-  type: 'dhcp' | 'arp' | 'bridge-host'
+  type: 'dhcp' | 'arp' | 'bridge-host' | 'mndp'
+  // Additional discovery info from MNDP/CDP/LLDP
+  vendor?: string | null
+  model?: string | null
+  version?: string | null
 }
 
 // Driver interface that all vendor drivers must implement

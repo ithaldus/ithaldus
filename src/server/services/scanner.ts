@@ -12,6 +12,7 @@ import {
   isRkscliDevice,
   type DeviceInfo,
   type LogLevel,
+  type NeighborInfo,
 } from './drivers'
 import { getMikrotikInfoViaApi } from './drivers/mikrotik-api'
 import { scanMdns, type MdnsDevice } from './mdns'
@@ -766,6 +767,7 @@ export class NetworkScanner {
   private deviceCount: number = 0
   private processedMacs: Set<string> = new Set()
   private deviceDepths: Map<string, number> = new Map()  // MAC -> depth level (0 = root, 1 = direct child, etc.)
+  private neighborDiscoveryData: Map<string, { hostname: string | null; model: string | null; version: string | null }> = new Map()  // MAC -> MNDP/CDP/LLDP data
   private credentialsList: CredentialInfo[] = []
   private matchedCredentials: Map<string, string> = new Map()  // "MAC:service" -> credentialId
   private failedCredentialsMap: Map<string, Set<string>> = new Map()  // "MAC:service" -> Set of failed credentialIds
@@ -926,7 +928,7 @@ export class NetworkScanner {
    * Scan multiple neighbors in parallel with concurrency limit
    */
   private async scanNeighborsParallel(
-    neighbors: Array<{ mac: string; ip: string | null; interface: string; type?: string }>,
+    neighbors: NeighborInfo[],
     parentDevice: DiscoveredDevice,
     localUpstreamInterface: string | null,
     parentIp: string,
@@ -940,6 +942,15 @@ export class NetworkScanner {
 
     for (const neighbor of neighbors) {
       const parentIface = parentDevice.interfaces.find(i => i.name === neighbor.interface)
+
+      // Cache MNDP/CDP/LLDP discovery data for later use in end-device creation
+      if (neighbor.hostname || neighbor.model || neighbor.version) {
+        this.neighborDiscoveryData.set(neighbor.mac, {
+          hostname: neighbor.hostname || null,
+          model: neighbor.model || null,
+          version: neighbor.version || null,
+        })
+      }
 
       // For devices with IPs, skip if already processed
       if (neighbor.ip) {
@@ -1089,15 +1100,16 @@ export class NetworkScanner {
    * Add a bridge host as an end-device
    */
   private async addBridgeHost(
-    neighbor: { mac: string; ip: string | null; interface: string },
+    neighbor: NeighborInfo,
     parentIface: DiscoveredInterface | undefined,
     parentIp: string
   ): Promise<void> {
     const endDeviceId = nanoid()
 
-    // Try to look up hostname from DHCP leases
+    // Try to look up hostname from various sources
+    // Priority: DHCP hostname > mDNS hostname > MNDP/CDP/LLDP identity
     let hostname: string | null = null
-    let neighborIp: string | null = null
+    let neighborIp: string | null = neighbor.ip
     const lease = await db.query.dhcpLeases.findFirst({
       where: eq(dhcpLeases.mac, neighbor.mac),
     })
@@ -1117,6 +1129,12 @@ export class NetworkScanner {
       }
     }
 
+    // Fall back to MNDP/CDP/LLDP identity if no other hostname found
+    if (!hostname && neighbor.hostname) {
+      hostname = neighbor.hostname
+      this.log('info', `${neighbor.mac}: Using MNDP/CDP/LLDP identity: ${hostname}`)
+    }
+
     // Try to detect vendor from MAC OUI
     const endDeviceVendor = detectVendorFromMac(neighbor.mac)
 
@@ -1124,6 +1142,7 @@ export class NetworkScanner {
     const endDeviceType = detectTypeFromVendor(endDeviceVendor, hostname) || 'end-device'
 
     // Create device record
+    // Use model/version from MNDP/CDP/LLDP discovery if available
     const endDevice: DiscoveredDevice = {
       id: endDeviceId,
       mac: neighbor.mac,
@@ -1131,9 +1150,9 @@ export class NetworkScanner {
       ip: neighborIp,
       type: endDeviceType,
       vendor: endDeviceVendor,
-      model: null,
+      model: neighbor.model || null,
       serialNumber: null,
-      firmwareVersion: null,
+      firmwareVersion: neighbor.version || null,
       accessible: false,
       openPorts: [],
       driver: null,
@@ -1147,26 +1166,34 @@ export class NetworkScanner {
 
     if (existingBridgeDevice) {
       // Update existing device, preserve user fields
+      // Update model/firmware only if we have new info and the device wasn't previously accessible
+      const updateData: Record<string, unknown> = {
+        parentInterfaceId: parentIface?.id || null,
+        networkId: this.networkId,
+        upstreamInterface: neighbor.interface,
+        hostname,
+        ip: neighborIp,
+        vendor: endDeviceVendor,
+        accessible: false,
+        openPorts: '[]',
+        warningPorts: '[]',
+        // Don't update: comment, nomad, type (user-managed)
+        lastSeenAt: new Date().toISOString(),
+      }
+      // Only update model/firmware if device wasn't accessible (i.e., doesn't have SSH-derived info)
+      // and we have MNDP/CDP/LLDP discovery data
+      if (!existingBridgeDevice.accessible) {
+        if (neighbor.model) updateData.model = neighbor.model
+        if (neighbor.version) updateData.firmwareVersion = neighbor.version
+      }
       await db.update(devices)
-        .set({
-          parentInterfaceId: parentIface?.id || null,
-          networkId: this.networkId,
-          upstreamInterface: neighbor.interface,
-          hostname,
-          ip: neighborIp,
-          vendor: endDeviceVendor,
-          accessible: false,
-          openPorts: '[]',
-          warningPorts: '[]',
-          // Don't update: comment, nomad, type (user-managed)
-          lastSeenAt: new Date().toISOString(),
-        })
+        .set(updateData)
         .where(eq(devices.mac, neighbor.mac))
 
       endDevice.id = existingBridgeDevice.id
       this.log('info', `${parentIp}: Updated bridge host on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
     } else {
-      // Insert new device
+      // Insert new device with MNDP/CDP/LLDP discovery data if available
       await db.insert(devices).values({
         id: endDeviceId,
         mac: neighbor.mac,
@@ -1176,8 +1203,8 @@ export class NetworkScanner {
         hostname,
         ip: neighborIp,
         vendor: endDeviceVendor,
-        model: null,
-        firmwareVersion: null,
+        model: neighbor.model || null,
+        firmwareVersion: neighbor.version || null,
         type: endDevice.type,
         accessible: false,
         openPorts: '[]',
@@ -1479,7 +1506,8 @@ export class NetworkScanner {
       }
       this.processedMacs.add(deviceMac)
 
-      // Try to look up hostname from DHCP leases
+      // Try to look up hostname from various sources
+      // Priority: DHCP hostname > mDNS hostname > MNDP/CDP/LLDP identity
       let hostname: string | null = null
       const lease = await db.query.dhcpLeases.findFirst({
         where: eq(dhcpLeases.mac, deviceMac),
@@ -1497,13 +1525,22 @@ export class NetworkScanner {
         }
       }
 
+      // Look up MNDP/CDP/LLDP discovery data if available
+      const discoveryData = this.neighborDiscoveryData.get(deviceMac)
+
+      // Fall back to MNDP/CDP/LLDP identity if no other hostname found
+      if (!hostname && discoveryData?.hostname) {
+        hostname = discoveryData.hostname
+        this.log('info', `${ip}: Using MNDP/CDP/LLDP identity: ${hostname}`)
+      }
+
       // Try to detect vendor from MAC OUI
       const vendor = detectVendorFromMac(deviceMac)
 
       // Detect device type from vendor
       const vendorType = detectTypeFromVendor(vendor, hostname)
 
-      // Create device record
+      // Create device record with MNDP/CDP/LLDP discovery data if available
       const newDevice: DiscoveredDevice = {
         id: deviceId,
         mac: deviceMac,
@@ -1511,8 +1548,8 @@ export class NetworkScanner {
         ip,
         type: vendorType || 'end-device',
         vendor,
-        model: null,
-        firmwareVersion: null,
+        model: discoveryData?.model || null,
+        firmwareVersion: discoveryData?.version || null,
         accessible: false,
         openPorts: [],
         driver: null,
@@ -1526,26 +1563,33 @@ export class NetworkScanner {
 
       if (existingDevice) {
         // Update existing device, preserve user fields
+        // Update model/firmware only if device wasn't accessible (no SSH-derived info)
+        const updateData: Record<string, unknown> = {
+          parentInterfaceId,
+          networkId: this.networkId,
+          upstreamInterface,
+          hostname,
+          ip,
+          vendor,
+          accessible: false,
+          openPorts: '[]',
+          warningPorts: '[]',
+          // Don't update: comment, nomad, type (user-managed)
+          lastSeenAt: new Date().toISOString(),
+        }
+        // Only update model/firmware if device wasn't accessible and we have discovery data
+        if (!existingDevice.accessible && discoveryData) {
+          if (discoveryData.model) updateData.model = discoveryData.model
+          if (discoveryData.version) updateData.firmwareVersion = discoveryData.version
+        }
         await db.update(devices)
-          .set({
-            parentInterfaceId,
-            networkId: this.networkId,
-            upstreamInterface,
-            hostname,
-            ip,
-            vendor,
-            accessible: false,
-            openPorts: '[]',
-            warningPorts: '[]',
-            // Don't update: comment, nomad, type (user-managed)
-            lastSeenAt: new Date().toISOString(),
-          })
+          .set(updateData)
           .where(eq(devices.mac, deviceMac))
 
         newDevice.id = existingDevice.id
         this.log('info', `${ip}: Updated end-device (MAC: ${deviceMac}${hostname ? ', hostname: ' + hostname : ''})`)
       } else {
-        // Insert new device
+        // Insert new device with MNDP/CDP/LLDP discovery data if available
         await db.insert(devices).values({
           id: deviceId,
           mac: deviceMac,
@@ -1555,8 +1599,8 @@ export class NetworkScanner {
           hostname,
           ip,
           vendor,
-          model: null,
-          firmwareVersion: null,
+          model: discoveryData?.model || null,
+          firmwareVersion: discoveryData?.version || null,
           type: newDevice.type,
           accessible: false,
           openPorts: '[]',
