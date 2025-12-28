@@ -2206,6 +2206,11 @@ export class NetworkScanner {
     const actualUpstreamInterface = upstreamInterface
 
     // Create device record - use MNDP/SNMP as fallback if no SSH access
+    // For Ruckus devices, SSH can connect but CLI login may fail with different credentials
+    // Check if we got CLI data (hostname/version only come from CLI, not SSH banner)
+    const ruckusCliWorked = vendor !== 'Ruckus' || (deviceInfo?.hostname != null || deviceInfo?.version != null)
+    const isAccessible = !!connectedClient && ruckusCliWorked
+
     const newDevice: DiscoveredDevice = {
       id: deviceId,
       mac: deviceMac,
@@ -2216,7 +2221,7 @@ export class NetworkScanner {
       model: deviceInfo?.model || snmpInfo?.description || discoveryData?.model || null,
       serialNumber: deviceInfo?.serialNumber || null,
       firmwareVersion: deviceInfo?.version || discoveryData?.version || null,
-      accessible: !!connectedClient,
+      accessible: isAccessible,
       openPorts,
       driver: vendorInfo.driver,
       parentInterfaceId,
@@ -2258,7 +2263,14 @@ export class NetworkScanner {
       newDevice.id = existingDevice.id
       actualDeviceId = existingDevice.id
       this.deviceCount++
-      const accessStatus = newDevice.accessible ? 'accessible' : 'not accessible (no SSH login)'
+      let accessStatus: string
+      if (newDevice.accessible) {
+        accessStatus = 'accessible'
+      } else if (connectedClient && !ruckusCliWorked) {
+        accessStatus = 'not accessible (CLI login failed)'
+      } else {
+        accessStatus = 'not accessible (no SSH login)'
+      }
       this.log('info', `${ip}: Updated existing device (MAC: ${deviceMac}, ${accessStatus})`)
     } else {
       // Release any stale IP claim before inserting (handles DHCP IP reuse)
@@ -2298,8 +2310,15 @@ export class NetworkScanner {
 
       actualDeviceId = deviceId
       this.deviceCount++
-      const accessStatus = newDevice.accessible ? 'accessible' : 'not accessible (no SSH login)'
-      this.log('success', `${ip}: Added as ${deviceType} (MAC: ${deviceMac}, ${accessStatus})`)
+      let newAccessStatus: string
+      if (newDevice.accessible) {
+        newAccessStatus = 'accessible'
+      } else if (connectedClient && !ruckusCliWorked) {
+        newAccessStatus = 'not accessible (CLI login failed)'
+      } else {
+        newAccessStatus = 'not accessible (no SSH login)'
+      }
+      this.log('success', `${ip}: Added as ${deviceType} (MAC: ${deviceMac}, ${newAccessStatus})`)
     }
 
     // Mark device as processed
