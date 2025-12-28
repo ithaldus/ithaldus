@@ -124,11 +124,12 @@ export async function getMikrotikInfoViaApi(
 
     // Build MAC to physical port map from bridge hosts
     const macToPort = new Map<string, string>()
-    for (const host of bridgeHostData as Record<string, string>[]) {
-      if (host.local === 'true') continue // Skip router's own MACs
+    for (const host of bridgeHostData as Record<string, unknown>[]) {
+      // Skip router's own MACs (local can be boolean true or string 'true')
+      if (host.local === true || host.local === 'true') continue
       if (host['mac-address'] && host['on-interface']) {
-        const mac = host['mac-address'].toUpperCase()
-        const port = host['on-interface']
+        const mac = (host['mac-address'] as string).toUpperCase()
+        const port = host['on-interface'] as string
         // Only use physical ports (not bridges or VLANs)
         if (!bridgeInterfaces.has(port) && !vlanToParent.has(port)) {
           macToPort.set(mac, port)
@@ -232,14 +233,15 @@ export async function getMikrotikInfoViaApi(
     }
 
     // Bridge hosts
-    for (const host of bridgeHostData as Record<string, string>[]) {
-      if (host.local === 'true') continue
+    for (const host of bridgeHostData as Record<string, unknown>[]) {
+      // Skip router's own MACs (local can be boolean true or string 'true')
+      if (host.local === true || host.local === 'true') continue
       if (!host['mac-address']) continue
-      const mac = host['mac-address'].toUpperCase()
+      const mac = (host['mac-address'] as string).toUpperCase()
       if (seenMacs.has(mac)) continue
       seenMacs.add(mac)
 
-      const port = host['on-interface'] || host.interface || 'unknown'
+      const port = (host['on-interface'] || host.interface || 'unknown') as string
 
       neighbors.push({
         mac,
