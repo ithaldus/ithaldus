@@ -2064,23 +2064,32 @@ export class NetworkScanner {
             { username: 'admin', password: 'admin' },
           ]
 
-          // Build credentials list: SSH cred first, then Ruckus defaults, then other network creds
-          // Limit to 4 attempts to avoid lockout (some devices lock after 1-3 failures)
+          // Build credentials list for Ruckus CLI login:
+          // 1. SSH credential first (might be same as CLI)
+          // 2. All 'admin' credentials (CLI often uses admin user even if SSH uses super)
+          // 3. Ruckus defaults
+          // 4. All other credentials
+          const adminCreds = this.credentialsList
+            .filter(c => c.username === 'admin' && (c.username !== successfulCreds!.username || c.password !== successfulCreds!.password))
+            .map(c => ({ username: c.username, password: c.password }))
+          const otherCreds = this.credentialsList
+            .filter(c => c.username !== 'admin' && (c.username !== successfulCreds!.username || c.password !== successfulCreds!.password))
+            .map(c => ({ username: c.username, password: c.password }))
+
           const allCreds = [
             { username: successfulCreds!.username, password: successfulCreds!.password },
+            ...adminCreds,  // Prioritize admin creds for CLI
             ...ruckusDefaults,
-            ...this.credentialsList
-              .filter(c => c.username !== successfulCreds!.username || c.password !== successfulCreds!.password)
-              .map(c => ({ username: c.username, password: c.password }))
+            ...otherCreds,
           ]
-          // Deduplicate by username+password
+          // Deduplicate by username+password, no hard limit (lockout detection handles early exit)
           const seen = new Set<string>()
           const ruckusCredentials = allCreds.filter(c => {
             const key = `${c.username}:${c.password}`
             if (seen.has(key)) return false
             seen.add(key)
             return true
-          }).slice(0, 4)  // Limit attempts to avoid lockout
+          })
           deviceInfo = await getRuckusInfo(
             connectedClient,
             banner,
