@@ -27,7 +27,7 @@ docker compose logs -f dev
 docker compose down
 ```
 
-The dev server runs on http://localhost:3100 (configured via `PORT_WEB` in `.env`).
+The dev server runs on the port configured via `PORT_WEB` in `.env`.
 
 ## Architecture
 
@@ -121,9 +121,9 @@ Enabled via `dark:` Tailwind variants. Set via `darkMode: 'class'` in config.
 Development uses `AUTH_BYPASS=true` for simplified login.
 
 Port configuration (for running multiple instances):
-- `PORT_WEB` - Web server port (default: 3000, this instance: 3100)
-- `PORT_API` - API/WebSocket port (default: 3001, this instance: 3101)
-- `COMPOSE_PROJECT_NAME` - Docker project name (this instance: topograph2)
+- `PORT_WEB` - Web server port (default: 3000)
+- `PORT_API` - API/WebSocket port (default: 3001)
+- `COMPOSE_PROJECT_NAME` - Docker project name (default: topograph)
 
 Production requires:
 - `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` - MS365 OAuth

@@ -46,3 +46,6 @@ bun.lockb
 logos/
 .browser-profile-puppeteer/
 .playwright-mcp/
+
+# Local Claude instructions
+CLAUDE.local.md
