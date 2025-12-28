@@ -9,7 +9,6 @@ import {
   AlertTriangle,
   MapPin,
   Zap,
-  HelpCircle,
   ArrowRightLeft,
   Server,
   Smartphone,
@@ -186,15 +185,6 @@ function parseWarningPorts(warningPorts: string | null): Set<number> {
   }
 }
 
-// Check if we need a virtual switch placeholder
-// (multiple children, all inaccessible = there's an unmanaged switch in between)
-// Only applies to wired interfaces - wireless interfaces naturally have multiple clients
-function needsVirtualSwitch(interfaceName: string, children: TopologyDevice[]): boolean {
-  if (children.length < 2) return false
-  // Wireless interfaces don't need virtual switch inference
-  if (interfaceName.toLowerCase().startsWith('wlan')) return false
-  return children.every((child) => !child.accessible)
-}
 
 // Check if an interface is a virtual/bridge interface that should be collapsed by default
 function isVirtualInterface(ifaceName: string): boolean {
@@ -566,7 +556,6 @@ export function DeviceCard({
             return sortedInterfaces.map(([ifaceName, children], idx) => {
             const isLastInterface = idx === sortedInterfaces.length - 1
             const ifaceInfo = getInterfaceInfo(ifaceName)
-            const showVirtualSwitch = needsVirtualSwitch(ifaceName, children)
 
             return (
               <div key={ifaceName} className="relative">
@@ -659,60 +648,25 @@ export function DeviceCard({
                 {/* Child Devices - only render if interface is not collapsed */}
                 {(expandAll === true || (expandAll !== false && (filterActive || !collapsedInterfaces.has(ifaceName)))) && (
                   <div className="space-y-1 ml-3 pb-1">
-                    {showVirtualSwitch ? (
-                      /* Virtual switch placeholder - inferred when multiple inaccessible devices on one interface */
-                      <div className="relative">
-                        <div className="inline-flex items-center gap-2 px-2 py-1.5 rounded border border-dashed border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 text-xs">
-                          <div className="shrink-0 p-1 rounded border border-amber-500/30 bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                            <HelpCircle className="w-3 h-3" />
-                          </div>
-                          <span className="font-medium text-amber-700 dark:text-amber-400">
-                            Unknown switch(es)
-                          </span>
-                        </div>
-                        <div className="mt-1 ml-4 pl-3 border-l border-dashed border-amber-400/50 space-y-1">
-                          {children.map((child) => (
-                            <DeviceCard
-                              key={child.id}
-                              device={child}
-                              level={level + 1}
-                              showEndDevices={showEndDevices}
-                              showFirmware={showFirmware}
-                              showPorts={showPorts}
-                              showInterfaces={showInterfaces}
-                              showVendor={showVendor}
-                              showSerialNumber={showSerialNumber}
-                              showAssetTag={showAssetTag}
-                              showMac={showMac}
-                              filterActive={filterActive}
-                              filterText={filterText}
-                              expandAll={expandAll}
-                              onDeviceClick={onDeviceClick}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      children.map((child) => (
-                        <DeviceCard
-                          key={child.id}
-                          device={child}
-                          level={level + 1}
-                          showEndDevices={showEndDevices}
-                          showFirmware={showFirmware}
-                          showPorts={showPorts}
-                          showInterfaces={showInterfaces}
-                          showVendor={showVendor}
-                          showSerialNumber={showSerialNumber}
-                          showAssetTag={showAssetTag}
-                          showMac={showMac}
-                          filterActive={filterActive}
-                          filterText={filterText}
-                          expandAll={expandAll}
-                          onDeviceClick={onDeviceClick}
-                        />
-                      ))
-                    )}
+                    {children.map((child) => (
+                      <DeviceCard
+                        key={child.id}
+                        device={child}
+                        level={level + 1}
+                        showEndDevices={showEndDevices}
+                        showFirmware={showFirmware}
+                        showPorts={showPorts}
+                        showInterfaces={showInterfaces}
+                        showVendor={showVendor}
+                        showSerialNumber={showSerialNumber}
+                        showAssetTag={showAssetTag}
+                        showMac={showMac}
+                        filterActive={filterActive}
+                        filterText={filterText}
+                        expandAll={expandAll}
+                        onDeviceClick={onDeviceClick}
+                      />
+                    ))}
                   </div>
                 )}
 
