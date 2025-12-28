@@ -356,51 +356,56 @@ async function getMikrotikInfo(client: Client, log?: (level: LogLevel, message: 
     }
   }
 
-  // DHCP leases - only process bound leases, ignore static unbound leases
+  // DHCP leases - process all leases (bound and unbound static)
+  // Unbound static leases may have comments useful for device identification
   const dhcpLeaseLines = dhcpLeases.split('\n').filter(l => l.includes('mac-address='))
   for (const line of dhcpLeaseLines) {
-    // Skip unbound leases (static leases for offline devices)
-    if (!line.includes('status=bound')) {
-      continue
-    }
     const macMatch = line.match(/mac-address=(\S+)/)
     const ipMatch = line.match(/address=(\d+\.\d+\.\d+\.\d+)/)
     const hostMatch = line.match(/host-name=(\S+)/)
     const serverMatch = line.match(/server=(\S+)/)
+    const commentMatch = line.match(/comment="([^"]*)"/) || line.match(/comment=(\S+)/)
+    const isBound = line.includes('status=bound')
+
     if (macMatch) {
       const mac = macMatch[1].toUpperCase()
       const ip = ipMatch ? ipMatch[1] : null
       const hostname = hostMatch ? decodeMikrotikString(hostMatch[1]) : null
+      const comment = commentMatch ? decodeMikrotikString(commentMatch[1]) : null
 
-      // Try to find physical port from bridge host table first
-      let interfaceName = 'unknown'
-      const physicalPort = tempMacToPort.get(mac)
-      if (physicalPort) {
-        // Best case: we know the physical port from bridge host table
-        interfaceName = physicalPort
-      } else if (serverMatch) {
-        // Fallback: resolve DHCP server name to its interface
-        const serverName = serverMatch[1]
-        const serverInterface = dhcpServerToInterface.get(serverName)
-        if (serverInterface) {
-          // DHCP server interface is typically a bridge - use it as fallback
-          interfaceName = serverInterface
-        } else {
-          // Last resort: use server name (won't match but at least preserves info)
-          interfaceName = serverName
+      // Store ALL leases for database persistence (for hostname/comment lookup)
+      // This includes unbound static leases which may have useful comments
+      parsedDhcpLeases.push({ mac, ip, hostname, comment })
+
+      // Only add BOUND leases as neighbors (avoid creating ghost devices)
+      if (isBound) {
+        // Try to find physical port from bridge host table first
+        let interfaceName = 'unknown'
+        const physicalPort = tempMacToPort.get(mac)
+        if (physicalPort) {
+          // Best case: we know the physical port from bridge host table
+          interfaceName = physicalPort
+        } else if (serverMatch) {
+          // Fallback: resolve DHCP server name to its interface
+          const serverName = serverMatch[1]
+          const serverInterface = dhcpServerToInterface.get(serverName)
+          if (serverInterface) {
+            // DHCP server interface is typically a bridge - use it as fallback
+            interfaceName = serverInterface
+          } else {
+            // Last resort: use server name (won't match but at least preserves info)
+            interfaceName = serverName
+          }
         }
+
+        neighbors.push({
+          mac,
+          ip,
+          hostname,
+          interface: interfaceName,
+          type: 'dhcp',
+        })
       }
-
-      neighbors.push({
-        mac,
-        ip,
-        hostname,
-        interface: interfaceName,
-        type: 'dhcp',
-      })
-
-      // Also store in dhcpLeases array for database persistence
-      parsedDhcpLeases.push({ mac, ip, hostname })
     }
   }
 

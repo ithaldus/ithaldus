@@ -147,6 +147,7 @@ export const dhcpLeases = sqliteTable('dhcp_leases', {
   mac: text('mac').notNull(),
   ip: text('ip'),
   hostname: text('hostname'),
+  comment: text('comment'),  // Comment from static DHCP lease (can be used for device identification)
   lastSeenAt: text('last_seen_at').notNull(),
 }, (table) => [
   index('idx_dhcp_leases_network').on(table.networkId),

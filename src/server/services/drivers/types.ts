@@ -6,6 +6,7 @@ export interface DhcpLeaseInfo {
   mac: string
   ip: string | null
   hostname: string | null
+  comment: string | null  // Comment from DHCP static lease
 }
 
 export interface DeviceInfo {

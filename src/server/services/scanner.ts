@@ -1039,6 +1039,52 @@ export class NetworkScanner {
   }
 
   /**
+   * Apply DHCP lease comments to discovered devices that don't have a comment
+   * This allows using static DHCP lease comments to identify devices that use static IPs
+   */
+  private async applyDhcpCommentsToDevices(): Promise<void> {
+    // Get all DHCP leases with comments for this network
+    const leasesWithComments = await db.select()
+      .from(dhcpLeases)
+      .where(eq(dhcpLeases.networkId, this.networkId))
+
+    // Filter to only leases that have comments
+    const commentsByMac = new Map<string, string>()
+    for (const lease of leasesWithComments) {
+      if (lease.comment) {
+        commentsByMac.set(lease.mac.toUpperCase(), lease.comment)
+      }
+    }
+
+    if (commentsByMac.size === 0) {
+      return  // No comments to apply
+    }
+
+    // Get all devices in this network that don't have a comment
+    const devicesWithoutComment = await db.select()
+      .from(devices)
+      .where(and(
+        eq(devices.networkId, this.networkId),
+        or(isNull(devices.comment), eq(devices.comment, ''))
+      ))
+
+    let appliedCount = 0
+    for (const device of devicesWithoutComment) {
+      const comment = commentsByMac.get(device.mac.toUpperCase())
+      if (comment) {
+        await db.update(devices)
+          .set({ comment })
+          .where(eq(devices.id, device.id))
+        appliedCount++
+      }
+    }
+
+    if (appliedCount > 0) {
+      this.log('info', `Applied ${appliedCount} DHCP lease comment${appliedCount !== 1 ? 's' : ''} to devices`)
+    }
+  }
+
+  /**
    * Add a bridge host as an end-device
    */
   private async addBridgeHost(
@@ -1329,6 +1375,10 @@ export class NetworkScanner {
 
       // Scan root device
       await this.scanDevice(network.rootIp, null, null)
+
+      // Apply DHCP lease comments to devices that don't have a comment
+      // This uses comments from static DHCP leases (including unbound ones) to identify devices
+      await this.applyDhcpCommentsToDevices()
 
       // Update scan record
       await db.update(scans)
@@ -1707,7 +1757,8 @@ export class NetworkScanner {
             deviceInfo = await mikrotikRouterOsDriver.getDeviceInfo(connectedClient, (level, msg) => this.log(level, `${ip}: ${msg}`))
             this.log('info', `${ip}: Detected ${vendorInfo.vendor} ${deviceInfo.model || 'device'}`)
 
-            // Save DHCP leases to database for hostname resolution
+            // Save DHCP leases to database for hostname/comment resolution
+            // Includes both bound and unbound static leases (for comment lookup)
             if (deviceInfo.dhcpLeases.length > 0) {
               this.log('info', `${ip}: Saving ${deviceInfo.dhcpLeases.length} DHCP leases`)
               const now = new Date().toISOString()
@@ -1718,6 +1769,7 @@ export class NetworkScanner {
                   mac: lease.mac,
                   ip: lease.ip,
                   hostname: lease.hostname,
+                  comment: lease.comment,
                   lastSeenAt: now,
                 }).catch(() => {}) // Ignore duplicates
               }

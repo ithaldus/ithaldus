@@ -1,0 +1,1 @@
+ALTER TABLE `dhcp_leases` ADD `comment` text;

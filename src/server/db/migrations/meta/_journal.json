@@ -127,6 +127,13 @@
       "when": 1766832623963,
       "tag": "0017_worthless_ghost_rider",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1766884391682,
+      "tag": "0018_yielding_tyrannus",
+      "breakpoints": true
     }
   ]
 }
