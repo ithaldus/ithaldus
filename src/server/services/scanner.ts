@@ -2170,10 +2170,11 @@ export class NetworkScanner {
       snmpInfo = await this.getSnmpInfo(ip)
     }
 
-    // Look up MNDP/CDP/LLDP discovery data for devices we couldn't SSH into
-    const discoveryData = !deviceInfo ? this.neighborDiscoveryData.get(deviceMac) : null
-    if (discoveryData && (discoveryData.model || discoveryData.version)) {
-      this.log('info', `${ip}: Using MNDP/CDP/LLDP discovery data (model=${discoveryData.model}, version=${discoveryData.version})`)
+    // Look up MNDP/CDP/LLDP discovery data as fallback for missing fields
+    // Always look this up since SSH may succeed but return incomplete data (e.g., Ruckus APs)
+    const discoveryData = this.neighborDiscoveryData.get(deviceMac)
+    if (discoveryData && (discoveryData.hostname || discoveryData.model || discoveryData.version)) {
+      this.log('info', `${ip}: MNDP/CDP/LLDP data available (hostname=${discoveryData.hostname}, model=${discoveryData.model}, version=${discoveryData.version})`)
     }
 
     // Determine hostname for type detection (combine all sources)
