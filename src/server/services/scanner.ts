@@ -13,6 +13,7 @@ import {
   type DeviceInfo,
   type LogLevel,
 } from './drivers'
+import { getMikrotikInfoViaApi } from './drivers/mikrotik-api'
 import { scanMdns, type MdnsDevice } from './mdns'
 import { snmpQuery, type SnmpDeviceInfo } from './snmp'
 import { limitConcurrency } from './concurrency'
@@ -1583,11 +1584,13 @@ export class NetworkScanner {
       }
     }
 
-    // Try to connect via SSH
+    // Try to connect via SSH or API
     let connectedClient: Client | null = null
     let banner = ''
     let successfulCreds: CredentialInfo | null = null
     let usedJumpHost = false
+    let connectedViaApi = false
+    let apiDeviceInfo_cache: DeviceInfo | null = null
     const isRootDevice = ip === this.rootIp
 
     // Build ordered list of credentials to try
@@ -1701,20 +1704,72 @@ export class NetworkScanner {
         this.log('info', `${ip}: SSH via jump host also failed - no valid credentials (tried ${credsToTry.length})`)
       }
     } else if (!shouldSkipLogin && !hasSSHPort) {
-      // SSH port not open - log why we can't connect
-      if (hasMikroTikPorts) {
-        this.log('warn', `${ip}: SSH port (22) not open - MikroTik API/WinBox ports detected but SSH is disabled on this device`)
-      } else if (hasTelnetPort) {
+      // SSH port not open - check for alternatives
+      if (hasTelnetPort && !openPorts.includes(8728)) {
         this.log('warn', `${ip}: SSH port (22) not open - only Telnet (23) available (not supported)`)
-      } else {
+      } else if (!openPorts.includes(8728)) {
         this.log('warn', `${ip}: SSH port (22) not open - cannot login to collect device info`)
+      }
+      // Note: If port 8728 is open, we'll try MikroTik API below
+    }
+
+    // Try MikroTik API (port 8728) if SSH failed or was not available
+    const hasApiPort = openPorts.includes(8728)
+    if (!connectedClient && hasApiPort && !shouldSkipLogin && credsToTry.length > 0) {
+      this.log('info', `${ip}: Trying MikroTik API (port 8728) with ${credsToTry.length} credentials`)
+      this.updateChannel(channelId, 'trying API')
+
+      for (const cred of credsToTry) {
+        try {
+          const apiDeviceInfo = await getMikrotikInfoViaApi(
+            ip,
+            cred.username,
+            cred.password,
+            (level, msg) => this.log(level, `${ip}: ${msg}`),
+            15000
+          )
+          // Success! Store the device info and credentials
+          successfulCreds = cred
+          connectedViaApi = true
+          apiDeviceInfo_cache = apiDeviceInfo
+          this.log('success', `${ip}: MikroTik API connection successful with ${cred.username}`)
+          break
+        } catch (error) {
+          // Try next credential
+        }
+      }
+
+      if (!connectedViaApi) {
+        this.log('warn', `${ip}: MikroTik API connection failed - no valid credentials`)
       }
     }
 
     let deviceInfo: DeviceInfo | null = null
     let vendorInfo: { vendor: string | null; driver: string | null } = { vendor: null, driver: null }
 
-    if (connectedClient) {
+    // Use cached API device info if we connected via API
+    if (connectedViaApi && apiDeviceInfo_cache) {
+      deviceInfo = apiDeviceInfo_cache
+      vendorInfo = { vendor: 'MikroTik', driver: 'mikrotik-api' }
+      this.log('info', `${ip}: Detected MikroTik ${deviceInfo.model || 'device'} via API`)
+
+      // Save DHCP leases to database
+      if (deviceInfo.dhcpLeases.length > 0) {
+        this.log('info', `${ip}: Saving ${deviceInfo.dhcpLeases.length} DHCP leases`)
+        const now = new Date().toISOString()
+        for (const lease of deviceInfo.dhcpLeases) {
+          await db.insert(dhcpLeases).values({
+            id: nanoid(),
+            networkId: this.networkId,
+            mac: lease.mac,
+            ip: lease.ip,
+            hostname: lease.hostname,
+            comment: lease.comment,
+            lastSeenAt: now,
+          }).catch(() => {})
+        }
+      }
+    } else if (connectedClient) {
       this.updateChannel(channelId, 'fetching device info')
       try {
         // Check if vendor can be determined from MAC OUI first
