@@ -2085,10 +2085,9 @@ export class NetworkScanner {
           ]
 
           // Build credentials list for Ruckus CLI login:
-          // 1. SSH credential first (might be same as CLI)
-          // 2. All 'admin' credentials (CLI often uses admin user even if SSH uses super)
-          // 3. Ruckus defaults
-          // 4. All other credentials
+          // Ruckus CLI typically uses 'admin' user even when SSH uses 'super'
+          // So prioritize admin credentials FIRST to avoid lockout from wrong username
+          const sshCred = { username: successfulCreds!.username, password: successfulCreds!.password }
           const adminCreds = this.credentialsList
             .filter(c => c.username === 'admin' && (c.username !== successfulCreds!.username || c.password !== successfulCreds!.password))
             .map(c => ({ username: c.username, password: c.password }))
@@ -2096,12 +2095,10 @@ export class NetworkScanner {
             .filter(c => c.username !== 'admin' && (c.username !== successfulCreds!.username || c.password !== successfulCreds!.password))
             .map(c => ({ username: c.username, password: c.password }))
 
-          const allCreds = [
-            { username: successfulCreds!.username, password: successfulCreds!.password },
-            ...adminCreds,  // Prioritize admin creds for CLI
-            ...ruckusDefaults,
-            ...otherCreds,
-          ]
+          // Order: admin creds first (most likely for CLI), then SSH cred, then defaults, then others
+          const allCreds = sshCred.username === 'admin'
+            ? [sshCred, ...adminCreds, ...ruckusDefaults, ...otherCreds]  // SSH is admin, keep it first
+            : [...adminCreds, sshCred, ...ruckusDefaults, ...otherCreds]  // SSH is super/other, try admin first
           // Deduplicate by username+password, no hard limit (lockout detection handles early exit)
           const seen = new Set<string>()
           const ruckusCredentials = allCreds.filter(c => {
