@@ -138,29 +138,33 @@ export function DebugConsole({
     }
   }, [filteredLogs, isAtBottom])
 
-  // Calculate required width based on longest log message
+  // Calculate required width based on 98th percentile of log message widths
+  // This allows exceptionally long lines to wrap while fitting most lines
   const calculateRequiredWidth = useCallback(() => {
     if (logs.length === 0) return 400
 
     // Use the hidden measure element for accurate width calculation
     if (measureRef.current) {
-      let maxWidth = 0
+      const widths: number[] = []
       for (const log of logs) {
         measureRef.current.textContent = log.message
-        maxWidth = Math.max(maxWidth, measureRef.current.offsetWidth)
+        widths.push(measureRef.current.offsetWidth)
       }
+      // Sort and find 98th percentile
+      widths.sort((a, b) => a - b)
+      const p98Index = Math.floor(widths.length * 0.98)
+      const p98Width = widths[p98Index] || widths[widths.length - 1]
       return Math.min(
-        Math.max(400, maxWidth + TIMESTAMP_WIDTH + PADDING),
+        Math.max(400, p98Width + TIMESTAMP_WIDTH + PADDING),
         window.innerWidth * 0.7 // Max 70% of viewport
       )
     }
 
-    // Fallback: estimate based on character count
-    const longestMessage = logs.reduce(
-      (max, log) => (log.message.length > max.length ? log.message : max),
-      ''
-    )
-    const estimatedWidth = longestMessage.length * CHAR_WIDTH + TIMESTAMP_WIDTH + PADDING
+    // Fallback: estimate based on character count (98th percentile)
+    const lengths = logs.map(log => log.message.length).sort((a, b) => a - b)
+    const p98Index = Math.floor(lengths.length * 0.98)
+    const p98Length = lengths[p98Index] || lengths[lengths.length - 1]
+    const estimatedWidth = p98Length * CHAR_WIDTH + TIMESTAMP_WIDTH + PADDING
     return Math.min(Math.max(400, estimatedWidth), window.innerWidth * 0.7)
   }, [logs])
 
@@ -383,9 +387,7 @@ export function DebugConsole({
           ref={consoleRef}
           onScroll={handleScroll}
           style={{ fontFamily: 'Iosevka, monospace' }}
-          className={`flex-1 overflow-y-auto p-2 text-[9px] leading-tight tracking-tight ${
-            autoExpand ? 'overflow-x-auto' : 'overflow-x-hidden'
-          }`}
+          className="flex-1 overflow-y-auto overflow-x-hidden p-2 text-[9px] leading-tight tracking-tight"
         >
           {logs.length === 0 ? (
             <div className="text-slate-500 text-center py-8">
@@ -399,14 +401,12 @@ export function DebugConsole({
             filteredLogs.map((log, index) => (
               <div
                 key={index}
-                className={`flex items-start gap-2 py-0.5 ${levelColors[log.level]} ${
-                  autoExpand ? 'whitespace-nowrap' : ''
-                }`}
+                className={`flex items-start gap-2 py-0.5 ${levelColors[log.level]}`}
               >
                 <span className="text-slate-600 shrink-0">
                   [{formatTime(log.timestamp)}]
                 </span>
-                <span className={autoExpand ? 'whitespace-nowrap' : 'break-all'}>{log.message}</span>
+                <span className="break-all">{log.message}</span>
               </div>
             ))
           )}
