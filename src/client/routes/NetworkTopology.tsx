@@ -15,6 +15,8 @@ import {
   Search,
   ChevronsDownUp,
   ChevronsUpDown,
+  MoreHorizontal,
+  Check,
 } from 'lucide-react'
 import { DeviceCard } from '../components/topology/DeviceCard'
 import { DebugConsole } from '../components/topology/DebugConsole'
@@ -128,6 +130,12 @@ export function NetworkTopology() {
     localStorage.setItem('topology-device-types', JSON.stringify(Array.from(enabledDeviceTypes)))
   }, [enabledDeviceTypes])
 
+  // Device type filter overflow state
+  const toolbarRowRef = useRef<HTMLDivElement>(null)
+  const deviceTypeContainerRef = useRef<HTMLDivElement>(null)
+  const [overflowIndex, setOverflowIndex] = useState<number | null>(null)
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false)
+
   // Derive selected device from URL param
   const selectedDeviceId = searchParams.get('device')
   const selectedDevice = useMemo(() => {
@@ -191,6 +199,71 @@ export function NetworkTopology() {
   useEffect(() => {
     localStorage.setItem('topology-visibility', JSON.stringify(visibility))
   }, [visibility])
+
+  // Device type filter overflow detection
+  useEffect(() => {
+    const container = deviceTypeContainerRef.current
+    if (!container) return
+
+    const calculateOverflow = () => {
+      // Get the container's actual width (it's flex-1 so it takes remaining space)
+      const containerWidth = container.offsetWidth
+
+      // Each device type button is ~32px, toggle is ~32px, overflow button is ~32px
+      const buttonWidth = 32
+      const toggleWidth = 32
+      const overflowButtonWidth = 32
+
+      // Available space for device type buttons after toggle and overflow button
+      const spaceForButtons = containerWidth - toggleWidth - overflowButtonWidth
+      const maxButtons = Math.floor(spaceForButtons / buttonWidth)
+      const totalButtons = deviceTypeOptions.length
+
+      // Need space for at least toggle + all buttons + some padding
+      const fullWidth = toggleWidth + (totalButtons * buttonWidth) + 8
+
+      if (containerWidth >= fullWidth) {
+        setOverflowIndex(null) // All fit, no overflow needed
+      } else if (maxButtons <= 0) {
+        setOverflowIndex(0) // No space, all in overflow
+      } else {
+        setOverflowIndex(maxButtons)
+      }
+    }
+
+    const observer = new ResizeObserver(calculateOverflow)
+    observer.observe(container)
+
+    // Initial calculation after a short delay to ensure layout is complete
+    setTimeout(calculateOverflow, 100)
+    // Also recalculate after a longer delay for console animations
+    setTimeout(calculateOverflow, 300)
+
+    return () => observer.disconnect()
+  }, [consoleOpen, consoleWidth])
+
+  // Close overflow menu on outside click
+  useEffect(() => {
+    if (!showOverflowMenu) return
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (deviceTypeContainerRef.current && !deviceTypeContainerRef.current.contains(e.target as Node)) {
+        setShowOverflowMenu(false)
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [showOverflowMenu])
+
+  // Calculate visible and overflow device types
+  const visibleDeviceTypes = overflowIndex === null
+    ? deviceTypeOptions
+    : deviceTypeOptions.slice(0, overflowIndex)
+
+  const overflowDeviceTypes = overflowIndex === null
+    ? []
+    : deviceTypeOptions.slice(overflowIndex)
 
   async function loadNetworkData() {
     try {
@@ -871,10 +944,10 @@ export function NetworkTopology() {
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div ref={toolbarRowRef} className="flex items-center gap-3 overflow-hidden">
 
           {/* Visibility Toggle Pill - "FIVEAMPS" */}
-          <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76] overflow-hidden">
+          <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76] overflow-hidden flex-shrink-0">
             {[
               { key: 'firmware' as const, label: 'F', tooltip: 'Firmware — Show or hide firmware version information on device cards' },
               { key: 'interfaces' as const, label: 'I', tooltip: 'Interfaces — Show or hide network interface details and bridge membership' },
@@ -902,14 +975,52 @@ export function NetworkTopology() {
             ))}
           </div>
 
-          {/* Device Type Filter Pill */}
-          <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76] overflow-hidden">
+          {/* Export PDF - positioned before device filter so it's always visible */}
+          <button
+            onClick={exportPDF}
+            disabled={devices.length === 0}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors flex-shrink-0"
+          >
+            <FileDown className="w-4 h-4" />
+            Export
+          </button>
+
+          {/* Start/Stop Scan - positioned before device filter so it's always visible */}
+          {isAdmin && (
+            scanStatus === 'running' ? (
+              <Tooltip content="Stop scan" position="bottom">
+                <button
+                  onClick={stopScan}
+                  className="inline-flex items-center justify-center gap-2 px-2.5 xl:px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 text-sm font-medium transition-colors flex-shrink-0"
+                >
+                  <Square className="w-4 h-4" />
+                  <span className="hidden xl:inline">Stop</span>
+                </button>
+              </Tooltip>
+            ) : (
+              <Tooltip content="Start network scan" position="bottom">
+                <button
+                  onClick={startScan}
+                  className="inline-flex items-center justify-center gap-2 px-2.5 xl:px-3 py-2 rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 text-sm font-medium transition-colors flex-shrink-0"
+                >
+                  <Radar className="w-4 h-4" />
+                  <span className="hidden xl:inline">Scan</span>
+                </button>
+              </Tooltip>
+            )
+          )}
+
+          {/* Device Type Filter Pill - last so it can shrink/overflow */}
+          <div
+            ref={deviceTypeContainerRef}
+            className="flex items-center rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76] overflow-hidden flex-1 min-w-[72px]"
+          >
             {/* All/None toggle */}
             <Tooltip content={allDeviceTypesEnabled ? "Hide all device types" : "Show all device types"}>
               <button
                 onClick={allDeviceTypesEnabled ? disableAllDeviceTypes : enableAllDeviceTypes}
                 className={`
-                  px-2 py-2 text-xs font-medium transition-colors
+                  px-2 py-2 text-xs font-medium transition-colors flex-shrink-0
                   ${allDeviceTypesEnabled
                     ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
                     : noDeviceTypesEnabled
@@ -921,12 +1032,13 @@ export function NetworkTopology() {
                 {allDeviceTypesEnabled ? '✓' : noDeviceTypesEnabled ? '✗' : '~'}
               </button>
             </Tooltip>
-            {deviceTypeOptions.map(({ value, label, icon: Icon }) => (
+            {/* Visible device type buttons */}
+            {visibleDeviceTypes.map(({ value, label, icon: Icon }) => (
               <Tooltip key={value} content={`${label} — ${enabledDeviceTypes.has(value) ? 'Click to hide' : 'Click to show'}`}>
                 <button
                   onClick={() => toggleDeviceType(value)}
                   className={`
-                    px-2 py-2 text-xs transition-colors
+                    px-2 py-2 text-xs transition-colors flex-shrink-0
                     ${enabledDeviceTypes.has(value)
                       ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
                       : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-600 dark:hover:text-slate-300'
@@ -937,42 +1049,52 @@ export function NetworkTopology() {
                 </button>
               </Tooltip>
             ))}
+            {/* Overflow dropdown */}
+            {overflowDeviceTypes.length > 0 && (
+              <div className="relative flex-shrink-0">
+                <Tooltip content={`${overflowDeviceTypes.length} more device types`}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowOverflowMenu(!showOverflowMenu)
+                    }}
+                    className={`
+                      px-2 py-2 text-xs transition-colors
+                      ${overflowDeviceTypes.some(opt => enabledDeviceTypes.has(opt.value))
+                        ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
+                        : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-600 dark:hover:text-slate-300'
+                      }
+                    `}
+                  >
+                    <MoreHorizontal className="w-3.5 h-3.5" />
+                  </button>
+                </Tooltip>
+                {showOverflowMenu && (
+                  <div className="absolute top-full right-0 mt-1 py-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-50 min-w-[160px]">
+                    {overflowDeviceTypes.map(({ value, label, icon: Icon }) => (
+                      <button
+                        key={value}
+                        onClick={() => toggleDeviceType(value)}
+                        className={`
+                          w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors
+                          ${enabledDeviceTypes.has(value)
+                            ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
+                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                          }
+                        `}
+                      >
+                        <Icon className="w-4 h-4 shrink-0" />
+                        <span className="flex-1 text-left">{label}</span>
+                        {enabledDeviceTypes.has(value) && (
+                          <Check className="w-4 h-4 shrink-0 text-cyan-500" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-
-          {/* Export PDF */}
-          <button
-            onClick={exportPDF}
-            disabled={devices.length === 0}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors"
-          >
-            <FileDown className="w-4 h-4" />
-            Export
-          </button>
-
-          {/* Start/Stop Scan */}
-          {isAdmin && (
-            scanStatus === 'running' ? (
-              <Tooltip content="Stop scan" position="bottom">
-                <button
-                  onClick={stopScan}
-                  className="inline-flex items-center justify-center gap-2 px-2.5 xl:px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 text-sm font-medium transition-colors"
-                >
-                  <Square className="w-4 h-4" />
-                  <span className="hidden xl:inline">Stop</span>
-                </button>
-              </Tooltip>
-            ) : (
-              <Tooltip content="Start network scan" position="bottom">
-                <button
-                  onClick={startScan}
-                  className="inline-flex items-center justify-center gap-2 px-2.5 xl:px-3 py-2 rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 text-sm font-medium transition-colors"
-                >
-                  <Radar className="w-4 h-4" />
-                  <span className="hidden xl:inline">Scan</span>
-                </button>
-              </Tooltip>
-            )
-          )}
           </div>
         </div>
 
