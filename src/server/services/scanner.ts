@@ -70,7 +70,7 @@ export interface DiscoveredInterface {
 const SSH_PORTS = [22]
 // Management ports: SSH, Telnet, HTTP, HTTPS, MikroTik (8291, 8728), SNMP (161), Ruckus AP (8090, 8099, 8100, 9998)
 // Additional: FTP (21), SMB (139, 445), LPD (515), IPP (631), Printers (9100-9103), Web mgmt (9080, 9081, 9090, 9091)
-const MANAGEMENT_PORTS = [21, 22, 23, 80, 139, 161, 443, 445, 515, 631, 8090, 8099, 8100, 8291, 8728, 9080, 9081, 9090, 9091, 9100, 9101, 9102, 9103, 9998]
+const MANAGEMENT_PORTS = [21, 22, 23, 80, 139, 161, 162, 443, 445, 515, 631, 888, 7443, 8022, 8090, 8099, 8100, 8291, 8443, 8728, 9080, 9081, 9090, 9091, 9100, 9101, 9102, 9103, 9998, 11443, 23233]
 
 // Concurrency configuration
 const SCAN_CONCURRENCY = {
