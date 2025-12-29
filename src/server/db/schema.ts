@@ -31,6 +31,11 @@ export const networks = sqliteTable('networks', {
   lastScannedAt: text('last_scanned_at'),
   deviceCount: integer('device_count'),
   isOnline: integer('is_online', { mode: 'boolean' }),
+  // SmartZone integration (optional)
+  smartzoneHost: text('smartzone_host'),
+  smartzonePort: integer('smartzone_port').default(8443),
+  smartzoneUsername: text('smartzone_username'),
+  smartzonePassword: text('smartzone_password'),
 })
 
 // Locations table (physical locations within a network)
@@ -114,6 +119,7 @@ export const devices = sqliteTable('devices', {
   nomad: integer('nomad', { mode: 'boolean' }).notNull().default(false),
   skipLogin: integer('skip_login', { mode: 'boolean' }).notNull().default(false),
   vlans: text('vlans'),  // Comma-separated VLAN IDs this device was seen on
+  smartzoneEnriched: integer('smartzone_enriched', { mode: 'boolean' }).notNull().default(false),  // True if data came from SmartZone API
   lastSeenAt: text('last_seen_at').notNull(),
 }, (table) => [
   index('idx_devices_primary_mac').on(table.primaryMac),

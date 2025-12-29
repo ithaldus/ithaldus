@@ -20,6 +20,7 @@ import { snmpQuery, type SnmpDeviceInfo } from './snmp'
 import { limitConcurrency } from './concurrency'
 import { wsManager } from './websocket'
 import { ensureStockImageEntry } from '../routes/stock-images'
+import { SmartZoneService, type SmartZoneAP } from './smartzone'
 
 export type { LogLevel }
 
@@ -807,6 +808,7 @@ export class NetworkScanner {
   private rootIp: string = ''  // Store root IP for jump host reference
   private mdnsDevices: Map<string, MdnsDevice> = new Map()  // IP -> mDNS device info
   private snmpDevices: Map<string, SnmpDeviceInfo> = new Map()  // IP -> SNMP device info
+  private smartzoneCache: Map<string, SmartZoneAP> = new Map()  // MAC -> SmartZone AP data
   private activeChannels: Map<string, { ip: string; action: string }> = new Map()  // channelId -> info
   private channelCounter: number = 0
 
@@ -1538,6 +1540,26 @@ export class NetworkScanner {
       const failedCount = existingFailed.length
       this.log('info', `Loaded ${this.credentialsList.length} credentials to try${failedCount > 0 ? ` (${failedCount} known failures will be skipped)` : ''}`)
 
+      // Pre-fetch SmartZone AP data if configured
+      if (network.smartzoneHost && network.smartzoneUsername && network.smartzonePassword) {
+        this.log('info', `Querying SmartZone at ${network.smartzoneHost}...`)
+        try {
+          const szService = new SmartZoneService({
+            host: network.smartzoneHost,
+            port: network.smartzonePort || 8443,
+            username: network.smartzoneUsername,
+            password: network.smartzonePassword,
+          })
+          this.smartzoneCache = await szService.fetchAPsByMac()
+          this.log('success', `SmartZone: Loaded ${this.smartzoneCache.size} APs`)
+          for (const [mac, ap] of this.smartzoneCache) {
+            this.log('info', `  ${mac}: ${ap.name} (${ap.model}, S/N: ${ap.serial})`)
+          }
+        } catch (err) {
+          this.log('warn', `SmartZone query failed: ${err instanceof Error ? err.message : err}`)
+        }
+      }
+
       // Run mDNS scan in parallel to discover hostnames from Bonjour/Avahi devices
       this.log('info', 'Scanning for mDNS/Bonjour devices...')
       try {
@@ -1545,7 +1567,7 @@ export class NetworkScanner {
         if (this.mdnsDevices.size > 0) {
           this.log('success', `mDNS: Found ${this.mdnsDevices.size} devices with hostnames`)
           for (const [ip, device] of this.mdnsDevices) {
-            this.log('info', `  ${ip}: ${device.hostname}${device.services.length ? ' (' + device.services.join(', ') + ')' : ''}`)
+            this.log('info', `  ${ip}: ${device.hostname}${device.services.length ? ' (' + device.services.join(',') + ')' : ''}`)
           }
         } else {
           this.log('info', 'mDNS: No devices found')
@@ -1818,12 +1840,12 @@ export class NetworkScanner {
       return
     }
 
-    this.log('info', `${ip}: Open ports: ${openPorts.join(', ')}`)
+    this.log('info', `${ip}: Open ports: ${openPorts.join(',')}`)
 
     // Check for warning ports (insecure HTTP, telnet)
     const warningPorts = await getWarningPorts(ip, openPorts)
     if (warningPorts.length > 0) {
-      this.log('info', `${ip}: Warning ports detected: ${warningPorts.join(', ')}`)
+      this.log('info', `${ip}: Warning ports: ${warningPorts.join(',')}`)
     }
 
     // Check if skipLogin is enabled for this device (by MAC)
@@ -2028,6 +2050,7 @@ export class NetworkScanner {
 
     let deviceInfo: DeviceInfo | null = null
     let vendorInfo: { vendor: string | null; driver: string | null } = { vendor: null, driver: null }
+    let isSmartZoneEnriched = false
 
     // Use cached API device info if we connected via API
     if (connectedViaApi && apiDeviceInfo_cache) {
@@ -2073,48 +2096,73 @@ export class NetworkScanner {
           vendorInfo = { vendor: 'Zyxel', driver: 'zyxel' }
           this.log('info', `${ip}: Detected Zyxel ${deviceInfo.model || 'switch'}${deviceInfo.serialNumber ? ' (S/N: ' + deviceInfo.serialNumber + ')' : ''}`)
         } else if (macVendor === 'Ruckus' || isRkscliDevice(banner)) {
-          // Ruckus detected from MAC or banner - use rkscli/Unleashed shell driver
-          // Requires special shell-based login for rkscli devices
-          // Pass all credentials since Ruckus often has different SSH vs CLI auth
-          this.log('info', `${ip}: Ruckus detected from ${macVendor === 'Ruckus' ? 'MAC OUI' : 'banner'}, using shell mode`)
-
-          // Common Ruckus CLI defaults (often different from SSH credentials)
-          const ruckusDefaults = [
-            { username: 'super', password: 'sp-admin' },  // Most common Ruckus default
-            { username: 'admin', password: 'admin' },
-          ]
-
-          // Build credentials list for Ruckus CLI login:
-          // Ruckus CLI typically uses 'admin' user even when SSH uses 'super'
-          // So prioritize admin credentials FIRST to avoid lockout from wrong username
-          const sshCred = { username: successfulCreds!.username, password: successfulCreds!.password }
-          const adminCreds = this.credentialsList
-            .filter(c => c.username === 'admin' && (c.username !== successfulCreds!.username || c.password !== successfulCreds!.password))
-            .map(c => ({ username: c.username, password: c.password }))
-          const otherCreds = this.credentialsList
-            .filter(c => c.username !== 'admin' && (c.username !== successfulCreds!.username || c.password !== successfulCreds!.password))
-            .map(c => ({ username: c.username, password: c.password }))
-
-          // Order: admin creds first (most likely for CLI), then SSH cred, then defaults, then others
-          const allCreds = sshCred.username === 'admin'
-            ? [sshCred, ...adminCreds, ...ruckusDefaults, ...otherCreds]  // SSH is admin, keep it first
-            : [...adminCreds, sshCred, ...ruckusDefaults, ...otherCreds]  // SSH is super/other, try admin first
-          // Deduplicate by username+password, no hard limit (lockout detection handles early exit)
-          const seen = new Set<string>()
-          const ruckusCredentials = allCreds.filter(c => {
-            const key = `${c.username}:${c.password}`
-            if (seen.has(key)) return false
-            seen.add(key)
-            return true
-          })
-          deviceInfo = await getRuckusInfo(
-            connectedClient,
-            banner,
-            ruckusCredentials,
-            (level, msg) => this.log(level, `${ip}: ${msg}`)
-          )
+          // Ruckus detected from MAC or banner
           vendorInfo = { vendor: 'Ruckus', driver: isRkscliDevice(banner) ? 'ruckus-smartzone' : 'ruckus-unleashed' }
-          this.log('info', `${ip}: Detected ${deviceInfo.model || 'Ruckus AP'}${deviceInfo.serialNumber ? ' (S/N: ' + deviceInfo.serialNumber + ')' : ''}`)
+
+          // Check if we have SmartZone data for this device (by MAC)
+          const normalizedMac = knownMac?.toUpperCase().replace(/[:-]/g, '').match(/.{2}/g)?.join(':')
+          const szData = normalizedMac ? this.smartzoneCache.get(normalizedMac) : null
+
+          if (szData) {
+            // Use SmartZone data instead of CLI login (faster, no lockout risk)
+            isSmartZoneEnriched = true
+            this.log('success', `${ip}: Using SmartZone data for ${szData.name}`)
+            deviceInfo = {
+              hostname: szData.name,
+              model: szData.model,
+              serialNumber: szData.serial,
+              version: szData.firmware,
+              interfaces: [
+                { name: 'eth0', mac: normalizedMac || null, ip: szData.ip, bridge: null, vlan: null, comment: null, linkUp: szData.status === 'Online' },
+                { name: 'wlan0', mac: null, ip: null, bridge: null, vlan: null, comment: '2.4GHz Radio', linkUp: szData.status === 'Online' },
+                { name: 'wlan1', mac: null, ip: null, bridge: null, vlan: null, comment: '5GHz Radio', linkUp: szData.status === 'Online' },
+              ],
+              neighbors: [],
+              dhcpLeases: [],
+              ownUpstreamInterface: 'eth0',
+            }
+            this.log('info', `${ip}: ${szData.model} (S/N: ${szData.serial}, FW: ${szData.firmware})`)
+          } else {
+            // No SmartZone data - use traditional CLI login
+            this.log('info', `${ip}: Ruckus detected from ${macVendor === 'Ruckus' ? 'MAC OUI' : 'banner'}, using shell mode`)
+
+            // Common Ruckus CLI defaults (often different from SSH credentials)
+            const ruckusDefaults = [
+              { username: 'super', password: 'sp-admin' },  // Most common Ruckus default
+              { username: 'admin', password: 'admin' },
+            ]
+
+            // Build credentials list for Ruckus CLI login:
+            // Ruckus CLI typically uses 'admin' user even when SSH uses 'super'
+            // So prioritize admin credentials FIRST to avoid lockout from wrong username
+            const sshCred = { username: successfulCreds!.username, password: successfulCreds!.password }
+            const adminCreds = this.credentialsList
+              .filter(c => c.username === 'admin' && (c.username !== successfulCreds!.username || c.password !== successfulCreds!.password))
+              .map(c => ({ username: c.username, password: c.password }))
+            const otherCreds = this.credentialsList
+              .filter(c => c.username !== 'admin' && (c.username !== successfulCreds!.username || c.password !== successfulCreds!.password))
+              .map(c => ({ username: c.username, password: c.password }))
+
+            // Order: admin creds first (most likely for CLI), then SSH cred, then defaults, then others
+            const allCreds = sshCred.username === 'admin'
+              ? [sshCred, ...adminCreds, ...ruckusDefaults, ...otherCreds]  // SSH is admin, keep it first
+              : [...adminCreds, sshCred, ...ruckusDefaults, ...otherCreds]  // SSH is super/other, try admin first
+            // Deduplicate by username+password, no hard limit (lockout detection handles early exit)
+            const seen = new Set<string>()
+            const ruckusCredentials = allCreds.filter(c => {
+              const key = `${c.username}:${c.password}`
+              if (seen.has(key)) return false
+              seen.add(key)
+              return true
+            })
+            deviceInfo = await getRuckusInfo(
+              connectedClient,
+              banner,
+              ruckusCredentials,
+              (level, msg) => this.log(level, `${ip}: ${msg}`)
+            )
+            this.log('info', `${ip}: Detected ${deviceInfo.model || 'Ruckus AP'}${deviceInfo.serialNumber ? ' (S/N: ' + deviceInfo.serialNumber + ')' : ''}`)
+          }
         } else {
           // Not Zyxel - safe to use exec channel for detection
           // Try MikroTik first (most common in this network)
@@ -2356,6 +2404,7 @@ export class NetworkScanner {
           openPorts: JSON.stringify(openPorts),
           warningPorts: JSON.stringify(warningPorts),
           driver: newDevice.driver,
+          smartzoneEnriched: isSmartZoneEnriched,
           ...(mergedVlans && { vlans: mergedVlans }),
           lastSeenAt: new Date().toISOString(),
         })
@@ -2396,6 +2445,7 @@ export class NetworkScanner {
         openPorts: JSON.stringify(openPorts),
         warningPorts: JSON.stringify(warningPorts),
         driver: newDevice.driver,
+        smartzoneEnriched: isSmartZoneEnriched,
         vlans: discoveryData?.vlans?.length
           ? discoveryData.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',')
           : null,

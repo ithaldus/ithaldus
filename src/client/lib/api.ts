@@ -161,6 +161,15 @@ export const api = {
       request<{ success: boolean }>(`/networks/${id}`, { method: 'DELETE' }),
     ping: (id: string) =>
       request<{ isOnline: boolean }>(`/networks/${id}/ping`, { method: 'POST' }),
+    // SmartZone integration
+    getSmartZone: (id: string) =>
+      request<SmartZoneConfig>(`/networks/${id}/smartzone`),
+    updateSmartZone: (id: string, data: { host?: string; port?: number; username?: string; password?: string; enabled?: boolean }) =>
+      request<{ success: boolean; enabled: boolean }>(`/networks/${id}/smartzone`, { method: 'PUT', body: JSON.stringify(data) }),
+    testSmartZone: (id: string, data?: { host?: string; port?: number; username?: string; password?: string }) =>
+      request<SmartZoneTestResult>(`/networks/${id}/smartzone/test`, { method: 'POST', body: JSON.stringify(data || {}) }),
+    syncSmartZone: (id: string) =>
+      request<{ success: boolean; apCount: number; aps: SmartZoneAP[]; error?: string }>(`/networks/${id}/smartzone/sync`, { method: 'POST' }),
   },
 
   // Credentials
@@ -336,6 +345,34 @@ export interface Network {
   lastScannedAt: string | null
   deviceCount: number | null
   isOnline: boolean | null
+  // SmartZone integration
+  smartzoneHost: string | null
+  smartzonePort: number | null
+  smartzoneUsername: string | null
+  smartzonePassword: string | null
+}
+
+export interface SmartZoneConfig {
+  enabled: boolean
+  host: string
+  port: number
+  username: string
+}
+
+export interface SmartZoneTestResult {
+  success: boolean
+  apCount: number
+  error?: string
+}
+
+export interface SmartZoneAP {
+  mac: string
+  ip: string
+  name: string
+  serial: string
+  model: string
+  firmware: string
+  status: 'Online' | 'Offline' | 'Flagged'
 }
 
 export interface Credential {
@@ -383,6 +420,7 @@ export interface Device {
   nomad: boolean
   skipLogin: boolean
   vlans: string | null
+  smartzoneEnriched: boolean
   lastSeenAt: string
   macCount?: number
 }

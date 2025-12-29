@@ -531,6 +531,15 @@ export function DeviceCard({
                 ))}
               </span>
             )}
+
+            {/* SmartZone Badge */}
+            {device.smartzoneEnriched && (
+              <Tooltip content="Data from Ruckus SmartZone API" position="bottom">
+                <span className="shrink-0 h-[18px] inline-flex items-center px-1 text-[9px] font-bold text-violet-700 dark:text-violet-300 bg-violet-100 dark:bg-violet-900/30 rounded border border-violet-300/50 dark:border-violet-600/50 cursor-help">
+                  SZ
+                </span>
+              </Tooltip>
+            )}
           </div>
 
           {/* End spacer for visual balance with chevron space */}

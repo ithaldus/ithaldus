@@ -4,6 +4,7 @@ import { networks, credentials, failedCredentials, matchedDevices } from '../db/
 import { eq, and, isNull } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { requireAdmin } from '../middleware/auth'
+import { SmartZoneService } from '../services/smartzone'
 
 // Helper: Delete any duplicate credentials that match the given username/password
 // Keeps only one root credential, removes global and network-specific duplicates
@@ -221,4 +222,152 @@ networksRoutes.post('/:id/ping', async (c) => {
     .where(eq(networks.id, id))
 
   return c.json({ isOnline })
+})
+
+// Get SmartZone configuration for a network
+networksRoutes.get('/:id/smartzone', async (c) => {
+  const id = c.req.param('id')
+
+  const network = await db.query.networks.findFirst({
+    where: eq(networks.id, id),
+  })
+
+  if (!network) {
+    return c.json({ error: 'Network not found' }, 404)
+  }
+
+  return c.json({
+    enabled: !!network.smartzoneHost,
+    host: network.smartzoneHost || '',
+    port: network.smartzonePort || 8443,
+    username: network.smartzoneUsername || '',
+    // Don't expose password in GET
+  })
+})
+
+// Update SmartZone configuration (admin only)
+networksRoutes.put('/:id/smartzone', requireAdmin, async (c) => {
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  const { host, port, username, password, enabled } = body
+
+  const network = await db.query.networks.findFirst({
+    where: eq(networks.id, id),
+  })
+
+  if (!network) {
+    return c.json({ error: 'Network not found' }, 404)
+  }
+
+  // If disabling, clear all fields
+  if (enabled === false) {
+    await db.update(networks)
+      .set({
+        smartzoneHost: null,
+        smartzonePort: null,
+        smartzoneUsername: null,
+        smartzonePassword: null,
+      })
+      .where(eq(networks.id, id))
+
+    return c.json({ success: true, enabled: false })
+  }
+
+  // Validate required fields when enabling
+  if (!host || !username || !password) {
+    return c.json({ error: 'Host, username, and password are required' }, 400)
+  }
+
+  await db.update(networks)
+    .set({
+      smartzoneHost: host,
+      smartzonePort: port || 8443,
+      smartzoneUsername: username,
+      smartzonePassword: password,
+    })
+    .where(eq(networks.id, id))
+
+  return c.json({ success: true, enabled: true })
+})
+
+// Test SmartZone connection
+networksRoutes.post('/:id/smartzone/test', requireAdmin, async (c) => {
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  const { host, port, username, password } = body
+
+  // Allow testing with provided credentials (before saving) or saved credentials
+  let testHost = host
+  let testPort = port || 8443
+  let testUsername = username
+  let testPassword = password
+
+  // If no credentials provided, use saved ones
+  if (!host || !username || !password) {
+    const network = await db.query.networks.findFirst({
+      where: eq(networks.id, id),
+    })
+
+    if (!network) {
+      return c.json({ error: 'Network not found' }, 404)
+    }
+
+    if (!network.smartzoneHost || !network.smartzoneUsername || !network.smartzonePassword) {
+      return c.json({ error: 'SmartZone is not configured for this network' }, 400)
+    }
+
+    testHost = network.smartzoneHost
+    testPort = network.smartzonePort || 8443
+    testUsername = network.smartzoneUsername
+    testPassword = network.smartzonePassword
+  }
+
+  const service = new SmartZoneService({
+    host: testHost,
+    port: testPort,
+    username: testUsername,
+    password: testPassword,
+  })
+
+  const result = await service.testConnection()
+
+  return c.json(result)
+})
+
+// Sync APs from SmartZone (manual trigger, outside of scan)
+networksRoutes.post('/:id/smartzone/sync', requireAdmin, async (c) => {
+  const id = c.req.param('id')
+
+  const network = await db.query.networks.findFirst({
+    where: eq(networks.id, id),
+  })
+
+  if (!network) {
+    return c.json({ error: 'Network not found' }, 404)
+  }
+
+  if (!network.smartzoneHost || !network.smartzoneUsername || !network.smartzonePassword) {
+    return c.json({ error: 'SmartZone is not configured for this network' }, 400)
+  }
+
+  const service = new SmartZoneService({
+    host: network.smartzoneHost,
+    port: network.smartzonePort || 8443,
+    username: network.smartzoneUsername,
+    password: network.smartzonePassword,
+  })
+
+  try {
+    const apMap = await service.fetchAPsByMac()
+    return c.json({
+      success: true,
+      apCount: apMap.size,
+      aps: Array.from(apMap.values()),
+    })
+  } catch (err) {
+    return c.json({
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    }, 500)
+  }
 })

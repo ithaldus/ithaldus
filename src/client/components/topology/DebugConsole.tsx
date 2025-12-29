@@ -33,9 +33,9 @@ function formatTime(timestamp: string): string {
   })
 }
 
-// Approximate character width for monospace font at text-xs (12px)
-const CHAR_WIDTH = 7.2
-const TIMESTAMP_WIDTH = 85 // "[HH:MM:SS]" + gap
+// Approximate character width for Iosevka at text-[9px] with tracking-tight
+const CHAR_WIDTH = 4.0
+const TIMESTAMP_WIDTH = 70 // "[HH:MM:SS]" + gap (Iosevka is narrow)
 const PADDING = 60 // Console padding + scrollbar + resize handle
 
 export function DebugConsole({
@@ -373,7 +373,8 @@ export function DebugConsole({
         {/* Hidden element for measuring text width */}
         <span
           ref={measureRef}
-          className="absolute -left-[9999px] font-mono text-xs whitespace-nowrap"
+          style={{ fontFamily: 'Iosevka, monospace' }}
+          className="absolute -left-[9999px] text-[9px] tracking-tight whitespace-nowrap"
           aria-hidden="true"
         />
 
@@ -381,7 +382,8 @@ export function DebugConsole({
         <div
           ref={consoleRef}
           onScroll={handleScroll}
-          className={`flex-1 overflow-y-auto p-3 font-mono text-xs leading-relaxed ${
+          style={{ fontFamily: 'Iosevka, monospace' }}
+          className={`flex-1 overflow-y-auto p-2 text-[9px] leading-tight tracking-tight ${
             autoExpand ? 'overflow-x-auto' : 'overflow-x-hidden'
           }`}
         >

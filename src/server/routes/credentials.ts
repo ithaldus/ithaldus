@@ -114,7 +114,7 @@ credentialsRoutes.post('/', requireAdmin, async (c) => {
     id: nanoid(),
     username,
     password,
-    networkId: networkId || null,
+    networkId: (networkId && networkId !== 'all') ? networkId : null,
   }
 
   await db.insert(credentials).values(newCredential)
@@ -155,7 +155,7 @@ credentialsRoutes.post('/bulk', requireAdmin, async (c) => {
       id: nanoid(),
       username,
       password,
-      networkId: networkId || null,
+      networkId: (networkId && networkId !== 'all') ? networkId : null,
     }
 
     await db.insert(credentials).values(newCredential)
@@ -187,7 +187,7 @@ credentialsRoutes.put('/:id', requireAdmin, async (c) => {
     .set({
       username: username || existing.username,
       password: password || existing.password,
-      networkId: networkId !== undefined ? (networkId || null) : existing.networkId,
+      networkId: networkId !== undefined ? ((networkId && networkId !== 'all') ? networkId : null) : existing.networkId,
     })
     .where(eq(credentials.id, id))
 
