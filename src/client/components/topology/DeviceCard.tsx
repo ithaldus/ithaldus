@@ -148,7 +148,7 @@ function getStatusInfo(device: TopologyDevice): { label: string; color: string }
 
   // Show status for devices that aren't accessible
   // A device with management ports (22, 23, 80, 443, 8291, etc.) is likely a network device
-  const managementPorts = [22, 23, 80, 443, 8080, 8443, 161, 8291, 8728]
+  const managementPorts = [21, 22, 23, 80, 139, 161, 443, 445, 515, 631, 8080, 8291, 8443, 8728, 9080, 9081, 9090, 9091, 9100, 9101, 9102, 9103]
   const hasManagementPorts = openPorts.some(p => managementPorts.includes(p))
   const isLikelyNetworkDevice = device.type !== 'end-device' || hasManagementPorts
 
