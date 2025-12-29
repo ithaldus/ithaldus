@@ -2470,6 +2470,9 @@ export class NetworkScanner {
 
     // Save interfaces
     if (deviceInfo) {
+      // Delete existing interfaces first to avoid duplicates
+      await db.delete(interfaces).where(eq(interfaces.deviceId, actualDeviceId)).catch(() => {})
+
       for (const iface of deviceInfo.interfaces) {
         const ifaceId = nanoid()
         await db.insert(interfaces).values({
