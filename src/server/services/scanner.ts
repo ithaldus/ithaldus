@@ -2236,6 +2236,20 @@ export class NetworkScanner {
         // Add the new MAC to this device
         await this.addMacToDevice(existingDeviceByIp.id, deviceMac, 'ssh')
         this.macToDeviceId.set(deviceMac, existingDeviceByIp.id)
+
+        // Update missing fields if we got better data in this scan (e.g., serial number from web)
+        const updates: Record<string, unknown> = {}
+        if (deviceInfo?.serialNumber && !existingDeviceByIp.serialNumber) {
+          updates.serialNumber = deviceInfo.serialNumber
+          this.log('info', `${ip}: Updated serial number: ${deviceInfo.serialNumber}`)
+        }
+        if (deviceInfo?.version && !existingDeviceByIp.firmwareVersion) {
+          updates.firmwareVersion = deviceInfo.version
+        }
+        if (Object.keys(updates).length > 0) {
+          await db.update(devices).set(updates).where(eq(devices.id, existingDeviceByIp.id))
+        }
+
         this.log('info', `${ip}: Merged MAC ${deviceMac} with existing device (multi-interface device)`)
         return  // Already processed, skip
       }
