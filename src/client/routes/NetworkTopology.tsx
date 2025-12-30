@@ -259,12 +259,10 @@ export function NetworkTopology() {
         wsRef.current.close()
       }
 
-      // In development, connect directly to the API server on port 3001
-      // In production, use the same host as the page
+      // Use Vite's WebSocket proxy in development (same host/port as page)
+      // Vite is configured with ws: true to proxy WebSocket connections
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const isDev = window.location.port === '5173' || window.location.port === '3000'
-      const host = isDev ? `${window.location.hostname}:3001` : window.location.host
-      const wsUrl = `${protocol}//${host}/api/scan/${networkId}/ws`
+      const wsUrl = `${protocol}//${window.location.host}/api/scan/${networkId}/ws`
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
       let isResolved = false

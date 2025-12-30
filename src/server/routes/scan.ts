@@ -163,6 +163,7 @@ scanRoutes.post('/:networkId/start', requireAdmin, async (c) => {
     logs: LogMessage[]
     devices: DiscoveredDevice[]
     scanner?: NetworkScanner
+    scanId?: string
   } = {
     status: 'running',
     logs: [],

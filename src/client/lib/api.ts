@@ -539,9 +539,6 @@ export type ScanUpdateMessage =
 // WebSocket URL helper
 export function getScanWebSocketUrl(networkId: string): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  // In development, Vite runs on 5173 (or 3000 via Docker) and proxies to backend on 3001
-  // WebSocket proxying through Vite can be unreliable, so connect directly to backend
-  const isDev = window.location.port === '5173' || window.location.port === '3000'
-  const host = isDev ? `${window.location.hostname}:3001` : window.location.host
-  return `${protocol}//${host}/api/scan/${networkId}/ws`
+  // Use Vite's WebSocket proxy (configured with ws: true)
+  return `${protocol}//${window.location.host}/api/scan/${networkId}/ws`
 }

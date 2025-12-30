@@ -1340,6 +1340,21 @@ export class NetworkScanner {
       this.callbacks.onDeviceDiscovered(endDevice)
       return existingBridgeDevice.id
     } else {
+      // Check if there's already a device with this IP that was processed in this scan
+      // (handles case where same device has multiple MACs, or DHCP reassigned IP during scan)
+      if (neighborIp) {
+        const existingByIp = await this.findDeviceByIp(neighborIp)
+        if (existingByIp && this.isDeviceProcessed(existingByIp.id)) {
+          // Device with this IP already exists and was processed - add MAC to it instead
+          await this.addMacToDevice(existingByIp.id, neighbor.mac, 'bridge-host')
+          this.macToDeviceId.set(neighbor.mac, existingByIp.id)
+          this.log('info', `${parentIp}: Added MAC ${neighbor.mac} to existing device ${existingByIp.hostname || existingByIp.primaryMac} (same IP: ${neighborIp})`)
+          endDevice.id = existingByIp.id
+          this.callbacks.onDeviceDiscovered(endDevice)
+          return existingByIp.id
+        }
+      }
+
       // Release any stale IP claim before inserting (handles DHCP IP reuse)
       await this.releaseStaleIpClaim(neighborIp)
 
@@ -1793,42 +1808,55 @@ export class NetworkScanner {
         actualDeviceId = existingDevice.id
         this.log('info', `${ip}: Updated end-device (MAC: ${deviceMac}${hostname ? ', hostname: ' + hostname : ''})`)
       } else {
-        // Release any stale IP claim before inserting (handles DHCP IP reuse)
-        await this.releaseStaleIpClaim(ip)
+        // Check if there's already a device with this IP that was processed in this scan
+        const existingByIp = await this.findDeviceByIp(ip)
+        if (existingByIp && this.isDeviceProcessed(existingByIp.id)) {
+          // Device with this IP already exists and was processed - add MAC to it instead
+          if (!deviceMac.startsWith('UNKNOWN-')) {
+            await this.addMacToDevice(existingByIp.id, deviceMac, 'arp')
+            this.macToDeviceId.set(deviceMac, existingByIp.id)
+          }
+          this.log('info', `${ip}: Added MAC ${deviceMac} to existing device ${existingByIp.hostname || existingByIp.primaryMac} (same IP)`)
+          newDevice.id = existingByIp.id
+          actualDeviceId = existingByIp.id
+        } else {
+          // Release any stale IP claim before inserting (handles DHCP IP reuse)
+          await this.releaseStaleIpClaim(ip)
 
-        // Insert new device with MNDP/CDP/LLDP discovery data if available
-        await db.insert(devices).values({
-          id: deviceId,
-          primaryMac: deviceMac,
-          parentInterfaceId,
-          networkId: this.networkId,
-          upstreamInterface,
-          hostname,
-          ip,
-          vendor,
-          model: discoveryData?.model || null,
-          firmwareVersion: discoveryData?.version || null,
-          type: newDevice.type,
-          accessible: false,
-          openPorts: '[]',
-          warningPorts: '[]',
-          driver: null,
-          vlans: discoveryData?.vlans?.length ? discoveryData.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',') : null,
-          lastSeenAt: new Date().toISOString(),
-        })
+          // Insert new device with MNDP/CDP/LLDP discovery data if available
+          await db.insert(devices).values({
+            id: deviceId,
+            primaryMac: deviceMac,
+            parentInterfaceId,
+            networkId: this.networkId,
+            upstreamInterface,
+            hostname,
+            ip,
+            vendor,
+            model: discoveryData?.model || null,
+            firmwareVersion: discoveryData?.version || null,
+            type: newDevice.type,
+            accessible: false,
+            openPorts: '[]',
+            warningPorts: '[]',
+            driver: null,
+            vlans: discoveryData?.vlans?.length ? discoveryData.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',') : null,
+            lastSeenAt: new Date().toISOString(),
+          })
 
-        // Add MAC to deviceMacs table (skip UNKNOWN MACs)
-        if (!deviceMac.startsWith('UNKNOWN-')) {
-          await this.addMacToDevice(deviceId, deviceMac, 'arp')
+          // Add MAC to deviceMacs table (skip UNKNOWN MACs)
+          if (!deviceMac.startsWith('UNKNOWN-')) {
+            await this.addMacToDevice(deviceId, deviceMac, 'arp')
+          }
+
+          // Ensure stock image entry exists for this vendor+model
+          if (vendor && discoveryData?.model) {
+            await ensureStockImageEntry(vendor, discoveryData.model)
+          }
+
+          actualDeviceId = deviceId
+          this.log('success', `${ip}: Added as ${newDevice.type} (MAC: ${deviceMac}${hostname ? ', hostname: ' + hostname : ''})`)
         }
-
-        // Ensure stock image entry exists for this vendor+model
-        if (vendor && discoveryData?.model) {
-          await ensureStockImageEntry(vendor, discoveryData.model)
-        }
-
-        actualDeviceId = deviceId
-        this.log('success', `${ip}: Added as ${newDevice.type} (MAC: ${deviceMac}${hostname ? ', hostname: ' + hostname : ''})`)
       }
 
       // Mark device as processed
@@ -2423,56 +2451,69 @@ export class NetworkScanner {
       }
       this.log('info', `${ip}: Updated existing device (MAC: ${deviceMac}, ${accessStatus})`)
     } else {
-      // Release any stale IP claim before inserting (handles DHCP IP reuse)
-      await this.releaseStaleIpClaim(ip)
-
-      // Insert new device
-      await db.insert(devices).values({
-        id: deviceId,
-        primaryMac: deviceMac,
-        parentInterfaceId,
-        networkId: this.networkId,
-        upstreamInterface: actualUpstreamInterface,
-        ownUpstreamInterface: deviceInfo?.ownUpstreamInterface || null,
-        hostname: newDevice.hostname,
-        ip,
-        vendor: newDevice.vendor,
-        model: newDevice.model,
-        serialNumber: newDevice.serialNumber,
-        firmwareVersion: newDevice.firmwareVersion,
-        type: deviceType,
-        accessible: newDevice.accessible,
-        openPorts: JSON.stringify(openPorts),
-        warningPorts: JSON.stringify(warningPorts),
-        driver: newDevice.driver,
-        smartzoneEnriched: isSmartZoneEnriched,
-        vlans: discoveryData?.vlans?.length
-          ? discoveryData.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',')
-          : null,
-        lastSeenAt: new Date().toISOString(),
-      })
-
-      // Add MAC to deviceMacs table (skip UNKNOWN MACs)
-      if (!deviceMac.startsWith('UNKNOWN-')) {
-        await this.addMacToDevice(deviceId, deviceMac, 'ssh')
-      }
-
-      // Ensure stock image entry exists for this vendor+model
-      if (newDevice.vendor && newDevice.model) {
-        await ensureStockImageEntry(newDevice.vendor, newDevice.model)
-      }
-
-      actualDeviceId = deviceId
-      this.deviceCount++
-      let newAccessStatus: string
-      if (newDevice.accessible) {
-        newAccessStatus = 'accessible'
-      } else if (connectedClient && !ruckusCliWorked) {
-        newAccessStatus = 'not accessible (CLI login failed)'
+      // Re-check if there's a device with this IP that was processed in this scan (race condition guard)
+      const existingByIpNow = await this.findDeviceByIp(ip)
+      if (existingByIpNow && this.isDeviceProcessed(existingByIpNow.id)) {
+        // Device with this IP was inserted concurrently - add MAC to it instead
+        if (!deviceMac.startsWith('UNKNOWN-')) {
+          await this.addMacToDevice(existingByIpNow.id, deviceMac, 'ssh')
+          this.macToDeviceId.set(deviceMac, existingByIpNow.id)
+        }
+        this.log('info', `${ip}: Added MAC ${deviceMac} to existing device ${existingByIpNow.hostname || existingByIpNow.primaryMac} (same IP, concurrent discovery)`)
+        actualDeviceId = existingByIpNow.id
+        newDevice.id = existingByIpNow.id
       } else {
-        newAccessStatus = 'not accessible (no SSH login)'
+        // Release any stale IP claim before inserting (handles DHCP IP reuse)
+        await this.releaseStaleIpClaim(ip)
+
+        // Insert new device
+        await db.insert(devices).values({
+          id: deviceId,
+          primaryMac: deviceMac,
+          parentInterfaceId,
+          networkId: this.networkId,
+          upstreamInterface: actualUpstreamInterface,
+          ownUpstreamInterface: deviceInfo?.ownUpstreamInterface || null,
+          hostname: newDevice.hostname,
+          ip,
+          vendor: newDevice.vendor,
+          model: newDevice.model,
+          serialNumber: newDevice.serialNumber,
+          firmwareVersion: newDevice.firmwareVersion,
+          type: deviceType,
+          accessible: newDevice.accessible,
+          openPorts: JSON.stringify(openPorts),
+          warningPorts: JSON.stringify(warningPorts),
+          driver: newDevice.driver,
+          smartzoneEnriched: isSmartZoneEnriched,
+          vlans: discoveryData?.vlans?.length
+            ? discoveryData.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',')
+            : null,
+          lastSeenAt: new Date().toISOString(),
+        })
+
+        // Add MAC to deviceMacs table (skip UNKNOWN MACs)
+        if (!deviceMac.startsWith('UNKNOWN-')) {
+          await this.addMacToDevice(deviceId, deviceMac, 'ssh')
+        }
+
+        // Ensure stock image entry exists for this vendor+model
+        if (newDevice.vendor && newDevice.model) {
+          await ensureStockImageEntry(newDevice.vendor, newDevice.model)
+        }
+
+        actualDeviceId = deviceId
+        this.deviceCount++
+        let newAccessStatus: string
+        if (newDevice.accessible) {
+          newAccessStatus = 'accessible'
+        } else if (connectedClient && !ruckusCliWorked) {
+          newAccessStatus = 'not accessible (CLI login failed)'
+        } else {
+          newAccessStatus = 'not accessible (no SSH login)'
+        }
+        this.log('success', `${ip}: Added as ${deviceType} (MAC: ${deviceMac}, ${newAccessStatus})`)
       }
-      this.log('success', `${ip}: Added as ${deviceType} (MAC: ${deviceMac}, ${newAccessStatus})`)
     }
 
     // Mark device as processed
