@@ -888,7 +888,7 @@ export function NetworkTopology() {
   // On mobile, console overlays content (no margin needed)
   // On sm+ screens, add margin to make room for console
   return (
-    <div className="h-full flex flex-col p-6 sm:mr-0" style={{ ['--console-margin' as string]: consoleOpen ? `${consoleWidth}px` : '0' }}>
+    <div className="h-full flex flex-col p-2 sm:p-6" style={{ ['--console-margin' as string]: consoleOpen ? `${consoleWidth}px` : '0' }}>
       <style>{`
         @media (min-width: 640px) {
           .topology-content { margin-right: var(--console-margin) !important; }
@@ -896,15 +896,15 @@ export function NetworkTopology() {
       `}</style>
       <div className="topology-content h-full flex flex-col">
       {/* Header */}
-      <div className="mb-6 flex-shrink-0 space-y-2">
+      <div className="mb-2 sm:mb-6 flex-shrink-0 space-y-1 sm:space-y-2">
         {/* Row 1: Network name, device count, last scanned */}
-        <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+          <h1 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
             {network.name}
           </h1>
           {totalDeviceCount > 0 && (
-            <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">
-              <Monitor className="w-4 h-4" />
+            <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              <Monitor className="w-3 h-3 sm:w-4 sm:h-4" />
               <span>
                 {filteredDeviceCount !== null
                   ? `${filteredDeviceCount} / ${totalDeviceCount} devices`
@@ -916,15 +916,15 @@ export function NetworkTopology() {
             </div>
           )}
           {lastScannedAt && (
-            <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">
-              <Clock className="w-4 h-4" />
+            <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
               <span>Scanned {formatLastScanned(lastScannedAt)}</span>
             </div>
           )}
         </div>
 
         {/* Row 2: Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
 
           {/* Start/Stop Scan */}
           {isAdmin && (
@@ -932,9 +932,9 @@ export function NetworkTopology() {
               <Tooltip content="Stop scan" position="bottom">
                 <button
                   onClick={stopScan}
-                  className="inline-flex items-center justify-center gap-2 px-2.5 xl:px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 text-sm font-medium transition-colors flex-shrink-0"
+                  className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 xl:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 text-xs sm:text-sm font-medium transition-colors flex-shrink-0"
                 >
-                  <Square className="w-4 h-4" />
+                  <Square className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="hidden xl:inline">Stop</span>
                 </button>
               </Tooltip>
@@ -942,9 +942,9 @@ export function NetworkTopology() {
               <Tooltip content="Start network scan" position="bottom">
                 <button
                   onClick={startScan}
-                  className="inline-flex items-center justify-center gap-2 px-2.5 xl:px-3 py-2 rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 text-sm font-medium transition-colors flex-shrink-0"
+                  className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 xl:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 text-xs sm:text-sm font-medium transition-colors flex-shrink-0"
                 >
-                  <Radar className="w-4 h-4" />
+                  <Radar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="hidden xl:inline">Scan</span>
                 </button>
               </Tooltip>
@@ -956,15 +956,15 @@ export function NetworkTopology() {
             <button
               onClick={exportPDF}
               disabled={devices.length === 0}
-              className="inline-flex items-center justify-center gap-2 px-2.5 xl:px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors flex-shrink-0"
+              className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 xl:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm transition-colors flex-shrink-0"
             >
-              <FileDown className="w-4 h-4" />
+              <FileDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span className="hidden xl:inline">Export</span>
             </button>
           </Tooltip>
 
           {/* Visibility Toggle Pill - "FIVEAMPS" */}
-          <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76] overflow-hidden flex-shrink-0">
+          <div className="inline-flex items-center rounded-md sm:rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76] overflow-hidden flex-shrink-0">
             {[
               { key: 'firmware' as const, label: 'F', tooltip: 'Firmware — Show or hide firmware version information on device cards' },
               { key: 'interfaces' as const, label: 'I', tooltip: 'Interfaces — Show or hide network interface details and bridge membership' },
@@ -979,7 +979,7 @@ export function NetworkTopology() {
                 <button
                   onClick={() => toggleVisibility(key)}
                   className={`
-                    px-2.5 py-2 text-xs font-medium transition-colors
+                    px-1.5 sm:px-2.5 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium transition-colors
                     ${visibility[key]
                       ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
                       : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-600 dark:hover:text-slate-300'
@@ -995,14 +995,14 @@ export function NetworkTopology() {
           {/* Device Type Filter Pill */}
           <div
             ref={deviceTypeContainerRef}
-            className="relative inline-flex items-center rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76]"
+            className="relative inline-flex items-center rounded-md sm:rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76]"
           >
             {/* All/None toggle */}
             <Tooltip content={allDeviceTypesEnabled ? "Hide all device types" : "Show all device types"}>
               <button
                 onClick={allDeviceTypesEnabled ? disableAllDeviceTypes : enableAllDeviceTypes}
                 className={`
-                  px-2 py-2 text-xs font-medium transition-colors flex-shrink-0
+                  px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium transition-colors flex-shrink-0
                   ${allDeviceTypesEnabled
                     ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
                     : noDeviceTypesEnabled
@@ -1020,14 +1020,14 @@ export function NetworkTopology() {
                 <button
                   onClick={() => toggleDeviceType(value)}
                   className={`
-                    px-2 py-2 text-xs transition-colors flex-shrink-0
+                    px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs transition-colors flex-shrink-0
                     ${enabledDeviceTypes.has(value)
                       ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
                       : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-600 dark:hover:text-slate-300'
                     }
                   `}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 </button>
               </Tooltip>
             ))}
@@ -1038,14 +1038,14 @@ export function NetworkTopology() {
                   title={`${overflowDeviceTypes.length} more device types`}
                   onClick={() => setShowOverflowMenu(!showOverflowMenu)}
                   className={`
-                    px-2 py-2 text-xs transition-colors
+                    px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs transition-colors
                     ${overflowDeviceTypes.some(opt => enabledDeviceTypes.has(opt.value))
                       ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
                       : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-600 dark:hover:text-slate-300'
                     }
                   `}
                 >
-                  <MoreHorizontal className="w-3.5 h-3.5" />
+                  <MoreHorizontal className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 </button>
                 {showOverflowMenu && (
                   <div
@@ -1079,54 +1079,54 @@ export function NetworkTopology() {
         </div>
 
         {/* Filter input and expand/collapse buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
             <input
               type="text"
               value={deviceFilter}
               onChange={(e) => updateDeviceFilter(e.target.value)}
-              placeholder="Filter by IP, MAC, hostname, vendor, model, serial..."
-              className="w-full pl-9 pr-9 py-2 text-sm bg-slate-800 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              placeholder="Filter by IP, MAC, hostnan..."
+              className="w-full pl-7 sm:pl-9 pr-7 sm:pr-9 py-1.5 sm:py-2 text-xs sm:text-sm bg-slate-800 border border-slate-600 rounded-md sm:rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
             {deviceFilter && (
               <button
                 onClick={() => updateDeviceFilter('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
               >
-                <X className="w-4 h-4" />
+                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
             )}
           </div>
           <Tooltip content={expandAll === true ? "Reset to default" : "Expand all interfaces"} position="bottom">
             <button
               onClick={() => setExpandAll(expandAll === true ? null : true)}
-              className={`p-2 rounded-lg border transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-md sm:rounded-lg border transition-colors ${
                 expandAll === true
                   ? 'bg-cyan-900/30 border-cyan-700 text-cyan-400'
                   : 'bg-slate-800 border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500'
               }`}
             >
-              <ChevronsUpDown className="w-4 h-4" />
+              <ChevronsUpDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </Tooltip>
           <Tooltip content={expandAll === false ? "Reset to default" : "Collapse all interfaces"} position="bottom">
             <button
               onClick={() => setExpandAll(expandAll === false ? null : false)}
-              className={`p-2 rounded-lg border transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-md sm:rounded-lg border transition-colors ${
                 expandAll === false
                   ? 'bg-cyan-900/30 border-cyan-700 text-cyan-400'
                   : 'bg-slate-800 border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500'
               }`}
             >
-              <ChevronsDownUp className="w-4 h-4" />
+              <ChevronsDownUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </Tooltip>
         </div>
       </div>
 
       {/* Topology View */}
-      <div ref={topologyRef} className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+      <div ref={topologyRef} className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-950 sm:rounded-xl sm:border sm:border-slate-200 dark:sm:border-slate-800 p-0 sm:p-6">
         {devices.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-full mb-4">
