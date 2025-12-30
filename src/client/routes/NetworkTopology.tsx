@@ -16,6 +16,8 @@ import {
   ChevronsUpDown,
   MoreHorizontal,
   Check,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { DeviceCard } from '../components/topology/DeviceCard'
 import { DebugConsole } from '../components/topology/DebugConsole'
@@ -82,6 +84,8 @@ export function NetworkTopology() {
   const [logFilter, setLogFilter] = useState(() => searchParams.get('logFilter') || searchParams.get('filter') || '')
   // Expand/collapse all interfaces - null means use default behavior
   const [expandAll, setExpandAll] = useState<boolean | null>(null)
+  // Mobile header collapsed state - hides action buttons and filters
+  const [headerExpanded, setHeaderExpanded] = useState(false)
 
   // Sync device filter with URL
   const updateDeviceFilter = useCallback((value: string) => {
@@ -897,7 +901,7 @@ export function NetworkTopology() {
       <div className="topology-content h-full flex flex-col">
       {/* Header */}
       <div className="mb-2 sm:mb-6 flex-shrink-0 space-y-1 sm:space-y-2">
-        {/* Row 1: Network name, device count, last scanned */}
+        {/* Row 1: Network name, device count, last scanned + mobile expand toggle */}
         <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
           <h1 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
             {network.name}
@@ -921,8 +925,18 @@ export function NetworkTopology() {
               <span>Scanned {formatLastScanned(lastScannedAt)}</span>
             </div>
           )}
+          {/* Mobile expand/collapse toggle - only visible on mobile */}
+          <button
+            onClick={() => setHeaderExpanded(!headerExpanded)}
+            className="sm:hidden ml-auto p-1.5 rounded-md border border-slate-600 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors"
+            aria-label={headerExpanded ? 'Collapse toolbar' : 'Expand toolbar'}
+          >
+            {headerExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
         </div>
 
+        {/* Collapsible rows - hidden on mobile unless expanded, always visible on sm+ */}
+        <div className={`space-y-1 sm:space-y-2 ${headerExpanded ? 'block' : 'hidden'} sm:block`}>
         {/* Row 2: Actions */}
         <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
 
@@ -1123,6 +1137,7 @@ export function NetworkTopology() {
             </button>
           </Tooltip>
         </div>
+        </div>{/* End collapsible rows */}
       </div>
 
       {/* Topology View */}
