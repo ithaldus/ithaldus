@@ -599,10 +599,10 @@ export function DeviceCard({
                           isVirtual
                             ? 'text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700'
                             : 'text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600'
-                        } ${(isVirtual || childCount > 3) ? 'cursor-pointer hover:opacity-80' : ''}`}
-                        onClick={(isVirtual || childCount > 3) ? (e) => handleInterfaceToggle(ifaceName, e) : undefined}
+                        } ${(isVirtual || childCount > 0) ? 'cursor-pointer hover:opacity-80' : ''}`}
+                        onClick={(isVirtual || childCount > 0) ? (e) => handleInterfaceToggle(ifaceName, e) : undefined}
                       >
-                        {(isVirtual || childCount > 3) && (
+                        {(isVirtual || childCount > 0) && (
                           isCollapsed ? (
                             <ChevronRight className="w-3 h-3 -ml-0.5" />
                           ) : (
