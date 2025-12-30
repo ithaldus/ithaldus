@@ -103,14 +103,14 @@ export function DeviceTypeFilter({
   return (
     <div
       ref={containerRef}
-      className="flex items-center rounded-md sm:rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76]"
+      className="flex items-center rounded-md sm:rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76] overflow-hidden"
     >
       {/* All/None toggle */}
       <Tooltip content={allDeviceTypesEnabled ? "Hide all device types" : "Show all device types"}>
         <button
           onClick={allDeviceTypesEnabled ? onDisableAll : onEnableAll}
           className={`
-            px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium transition-colors flex-shrink-0
+            px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium transition-colors flex-shrink-0 rounded-l-md sm:rounded-l-lg
             ${allDeviceTypesEnabled
               ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
               : noDeviceTypesEnabled
