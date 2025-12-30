@@ -52,8 +52,14 @@ export function NetworkTopology() {
   const [scanStatus, setScanStatus] = useState<ScanStatus>('idle')
   const [logs, setLogs] = useState<LogMessage[]>([])
   const [channels, setChannels] = useState<ChannelInfo[]>([])
-  const [consoleOpen, setConsoleOpen] = useState(false)
-  const [consoleWidth, setConsoleWidth] = useState(400)
+  const [consoleOpen, setConsoleOpen] = useState(() => {
+    const stored = localStorage.getItem('debug-console-open')
+    return stored === 'true'
+  })
+  const [consoleWidth, setConsoleWidth] = useState(() => {
+    const stored = localStorage.getItem('debug-console-width')
+    return stored ? parseInt(stored, 10) : 400
+  })
   const [lastScannedAt, setLastScannedAt] = useState<string | null>(null)
   const [scanError, setScanError] = useState<string | null>(null)
   const topologyRef = useRef<HTMLDivElement>(null)
@@ -204,6 +210,15 @@ export function NetworkTopology() {
   useEffect(() => {
     localStorage.setItem('topology-visibility', JSON.stringify(visibility))
   }, [visibility])
+
+  // Save debug console state
+  useEffect(() => {
+    localStorage.setItem('debug-console-open', String(consoleOpen))
+  }, [consoleOpen])
+
+  useEffect(() => {
+    localStorage.setItem('debug-console-width', String(consoleWidth))
+  }, [consoleWidth])
 
   // Simple overflow calculation - first N visible, rest in overflow
   const visibleDeviceTypes = deviceTypeOptions.slice(0, VISIBLE_DEVICE_TYPES)
