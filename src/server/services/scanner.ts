@@ -2337,6 +2337,46 @@ export class NetworkScanner {
       snmpInfo = await this.getSnmpInfo(ip)
     }
 
+    // SmartZone fallback: For Ruckus devices that couldn't be accessed via SSH,
+    // try to enrich from SmartZone cache (by knownMac or deviceMac)
+    if (!isSmartZoneEnriched && this.smartzoneCache.size > 0 && (vendor === 'Ruckus' || detectVendorFromMac(deviceMac) === 'Ruckus')) {
+      // Try knownMac first, then deviceMac
+      const macsToTry = [knownMac, deviceMac].filter(m => m && !m.startsWith('UNKNOWN-'))
+      for (const mac of macsToTry) {
+        const normalizedMac = mac?.toUpperCase().replace(/[:-]/g, '').match(/.{2}/g)?.join(':')
+        const szData = normalizedMac ? this.smartzoneCache.get(normalizedMac) : null
+        if (szData) {
+          isSmartZoneEnriched = true
+          this.log('success', `${ip}: SmartZone fallback - enriching ${szData.name} (MAC: ${normalizedMac})`)
+          // Fill in deviceInfo from SmartZone if SSH didn't provide it
+          if (!deviceInfo) {
+            deviceInfo = {
+              hostname: szData.name,
+              model: szData.model,
+              serialNumber: szData.serial,
+              version: szData.firmware,
+              interfaces: [
+                { name: 'eth0', mac: normalizedMac || null, ip: szData.ip, bridge: null, vlan: null, comment: null, linkUp: szData.status === 'Online' },
+                { name: 'wlan0', mac: null, ip: null, bridge: null, vlan: null, comment: '2.4GHz Radio', linkUp: szData.status === 'Online' },
+                { name: 'wlan1', mac: null, ip: null, bridge: null, vlan: null, comment: '5GHz Radio', linkUp: szData.status === 'Online' },
+              ],
+              neighbors: [],
+              dhcpLeases: [],
+              ownUpstreamInterface: 'eth0',
+            }
+            vendorInfo = { vendor: 'Ruckus', driver: 'ruckus-smartzone' }
+          } else {
+            // SSH worked but gave incomplete data - supplement with SmartZone
+            deviceInfo.hostname = deviceInfo.hostname || szData.name
+            deviceInfo.model = deviceInfo.model || szData.model
+            deviceInfo.serialNumber = deviceInfo.serialNumber || szData.serial
+            deviceInfo.version = deviceInfo.version || szData.firmware
+          }
+          break
+        }
+      }
+    }
+
     // Look up MNDP/CDP/LLDP discovery data as fallback for missing fields
     // Always look this up since SSH may succeed but return incomplete data (e.g., Ruckus APs)
     const discoveryData = this.neighborDiscoveryData.get(deviceMac)
