@@ -100,6 +100,38 @@ All routes except `/login` are protected via `ProtectedRoute`. User management r
 - `DeviceModal` - Device detail modal with credential testing and comment editing
 - `DebugConsole` - Resizable sidebar showing real-time scan logs
 - `VendorLogo` - SVG logos for common network vendors (MikroTik, Ubiquiti, etc.)
+- `DeviceTypeFilter` - Filter buttons for device types with optional overflow menu
+
+### URL Query Parameters (Topology View)
+The topology view (`/networks/:networkId`) supports URL query parameters to customize the display:
+
+| Parameter | Values | Description |
+|-----------|--------|-------------|
+| `sidebar` | `0`, `false` | Hide the navigation sidebar |
+| `console` | `0`, `false` | Hide the debug console |
+| `labels` | comma-separated | Show only specified labels (see below) |
+| `types` | comma-separated | Show only specified device types |
+| `filter` | string | Pre-fill the device filter input |
+| `device` | device ID | Open device modal for specific device |
+
+**Label values** (for `labels` parameter):
+- Full names: `firmware`, `interfaces`, `vendor`, `enddevices`, `assettag`, `mac`, `ports`, `serialnumber`
+- Short codes: `f`, `i`, `v`, `e`, `a`, `m`, `p`, `s`
+- Use `labels=` or `labels=none` to hide all labels
+
+**Device type values** (for `types` parameter):
+`router`, `switch`, `access-point`, `server`, `computer`, `phone`, `desktop-phone`, `tv`, `tablet`, `printer`, `camera`, `iot`, `end-device`
+
+**Example - Minimal UI for Playwright MCP testing:**
+```
+/networks/:networkId?sidebar=0&console=0&labels=
+```
+This hides sidebar, debug console, and all device labels to minimize DOM elements and avoid truncated Playwright snapshots.
+
+**Example - Show only routers and switches with firmware info:**
+```
+/networks/:networkId?types=router,switch&labels=f,v
+```
 
 ## Design System
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { NavLink, useNavigate, useParams, useLocation } from 'react-router-dom'
+import { NavLink, useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom'
 import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin, Loader2, Image } from 'lucide-react'
 import { Tooltip } from '../ui/Tooltip'
 import { useAuth } from '../../hooks/useAuth'
@@ -14,6 +14,11 @@ export function Shell({ children }: ShellProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
+
+  // Check if sidebar is hidden via query param (?sidebar=0 or ?sidebar=false)
+  const sidebarHidden = searchParams.get('sidebar') === '0' || searchParams.get('sidebar') === 'false'
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -130,15 +135,16 @@ export function Shell({ children }: ShellProps) {
 
   return (
     <div className="h-screen bg-slate-50 dark:bg-slate-950 font-sans flex overflow-hidden">
-      {/* Mobile menu overlay */}
-      {mobileMenuOpen && (
+      {/* Mobile menu overlay - hidden when ?sidebar=0 */}
+      {!sidebarHidden && mobileMenuOpen && (
         <div
           className="absolute inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
 
-      {/* Sidebar - using absolute on mobile, relative on desktop */}
+      {/* Sidebar - hidden when ?sidebar=0 or ?sidebar=false */}
+      {!sidebarHidden && (
       <aside
         className={`
           bg-[#f9f9f9] dark:bg-slate-900 text-[#0d0d0d] dark:text-white flex flex-col shrink-0
@@ -340,23 +346,26 @@ export function Shell({ children }: ShellProps) {
           </div>
         )}
       </aside>
+      )}
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
-        {/* Mobile header bar */}
-        <header className="lg:hidden h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0">
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="p-2 -ml-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <Logo className={`w-5 h-5 ${logoColor}`} />
-            <span className={`font-semibold ${logoColor}`}>TopoGraph</span>
-          </div>
-          <div className="w-9" /> {/* Spacer for centering */}
-        </header>
+        {/* Mobile header bar - hidden when ?sidebar=0 */}
+        {!sidebarHidden && (
+          <header className="lg:hidden h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-2 -ml-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2">
+              <Logo className={`w-5 h-5 ${logoColor}`} />
+              <span className={`font-semibold ${logoColor}`}>TopoGraph</span>
+            </div>
+            <div className="w-9" /> {/* Spacer for centering */}
+          </header>
+        )}
 
         {/* Page content */}
         <main className="flex-1 overflow-hidden">

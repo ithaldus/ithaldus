@@ -51,7 +51,11 @@ export function NetworkTopology() {
   const [scanStatus, setScanStatus] = useState<ScanStatus>('idle')
   const [logs, setLogs] = useState<LogMessage[]>([])
   const [channels, setChannels] = useState<ChannelInfo[]>([])
+  // Check if console is disabled via query param (?console=0 or ?console=false)
+  const consoleDisabled = searchParams.get('console') === '0' || searchParams.get('console') === 'false'
+
   const [consoleOpen, setConsoleOpen] = useState(() => {
+    if (consoleDisabled) return false
     const stored = localStorage.getItem('debug-console-open')
     return stored === 'true'
   })
@@ -62,7 +66,45 @@ export function NetworkTopology() {
   const [lastScannedAt, setLastScannedAt] = useState<string | null>(null)
   const [scanError, setScanError] = useState<string | null>(null)
   const topologyRef = useRef<HTMLDivElement>(null)
+  // Visibility toggles (FIVEAMPS) - can be set via URL param: ?labels=firmware,vendor,ports
+  // Use ?labels= or ?labels=none to hide all labels
+  const labelsFromUrl = searchParams.get('labels')
   const [visibility, setVisibility] = useState<VisibilityToggles>(() => {
+    // Check URL param first
+    if (labelsFromUrl !== null) {
+      // Map short names to full keys for convenience
+      const labelMap: Record<string, keyof VisibilityToggles> = {
+        firmware: 'firmware', f: 'firmware',
+        interfaces: 'interfaces', i: 'interfaces',
+        vendor: 'vendor', v: 'vendor',
+        enddevices: 'endDevices', e: 'endDevices',
+        assettag: 'assetTag', a: 'assetTag',
+        mac: 'mac', m: 'mac',
+        ports: 'ports', p: 'ports',
+        serialnumber: 'serialNumber', s: 'serialNumber',
+      }
+      // Start with all false
+      const result: VisibilityToggles = {
+        endDevices: false,
+        firmware: false,
+        ports: false,
+        interfaces: false,
+        vendor: false,
+        serialNumber: false,
+        assetTag: false,
+        mac: false,
+      }
+      // Enable specified labels (if any)
+      if (labelsFromUrl && labelsFromUrl !== 'none') {
+        const labels = labelsFromUrl.toLowerCase().split(',')
+        for (const label of labels) {
+          const key = labelMap[label.trim()]
+          if (key) result[key] = true
+        }
+      }
+      return result
+    }
+    // Fall back to localStorage
     const stored = localStorage.getItem('topology-visibility')
     if (stored) {
       try {
@@ -120,8 +162,21 @@ export function NetworkTopology() {
     }, { replace: true })
   }, [setSearchParams])
 
-  // Device type filter - which types to show (all enabled by default)
+  // Device type filter - which types to show
+  // Can be set via URL param: ?types=router,switch,access-point
+  // If not set, uses localStorage or defaults to all types
+  const typesFromUrl = searchParams.get('types')
   const [enabledDeviceTypes, setEnabledDeviceTypes] = useState<Set<DeviceType>>(() => {
+    // Check URL param first
+    if (typesFromUrl) {
+      const types = typesFromUrl.split(',').filter(t =>
+        deviceTypeOptions.some(opt => opt.value === t)
+      ) as DeviceType[]
+      if (types.length > 0) {
+        return new Set(types)
+      }
+    }
+    // Fall back to localStorage
     const stored = localStorage.getItem('topology-device-types')
     if (stored) {
       try {
@@ -133,10 +188,11 @@ export function NetworkTopology() {
     return new Set(deviceTypeOptions.map(opt => opt.value))
   })
 
-  // Save device type filter preferences
+  // Save device type filter preferences (only when not set via URL)
   useEffect(() => {
+    if (typesFromUrl) return // Don't overwrite localStorage when types come from URL
     localStorage.setItem('topology-device-types', JSON.stringify(Array.from(enabledDeviceTypes)))
-  }, [enabledDeviceTypes])
+  }, [enabledDeviceTypes, typesFromUrl])
 
   // Derive selected device from URL param
   const selectedDeviceId = searchParams.get('device')
@@ -156,24 +212,46 @@ export function NetworkTopology() {
     return findDevice(devices)
   }, [selectedDeviceId, devices])
 
-  function toggleDeviceType(type: DeviceType) {
-    setEnabledDeviceTypes(prev => {
-      const next = new Set(prev)
-      if (next.has(type)) {
-        next.delete(type)
+  // Update types URL param based on enabled device types
+  const updateTypesInUrl = useCallback((types: Set<DeviceType>) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev)
+
+      // If all types enabled, remove the param (default behavior)
+      if (types.size === deviceTypeOptions.length) {
+        newParams.delete('types')
+      } else if (types.size === 0) {
+        // None enabled - use empty string
+        newParams.set('types', '')
       } else {
-        next.add(type)
+        newParams.set('types', Array.from(types).join(','))
       }
-      return next
-    })
+
+      return newParams
+    }, { replace: true })
+  }, [setSearchParams])
+
+  function toggleDeviceType(type: DeviceType) {
+    const next = new Set(enabledDeviceTypes)
+    if (next.has(type)) {
+      next.delete(type)
+    } else {
+      next.add(type)
+    }
+    setEnabledDeviceTypes(next)
+    updateTypesInUrl(next)
   }
 
   function enableAllDeviceTypes() {
-    setEnabledDeviceTypes(new Set(deviceTypeOptions.map(opt => opt.value)))
+    const all = new Set(deviceTypeOptions.map(opt => opt.value))
+    setEnabledDeviceTypes(all)
+    updateTypesInUrl(all)
   }
 
   function disableAllDeviceTypes() {
-    setEnabledDeviceTypes(new Set())
+    const none = new Set<DeviceType>()
+    setEnabledDeviceTypes(none)
+    updateTypesInUrl(none)
   }
 
 
@@ -195,10 +273,11 @@ export function NetworkTopology() {
     }
   }, [networkId])
 
-  // Save visibility preferences
+  // Save visibility preferences (only when not set via URL)
   useEffect(() => {
+    if (labelsFromUrl !== null) return // Don't overwrite localStorage when labels come from URL
     localStorage.setItem('topology-visibility', JSON.stringify(visibility))
-  }, [visibility])
+  }, [visibility, labelsFromUrl])
 
   // Save debug console state
   useEffect(() => {
@@ -489,8 +568,41 @@ export function NetworkTopology() {
     return `${year}-${month}-${day} ${hours}:${minutes}`
   }
 
+  // Update labels URL param based on visibility state
+  const updateLabelsInUrl = useCallback((vis: VisibilityToggles) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev)
+
+      const labelShortCodes: [keyof VisibilityToggles, string][] = [
+        ['firmware', 'f'],
+        ['interfaces', 'i'],
+        ['vendor', 'v'],
+        ['endDevices', 'e'],
+        ['assetTag', 'a'],
+        ['mac', 'm'],
+        ['ports', 'p'],
+        ['serialNumber', 's'],
+      ]
+
+      const enabledLabels = labelShortCodes
+        .filter(([key]) => vis[key])
+        .map(([, code]) => code)
+
+      if (enabledLabels.length === 0) {
+        // None enabled - use empty string to indicate all off
+        newParams.set('labels', '')
+      } else {
+        newParams.set('labels', enabledLabels.join(','))
+      }
+
+      return newParams
+    }, { replace: true })
+  }, [setSearchParams])
+
   function toggleVisibility(key: keyof VisibilityToggles) {
-    setVisibility(prev => ({ ...prev, [key]: !prev[key] }))
+    const newVisibility = { ...visibility, [key]: !visibility[key] }
+    setVisibility(newVisibility)
+    updateLabelsInUrl(newVisibility)
   }
 
   // Network devices are infrastructure devices (routers, switches, APs)
@@ -1104,17 +1216,19 @@ export function NetworkTopology() {
         )}
       </div>
 
-      {/* Debug Console */}
-      <DebugConsole
-        logs={logs}
-        channels={channels}
-        isOpen={consoleOpen}
-        onToggle={() => setConsoleOpen(!consoleOpen)}
-        width={consoleWidth}
-        onWidthChange={setConsoleWidth}
-        filter={logFilter}
-        onFilterChange={updateLogFilter}
-      />
+      {/* Debug Console - hidden when ?console=0 or ?console=false */}
+      {!consoleDisabled && (
+        <DebugConsole
+          logs={logs}
+          channels={channels}
+          isOpen={consoleOpen}
+          onToggle={() => setConsoleOpen(!consoleOpen)}
+          width={consoleWidth}
+          onWidthChange={setConsoleWidth}
+          filter={logFilter}
+          onFilterChange={updateLogFilter}
+        />
+      )}
 
       {/* Device Modal */}
       {selectedDevice && (

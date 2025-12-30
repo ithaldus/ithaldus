@@ -98,6 +98,32 @@ Each instance will have its own:
 - Docker volumes (including `node_modules`)
 - SQLite database (in the local `./data` folder)
 
+## URL Parameters (Topology View)
+
+The network topology view supports URL query parameters to customize the display:
+
+| Parameter | Example | Description |
+|-----------|---------|-------------|
+| `sidebar` | `?sidebar=0` | Hide the navigation sidebar |
+| `console` | `?console=0` | Hide the debug console |
+| `labels` | `?labels=f,v,p` | Show only specific labels |
+| `types` | `?types=router,switch` | Show only specific device types |
+| `filter` | `?filter=192.168` | Pre-fill the device filter |
+
+### Label Options
+Use full names or short codes: `firmware`/`f`, `interfaces`/`i`, `vendor`/`v`, `enddevices`/`e`, `assettag`/`a`, `mac`/`m`, `ports`/`p`, `serialnumber`/`s`
+
+Use `?labels=` (empty) to hide all labels.
+
+### Device Types
+Available types: `router`, `switch`, `access-point`, `server`, `computer`, `phone`, `desktop-phone`, `tv`, `tablet`, `printer`, `camera`, `iot`, `end-device`
+
+### Example
+```
+http://localhost:3000/networks/abc123?sidebar=0&console=0&types=router,switch&labels=f,v
+```
+Shows only routers and switches with firmware and vendor info, without sidebar or console.
+
 ## Development
 
 The development environment runs two processes inside Docker:
