@@ -239,13 +239,19 @@ export function DebugConsole({
 
   return (
     <div
-      className="fixed right-0 top-0 h-full z-40 flex"
-      style={{ width: `${width}px` }}
+      className="debug-console-container fixed right-0 top-0 h-full z-40 flex w-full sm:w-auto"
+      style={{ ['--console-width' as string]: `${width}px` }}
     >
-      {/* Resize Handle */}
+      {/* Use CSS custom property for width, full width on mobile */}
+      <style>{`
+        @media (min-width: 640px) {
+          .debug-console-container { width: var(--console-width) !important; }
+        }
+      `}</style>
+      {/* Resize Handle - hidden on mobile */}
       <div
         ref={resizeRef}
-        className="w-1 h-full cursor-ew-resize bg-slate-700 hover:bg-cyan-500 transition-colors"
+        className="w-1 h-full cursor-ew-resize bg-slate-700 hover:bg-cyan-500 transition-colors hidden sm:block"
       />
 
       {/* Console Panel */}

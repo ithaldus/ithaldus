@@ -885,8 +885,16 @@ export function NetworkTopology() {
     )
   }
 
+  // On mobile, console overlays content (no margin needed)
+  // On sm+ screens, add margin to make room for console
   return (
-    <div className="h-full flex flex-col p-6" style={{ marginRight: consoleOpen ? consoleWidth : 0 }}>
+    <div className="h-full flex flex-col p-6 sm:mr-0" style={{ ['--console-margin' as string]: consoleOpen ? `${consoleWidth}px` : '0' }}>
+      <style>{`
+        @media (min-width: 640px) {
+          .topology-content { margin-right: var(--console-margin) !important; }
+        }
+      `}</style>
+      <div className="topology-content h-full flex flex-col">
       {/* Header */}
       <div className="mb-6 flex-shrink-0 space-y-2">
         {/* Row 1: Network name, device count, last scanned */}
@@ -1237,6 +1245,7 @@ export function NetworkTopology() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }
