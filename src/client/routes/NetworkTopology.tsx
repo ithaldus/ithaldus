@@ -20,6 +20,7 @@ import {
 import { DeviceCard } from '../components/topology/DeviceCard'
 import { DebugConsole } from '../components/topology/DebugConsole'
 import { DeviceModal, deviceTypeOptions } from '../components/topology/DeviceModal'
+import { DeviceTypeFilter } from '../components/topology/DeviceTypeFilter'
 import { Tooltip } from '../components/ui/Tooltip'
 
 type ScanStatus = 'idle' | 'running' | 'completed' | 'error'
@@ -175,8 +176,6 @@ export function NetworkTopology() {
     setEnabledDeviceTypes(new Set())
   }
 
-  const allDeviceTypesEnabled = enabledDeviceTypes.size === deviceTypeOptions.length
-  const noDeviceTypesEnabled = enabledDeviceTypes.size === 0
 
   // WebSocket ref
   const wsRef = useRef<WebSocket | null>(null)
@@ -991,42 +990,12 @@ export function NetworkTopology() {
           </div>
 
           {/* Device Type Filter Pill */}
-          <div className="inline-flex items-center rounded-md sm:rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76]">
-            {/* All/None toggle */}
-            <Tooltip content={allDeviceTypesEnabled ? "Hide all device types" : "Show all device types"}>
-              <button
-                onClick={allDeviceTypesEnabled ? disableAllDeviceTypes : enableAllDeviceTypes}
-                className={`
-                  px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs font-medium transition-colors flex-shrink-0
-                  ${allDeviceTypesEnabled
-                    ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
-                    : noDeviceTypesEnabled
-                      ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                      : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                  }
-                `}
-              >
-                {allDeviceTypesEnabled ? '✓' : noDeviceTypesEnabled ? '✗' : '~'}
-              </button>
-            </Tooltip>
-            {/* Device type buttons */}
-            {deviceTypeOptions.map(({ value, label, icon: Icon }) => (
-              <Tooltip key={value} content={`${label} — ${enabledDeviceTypes.has(value) ? 'Click to hide' : 'Click to show'}`}>
-                <button
-                  onClick={() => toggleDeviceType(value)}
-                  className={`
-                    px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs transition-colors flex-shrink-0
-                    ${enabledDeviceTypes.has(value)
-                      ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
-                      : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-600 dark:hover:text-slate-300'
-                    }
-                  `}
-                >
-                  <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                </button>
-              </Tooltip>
-            ))}
-          </div>
+          <DeviceTypeFilter
+            enabledDeviceTypes={enabledDeviceTypes}
+            onToggleType={toggleDeviceType}
+            onEnableAll={enableAllDeviceTypes}
+            onDisableAll={disableAllDeviceTypes}
+          />
         </div>
 
         {/* Filter input and expand/collapse buttons */}
