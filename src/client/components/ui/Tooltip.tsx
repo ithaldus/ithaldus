@@ -11,6 +11,7 @@ interface TooltipProps {
 
 export function Tooltip({ content, children, position = 'bottom', className = '', delay = 300 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false)
+  const [isPositioned, setIsPositioned] = useState(false)
   const [coords, setCoords] = useState({ top: 0, left: 0 })
   const [actualPosition, setActualPosition] = useState(position)
   const triggerRef = useRef<HTMLDivElement>(null)
@@ -24,6 +25,7 @@ export function Tooltip({ content, children, position = 'bottom', className = ''
   const hideTooltip = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
     setIsVisible(false)
+    setIsPositioned(false)
   }
 
   useEffect(() => {
@@ -90,6 +92,7 @@ export function Tooltip({ content, children, position = 'bottom', className = ''
 
     setCoords({ top, left })
     setActualPosition(finalPosition)
+    setIsPositioned(true)
   }, [isVisible, position])
 
   const arrowClasses = {
@@ -111,8 +114,8 @@ export function Tooltip({ content, children, position = 'bottom', className = ''
         <div
           ref={tooltipRef}
           role="tooltip"
-          className="fixed z-[9999] pointer-events-none animate-in fade-in zoom-in-95 duration-100"
-          style={{ top: coords.top, left: coords.left }}
+          className="fixed z-[9999] pointer-events-none"
+          style={{ top: coords.top, left: coords.left, opacity: isPositioned ? 1 : 0 }}
         >
           <div className="bg-black text-white text-xs px-3 py-2 rounded-lg shadow-xl max-w-xs whitespace-normal text-center font-medium">
             {content}
