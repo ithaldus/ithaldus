@@ -499,14 +499,12 @@ export function NetworkTopology() {
   function formatLastScanned(date: string | null): string {
     if (!date) return 'Never'
     const d = new Date(date)
-    return d.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    })
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const hours = String(d.getHours()).padStart(2, '0')
+    const minutes = String(d.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day} ${hours}:${minutes}`
   }
 
   function toggleVisibility(key: keyof VisibilityToggles) {
@@ -911,10 +909,10 @@ export function NetworkTopology() {
               <Monitor className="w-3 h-3 sm:w-4 sm:h-4" />
               <span>
                 {filteredDeviceCount !== null
-                  ? `${filteredDeviceCount} / ${totalDeviceCount} devices`
+                  ? `${filteredDeviceCount} / ${totalDeviceCount}`
                   : !visibility.endDevices && deviceCount !== totalDeviceCount
-                    ? `${deviceCount} / ${totalDeviceCount} devices`
-                    : `${totalDeviceCount} devices`
+                    ? `${deviceCount} / ${totalDeviceCount}`
+                    : `${totalDeviceCount}`
                 }
               </span>
             </div>
@@ -922,7 +920,7 @@ export function NetworkTopology() {
           {lastScannedAt && (
             <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
               <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span>Scanned {formatLastScanned(lastScannedAt)}</span>
+              <span>{formatLastScanned(lastScannedAt)}</span>
             </div>
           )}
           {/* Mobile expand/collapse toggle - only visible on mobile */}
