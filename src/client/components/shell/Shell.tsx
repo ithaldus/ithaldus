@@ -14,12 +14,17 @@ export function Shell({ children }: ShellProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  // Check if sidebar is hidden via query param (?sidebar=0 or ?sidebar=false)
-  const sidebarHidden = searchParams.get('sidebar') === '0' || searchParams.get('sidebar') === 'false'
+  // Sidebar state - can be set via URL param (?sidebar=0 to collapse/hide)
+  const sidebarFromUrl = searchParams.get('sidebar')
+  const sidebarHidden = sidebarFromUrl === '0' || sidebarFromUrl === 'false'
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    // URL param takes precedence
+    if (sidebarFromUrl === '0' || sidebarFromUrl === 'false') return true
+    return false
+  })
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'))
@@ -168,7 +173,20 @@ export function Shell({ children }: ShellProps) {
           {/* Desktop collapse toggle */}
           <Tooltip content={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} position="right">
             <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              onClick={() => {
+                const newCollapsed = !sidebarCollapsed
+                setSidebarCollapsed(newCollapsed)
+                // Sync to URL
+                setSearchParams(prev => {
+                  const newParams = new URLSearchParams(prev)
+                  if (newCollapsed) {
+                    newParams.set('sidebar', '0')
+                  } else {
+                    newParams.delete('sidebar')
+                  }
+                  return newParams
+                }, { replace: true })
+              }}
               className="hidden lg:flex items-center justify-center w-8 h-8 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
             >
               {sidebarCollapsed ? (

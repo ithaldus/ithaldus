@@ -51,11 +51,13 @@ export function NetworkTopology() {
   const [scanStatus, setScanStatus] = useState<ScanStatus>('idle')
   const [logs, setLogs] = useState<LogMessage[]>([])
   const [channels, setChannels] = useState<ChannelInfo[]>([])
-  // Check if console is disabled via query param (?console=0 or ?console=false)
-  const consoleDisabled = searchParams.get('console') === '0' || searchParams.get('console') === 'false'
-
+  // Console open state - can be set via URL param (?console=0 to close)
+  const consoleFromUrl = searchParams.get('console')
   const [consoleOpen, setConsoleOpen] = useState(() => {
-    if (consoleDisabled) return false
+    // URL param takes precedence
+    if (consoleFromUrl === '0' || consoleFromUrl === 'false') return false
+    if (consoleFromUrl === '1' || consoleFromUrl === 'true') return true
+    // Fall back to localStorage
     const stored = localStorage.getItem('debug-console-open')
     return stored === 'true'
   })
@@ -1216,19 +1218,30 @@ export function NetworkTopology() {
         )}
       </div>
 
-      {/* Debug Console - hidden when ?console=0 or ?console=false */}
-      {!consoleDisabled && (
-        <DebugConsole
-          logs={logs}
-          channels={channels}
-          isOpen={consoleOpen}
-          onToggle={() => setConsoleOpen(!consoleOpen)}
-          width={consoleWidth}
-          onWidthChange={setConsoleWidth}
-          filter={logFilter}
-          onFilterChange={updateLogFilter}
-        />
-      )}
+      {/* Debug Console */}
+      <DebugConsole
+        logs={logs}
+        channels={channels}
+        isOpen={consoleOpen}
+        onToggle={() => {
+          const newOpen = !consoleOpen
+          setConsoleOpen(newOpen)
+          // Sync to URL
+          setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev)
+            if (newOpen) {
+              newParams.delete('console')
+            } else {
+              newParams.set('console', '0')
+            }
+            return newParams
+          }, { replace: true })
+        }}
+        width={consoleWidth}
+        onWidthChange={setConsoleWidth}
+        filter={logFilter}
+        onFilterChange={updateLogFilter}
+      />
 
       {/* Device Modal */}
       {selectedDevice && (
