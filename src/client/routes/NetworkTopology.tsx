@@ -914,8 +914,10 @@ export function NetworkTopology() {
           </button>
         </div>
 
-        {/* Row 2: Device count and scanned date */}
-        <div className="flex items-center gap-3 mt-0.5">
+        {/* Collapsible rows - hidden on mobile unless expanded, always visible on sm+ */}
+        <div className={`mt-1 sm:mt-2 space-y-1 sm:space-y-2 ${headerExpanded ? 'block' : 'hidden'} sm:block`}>
+        {/* Device count and scanned date */}
+        <div className="flex items-center gap-3">
           {totalDeviceCount > 0 && (
             <div className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
               <Monitor className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
@@ -936,9 +938,6 @@ export function NetworkTopology() {
             </div>
           )}
         </div>
-
-        {/* Collapsible rows - hidden on mobile unless expanded, always visible on sm+ */}
-        <div className={`space-y-1 sm:space-y-2 mt-2 sm:mt-3 ${headerExpanded ? 'block' : 'hidden'} sm:block`}>
         {/* Row 2: Actions */}
         <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
 
