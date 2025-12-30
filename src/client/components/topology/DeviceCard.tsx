@@ -370,7 +370,7 @@ export function DeviceCard({
           {(showVendor && (device.vendor || device.model)) || (showMac && device.primaryMac) ? (
             <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
               {showVendor && (device.vendor || device.model) && (
-                <span className="px-1 sm:px-1.5 h-full flex items-center bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                <span className="px-1 sm:px-1.5 h-full flex items-center bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                   {device.vendor && <HighlightText text={device.vendor} filter={filterText} />}
                   {device.vendor && device.model && ' '}
                   {device.model && <HighlightText text={device.model} filter={filterText} />}
@@ -381,7 +381,7 @@ export function DeviceCard({
                   {showVendor && (device.vendor || device.model) && (
                     <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
                   )}
-                  <span className="px-0.5 sm:px-1 h-full flex items-center bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-500 font-mono">
+                  <span className="px-0.5 sm:px-1 h-full flex items-center bg-slate-200 dark:bg-slate-900 text-slate-500 dark:text-slate-500 font-mono">
                     <HighlightText text={device.primaryMac} filter={filterText} />
                     {device.macCount && device.macCount > 1 && (
                       <span className="ml-0.5 sm:ml-1 px-0.5 sm:px-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
@@ -408,7 +408,7 @@ export function DeviceCard({
                   <Tooltip content={copiedText === device.ip ? 'Copied!' : 'Click to copy'} position="bottom">
                     <button
                       onClick={(e) => handleCopy(device.ip!, e)}
-                      className="px-0.5 sm:px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                      className="px-0.5 sm:px-1 flex items-center h-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                     >
                       <HighlightText text={device.ip} filter={filterText} />
                     </button>
@@ -418,7 +418,7 @@ export function DeviceCard({
                 <Tooltip content={copiedText === device.ip ? 'Copied!' : 'Click to copy'} position="bottom">
                   <button
                     onClick={(e) => handleCopy(device.ip!, e)}
-                    className="shrink-0 h-[14px] sm:h-[18px] px-0.5 sm:px-1 inline-flex items-center text-[7px] sm:text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                    className="shrink-0 h-[14px] sm:h-[18px] px-0.5 sm:px-1 inline-flex items-center text-[7px] sm:text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50 hover:bg-slate-300 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                   >
                     <HighlightText text={device.ip} filter={filterText} />
                   </button>
@@ -440,7 +440,7 @@ export function DeviceCard({
                   SN
                 </span>
                 <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
-                <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
+                <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
                   <HighlightText text={device.serialNumber} filter={filterText} />
                 </span>
               </span>
@@ -453,7 +453,7 @@ export function DeviceCard({
                   <Tag className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
                 </span>
                 <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
-                <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
+                <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
                   <HighlightText text={device.assetTag} filter={filterText} />
                 </span>
               </span>
@@ -598,7 +598,7 @@ export function DeviceCard({
                         className={`inline-flex items-center gap-0.5 text-[10px] font-mono px-1 rounded border ${
                           isVirtual
                             ? 'text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700'
-                            : 'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600'
+                            : 'text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600'
                         } ${(isVirtual || childCount > 3) ? 'cursor-pointer hover:opacity-80' : ''}`}
                         onClick={(isVirtual || childCount > 3) ? (e) => handleInterfaceToggle(ifaceName, e) : undefined}
                       >
@@ -646,7 +646,7 @@ export function DeviceCard({
                         </span>
                       ))}
                       {ifaceInfo?.comment && (
-                        <span className="text-[10px] italic text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1 rounded">
+                        <span className="text-[10px] italic text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 px-1 rounded">
                           {ifaceInfo.comment}
                         </span>
                       )}
