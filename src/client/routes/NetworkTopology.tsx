@@ -362,10 +362,12 @@ export function NetworkTopology() {
         wsRef.current.close()
       }
 
-      // Use Vite's WebSocket proxy in development (same host/port as page)
-      // Vite is configured with ws: true to proxy WebSocket connections
+      // In development, connect directly to API port (Vite's WS proxy is unreliable)
+      // In production, use the same host/port as the page
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const wsUrl = `${protocol}//${window.location.host}/api/scan/${networkId}/ws`
+      const isDev = import.meta.env.DEV
+      const wsHost = isDev ? `${window.location.hostname}:3001` : window.location.host
+      const wsUrl = `${protocol}//${wsHost}/api/scan/${networkId}/ws`
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
       let isResolved = false
