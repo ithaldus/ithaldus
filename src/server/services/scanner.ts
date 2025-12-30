@@ -2338,41 +2338,60 @@ export class NetworkScanner {
     }
 
     // SmartZone fallback: For Ruckus devices that couldn't be accessed via SSH,
-    // try to enrich from SmartZone cache (by knownMac or deviceMac)
+    // try to enrich from SmartZone cache (by knownMac, deviceMac, or IP)
     if (!isSmartZoneEnriched && this.smartzoneCache.size > 0 && (vendor === 'Ruckus' || detectVendorFromMac(deviceMac) === 'Ruckus')) {
+      let szData: SmartZoneAP | null = null
+      let matchedBy = ''
+
       // Try knownMac first, then deviceMac
       const macsToTry = [knownMac, deviceMac].filter(m => m && !m.startsWith('UNKNOWN-'))
       for (const mac of macsToTry) {
         const normalizedMac = mac?.toUpperCase().replace(/[:-]/g, '').match(/.{2}/g)?.join(':')
-        const szData = normalizedMac ? this.smartzoneCache.get(normalizedMac) : null
+        szData = normalizedMac ? this.smartzoneCache.get(normalizedMac) ?? null : null
         if (szData) {
-          isSmartZoneEnriched = true
-          this.log('success', `${ip}: SmartZone fallback - enriching ${szData.name} (MAC: ${normalizedMac})`)
-          // Fill in deviceInfo from SmartZone if SSH didn't provide it
-          if (!deviceInfo) {
-            deviceInfo = {
-              hostname: szData.name,
-              model: szData.model,
-              serialNumber: szData.serial,
-              version: szData.firmware,
-              interfaces: [
-                { name: 'eth0', mac: normalizedMac || null, ip: szData.ip, bridge: null, vlan: null, comment: null, linkUp: szData.status === 'Online' },
-                { name: 'wlan0', mac: null, ip: null, bridge: null, vlan: null, comment: '2.4GHz Radio', linkUp: szData.status === 'Online' },
-                { name: 'wlan1', mac: null, ip: null, bridge: null, vlan: null, comment: '5GHz Radio', linkUp: szData.status === 'Online' },
-              ],
-              neighbors: [],
-              dhcpLeases: [],
-              ownUpstreamInterface: 'eth0',
-            }
-            vendorInfo = { vendor: 'Ruckus', driver: 'ruckus-smartzone' }
-          } else {
-            // SSH worked but gave incomplete data - supplement with SmartZone
-            deviceInfo.hostname = deviceInfo.hostname || szData.name
-            deviceInfo.model = deviceInfo.model || szData.model
-            deviceInfo.serialNumber = deviceInfo.serialNumber || szData.serial
-            deviceInfo.version = deviceInfo.version || szData.firmware
-          }
+          matchedBy = `MAC: ${normalizedMac}`
           break
+        }
+      }
+
+      // If MAC lookup failed, try IP lookup (handles different interface MACs)
+      if (!szData && ip) {
+        for (const ap of this.smartzoneCache.values()) {
+          if (ap.ip === ip) {
+            szData = ap
+            matchedBy = `IP: ${ip}`
+            break
+          }
+        }
+      }
+
+      if (szData) {
+        isSmartZoneEnriched = true
+        this.log('success', `${ip}: SmartZone fallback - enriching ${szData.name} (${matchedBy})`)
+        // Fill in deviceInfo from SmartZone if SSH didn't provide it
+        if (!deviceInfo) {
+          const szMac = szData.mac // Use SmartZone's MAC since our discovery MAC may differ
+          deviceInfo = {
+            hostname: szData.name,
+            model: szData.model,
+            serialNumber: szData.serial,
+            version: szData.firmware,
+            interfaces: [
+              { name: 'eth0', mac: szMac || null, ip: szData.ip, bridge: null, vlan: null, comment: null, linkUp: szData.status === 'Online' },
+              { name: 'wlan0', mac: null, ip: null, bridge: null, vlan: null, comment: '2.4GHz Radio', linkUp: szData.status === 'Online' },
+              { name: 'wlan1', mac: null, ip: null, bridge: null, vlan: null, comment: '5GHz Radio', linkUp: szData.status === 'Online' },
+            ],
+            neighbors: [],
+            dhcpLeases: [],
+            ownUpstreamInterface: 'eth0',
+          }
+          vendorInfo = { vendor: 'Ruckus', driver: 'ruckus-smartzone' }
+        } else {
+          // SSH worked but gave incomplete data - supplement with SmartZone
+          deviceInfo.hostname = deviceInfo.hostname || szData.name
+          deviceInfo.model = deviceInfo.model || szData.model
+          deviceInfo.serialNumber = deviceInfo.serialNumber || szData.serial
+          deviceInfo.version = deviceInfo.version || szData.firmware
         }
       }
     }
