@@ -1264,6 +1264,8 @@ export function NetworkTopology() {
         onWidthChange={setConsoleWidth}
         filter={logFilter}
         onFilterChange={updateLogFilter}
+        networkId={networkId}
+        onLogsCleared={() => setLogs([])}
       />
 
       {/* Device Modal */}

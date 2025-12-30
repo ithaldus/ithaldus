@@ -294,3 +294,29 @@ scanRoutes.get('/:networkId/history', async (c) => {
 
   return c.json(scanHistory)
 })
+
+// Delete all scan logs for a network (admin only)
+scanRoutes.delete('/:networkId/logs', requireAdmin, async (c) => {
+  const networkId = c.req.param('networkId')
+
+  // Get all scans for this network
+  const networkScans = await db.select({ id: scans.id })
+    .from(scans)
+    .where(eq(scans.networkId, networkId))
+
+  // Delete all logs for these scans
+  for (const scan of networkScans) {
+    await db.delete(scanLogs).where(eq(scanLogs.scanId, scan.id))
+  }
+
+  // Delete all scan records
+  await db.delete(scans).where(eq(scans.networkId, networkId))
+
+  // Clear in-memory logs if there's an active scan state
+  const scanState = activeScans.get(networkId)
+  if (scanState) {
+    scanState.logs = []
+  }
+
+  return c.json({ success: true })
+})

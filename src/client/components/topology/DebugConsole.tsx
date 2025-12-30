@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
-import { Terminal, ChevronLeft, X, Maximize2, Minimize2, Search, Radio, AlertCircle, AlertTriangle, CheckCircle, Info, Copy, Check } from 'lucide-react'
+import { Terminal, ChevronLeft, X, Maximize2, Minimize2, Search, Radio, AlertCircle, AlertTriangle, CheckCircle, Info, Copy, Check, Trash2 } from 'lucide-react'
+import { api } from '../../lib/api'
 import { Tooltip } from '../ui/Tooltip'
 import type { LogMessage, ChannelInfo } from '../../lib/api'
 
@@ -14,6 +15,8 @@ interface DebugConsoleProps {
   onWidthChange?: (width: number) => void
   filter?: string
   onFilterChange?: (filter: string) => void
+  networkId?: string
+  onLogsCleared?: () => void
 }
 
 const levelColors = {
@@ -47,6 +50,8 @@ export function DebugConsole({
   onWidthChange,
   filter: controlledFilter,
   onFilterChange,
+  networkId,
+  onLogsCleared,
 }: DebugConsoleProps) {
   const consoleRef = useRef<HTMLDivElement>(null)
   const resizeRef = useRef<HTMLDivElement>(null)
@@ -124,6 +129,21 @@ export function DebugConsole({
     await navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const [deleting, setDeleting] = useState(false)
+  const deleteAllLogs = async () => {
+    if (!networkId || deleting) return
+    if (!confirm('Delete all scan logs and history for this network?')) return
+    setDeleting(true)
+    try {
+      await api.scan.deleteLogs(networkId)
+      onLogsCleared?.()
+    } catch (err) {
+      console.error('Failed to delete logs:', err)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   // Persist auto-expand preference
@@ -434,6 +454,17 @@ export function DebugConsole({
                   {copied ? <Check className="w-3.5 h-3.5 text-green-500 dark:text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
               </Tooltip>
+              {networkId && (
+                <Tooltip content="Delete all logs" position="top">
+                  <button
+                    onClick={deleteAllLogs}
+                    disabled={deleting || logs.length === 0}
+                    className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Trash2 className={`w-3.5 h-3.5 ${deleting ? 'animate-pulse' : ''}`} />
+                  </button>
+                </Tooltip>
+              )}
             </div>
           </div>
         </div>

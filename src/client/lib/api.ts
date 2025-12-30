@@ -322,6 +322,8 @@ export const api = {
       request<TopologyResponse>(`/scan/${networkId}/topology`),
     history: (networkId: string) =>
       request<Scan[]>(`/scan/${networkId}/history`),
+    deleteLogs: (networkId: string) =>
+      request<{ success: boolean }>(`/scan/${networkId}/logs`, { method: 'DELETE' }),
   },
 }
 
