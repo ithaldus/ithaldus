@@ -541,6 +541,9 @@ export type ScanUpdateMessage =
 // WebSocket URL helper
 export function getScanWebSocketUrl(networkId: string): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  // Use Vite's WebSocket proxy (configured with ws: true)
-  return `${protocol}//${window.location.host}/api/scan/${networkId}/ws`
+  // In development, connect directly to API port (Vite's WS proxy is unreliable)
+  // In production, use the same host/port as the page
+  const isDev = import.meta.env.DEV
+  const wsHost = isDev ? `${window.location.hostname}:3001` : window.location.host
+  return `${protocol}//${wsHost}/api/scan/${networkId}/ws`
 }

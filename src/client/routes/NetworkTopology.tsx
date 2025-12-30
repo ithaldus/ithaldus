@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { api, type Network, type TopologyDevice, type LogMessage, type ScanUpdateMessage, type ChannelInfo, type DeviceType } from '../lib/api'
+import { api, getScanWebSocketUrl, type Network, type TopologyDevice, type LogMessage, type ScanUpdateMessage, type ChannelInfo, type DeviceType } from '../lib/api'
 import {
   ArrowLeft,
   Square,
@@ -362,13 +362,7 @@ export function NetworkTopology() {
         wsRef.current.close()
       }
 
-      // In development, connect directly to API port (Vite's WS proxy is unreliable)
-      // In production, use the same host/port as the page
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const isDev = import.meta.env.DEV
-      const wsHost = isDev ? `${window.location.hostname}:3001` : window.location.host
-      const wsUrl = `${protocol}//${wsHost}/api/scan/${networkId}/ws`
-      const ws = new WebSocket(wsUrl)
+      const ws = new WebSocket(getScanWebSocketUrl(networkId))
       wsRef.current = ws
       let isResolved = false
 
