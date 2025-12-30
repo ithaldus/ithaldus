@@ -898,15 +898,27 @@ export function NetworkTopology() {
       `}</style>
       <div className="topology-content h-full flex flex-col">
       {/* Header */}
-      <div className="mb-2 sm:mb-6 flex-shrink-0 space-y-1 sm:space-y-2">
-        {/* Row 1: Network name, device count, last scanned + mobile expand toggle */}
-        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-          <h1 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
+      <div className="mb-2 sm:mb-4 flex-shrink-0 p-2 sm:p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50">
+        {/* Row 1: Network name + mobile expand toggle */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-sm sm:text-lg font-semibold text-slate-900 dark:text-white">
             {network.name}
           </h1>
+          {/* Mobile expand/collapse toggle - only visible on mobile */}
+          <button
+            onClick={() => setHeaderExpanded(!headerExpanded)}
+            className="sm:hidden p-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
+            aria-label={headerExpanded ? 'Collapse toolbar' : 'Expand toolbar'}
+          >
+            {headerExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {/* Row 2: Device count and scanned date */}
+        <div className="flex items-center gap-3 mt-0.5">
           {totalDeviceCount > 0 && (
-            <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              <Monitor className="w-3 h-3 sm:w-4 sm:h-4" />
+            <div className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
+              <Monitor className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
               <span>
                 {filteredDeviceCount !== null
                   ? `${filteredDeviceCount} / ${totalDeviceCount}`
@@ -918,23 +930,15 @@ export function NetworkTopology() {
             </div>
           )}
           {lastScannedAt && (
-            <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-              <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+            <div className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
+              <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
               <span>{formatLastScanned(lastScannedAt)}</span>
             </div>
           )}
-          {/* Mobile expand/collapse toggle - only visible on mobile */}
-          <button
-            onClick={() => setHeaderExpanded(!headerExpanded)}
-            className="sm:hidden ml-auto p-1.5 rounded-md border border-slate-600 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors"
-            aria-label={headerExpanded ? 'Collapse toolbar' : 'Expand toolbar'}
-          >
-            {headerExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
         </div>
 
         {/* Collapsible rows - hidden on mobile unless expanded, always visible on sm+ */}
-        <div className={`space-y-1 sm:space-y-2 ${headerExpanded ? 'block' : 'hidden'} sm:block`}>
+        <div className={`space-y-1 sm:space-y-2 mt-2 sm:mt-3 ${headerExpanded ? 'block' : 'hidden'} sm:block`}>
         {/* Row 2: Actions */}
         <div className="flex items-center gap-1.5 sm:gap-3 flex-wrap">
 
