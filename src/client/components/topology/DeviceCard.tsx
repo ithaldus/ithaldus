@@ -398,7 +398,8 @@ export function DeviceCard({
           <div className="flex items-center gap-1 sm:gap-2 flex-nowrap">
 
             {/* IP Address Pill with optional uplink interface - clickable to copy */}
-            {showInterfaces && device.ip && device.hostname && (
+            {/* Always show when showInterfaces is enabled, even if IP is used as display name */}
+            {showInterfaces && device.ip && (
               device.ownUpstreamInterface ? (
                 <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-mono border border-slate-300/50 dark:border-slate-600/50">
                   <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400">

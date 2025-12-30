@@ -2450,6 +2450,14 @@ export class NetworkScanner {
         accessStatus = 'not accessible (no SSH login)'
       }
       this.log('info', `${ip}: Updated existing device (MAC: ${deviceMac}, ${accessStatus})`)
+
+      // Also add knownMac if it's different from deviceMac
+      // This handles cases where a managed switch reports a different interface MAC
+      // than the one seen in ARP/bridge tables (e.g., management vs switching fabric MAC)
+      if (knownMac && !knownMac.startsWith('UNKNOWN-') && knownMac !== deviceMac) {
+        await this.addMacToDevice(actualDeviceId, knownMac, 'arp')
+        this.log('info', `${ip}: Added neighbor MAC ${knownMac} to device (interface MAC: ${deviceMac})`)
+      }
     } else {
       // Re-check if there's a device with this IP that was processed in this scan (race condition guard)
       const existingByIpNow = await this.findDeviceByIp(ip)
@@ -2462,6 +2470,12 @@ export class NetworkScanner {
         this.log('info', `${ip}: Added MAC ${deviceMac} to existing device ${existingByIpNow.hostname || existingByIpNow.primaryMac} (same IP, concurrent discovery)`)
         actualDeviceId = existingByIpNow.id
         newDevice.id = existingByIpNow.id
+
+        // Also add knownMac if it's different from deviceMac
+        if (knownMac && !knownMac.startsWith('UNKNOWN-') && knownMac !== deviceMac) {
+          await this.addMacToDevice(existingByIpNow.id, knownMac, 'arp')
+          this.log('info', `${ip}: Added neighbor MAC ${knownMac} to device (interface MAC: ${deviceMac})`)
+        }
       } else {
         // Release any stale IP claim before inserting (handles DHCP IP reuse)
         await this.releaseStaleIpClaim(ip)
@@ -2495,6 +2509,14 @@ export class NetworkScanner {
         // Add MAC to deviceMacs table (skip UNKNOWN MACs)
         if (!deviceMac.startsWith('UNKNOWN-')) {
           await this.addMacToDevice(deviceId, deviceMac, 'ssh')
+        }
+
+        // Also add knownMac if it's different from deviceMac
+        // This handles cases where a managed switch reports a different interface MAC
+        // than the one seen in ARP/bridge tables (e.g., management vs switching fabric MAC)
+        if (knownMac && !knownMac.startsWith('UNKNOWN-') && knownMac !== deviceMac) {
+          await this.addMacToDevice(deviceId, knownMac, 'arp')
+          this.log('info', `${ip}: Added neighbor MAC ${knownMac} to device (interface MAC: ${deviceMac})`)
         }
 
         // Ensure stock image entry exists for this vendor+model
