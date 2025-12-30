@@ -257,11 +257,11 @@ export function DebugConsole({
       {/* Console Panel */}
       <div className="flex-1 flex flex-col bg-slate-900 border-l border-slate-700 shadow-xl">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 bg-slate-800">
-          <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2 border-b border-slate-700 bg-slate-800">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <Terminal className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm font-medium text-white">Console</span>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs sm:text-sm font-medium text-white">Console</span>
+            <span className="text-[10px] sm:text-xs text-slate-400">
               {(filter || enabledLevels.size < 4) ? `${filteredLogs.length}/${logs.length}` : logs.length}
             </span>
           </div>
@@ -393,7 +393,7 @@ export function DebugConsole({
           ref={consoleRef}
           onScroll={handleScroll}
           style={{ fontFamily: 'Iosevka, monospace' }}
-          className="flex-1 overflow-y-auto overflow-x-hidden p-2 text-[9px] leading-tight tracking-tight"
+          className="flex-1 overflow-y-auto overflow-x-hidden p-1 sm:p-2 text-[9px] leading-tight tracking-tight"
         >
           {logs.length === 0 ? (
             <div className="text-slate-500 text-center py-8">
@@ -407,22 +407,22 @@ export function DebugConsole({
             filteredLogs.map((log, index) => (
               <div
                 key={index}
-                className={`flex items-start gap-2 py-0.5 ${levelColors[log.level]}`}
+                className={`flex items-start gap-1 sm:gap-2 py-0.5 ${levelColors[log.level]}`}
               >
                 <span className="text-slate-600 shrink-0">
                   [{formatTime(log.timestamp)}]
                 </span>
-                <span className="break-all">{log.message}</span>
+                <span className="min-w-0" style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{log.message}</span>
               </div>
             ))
           )}
         </div>
 
         {/* Footer with status */}
-        <div className="px-4 py-2 border-t border-slate-700 bg-slate-800 text-xs text-slate-400">
+        <div className="px-2 sm:px-4 py-1.5 sm:py-2 border-t border-slate-700 bg-slate-800 text-[10px] sm:text-xs text-slate-400">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-green-400 animate-pulse" />
               <span>Listening for updates...</span>
             </div>
             <Tooltip content={copied ? "Copied!" : "Copy all logs"} position="top">
