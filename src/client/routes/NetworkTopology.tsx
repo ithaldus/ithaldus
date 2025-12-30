@@ -14,8 +14,6 @@ import {
   Search,
   ChevronsDownUp,
   ChevronsUpDown,
-  MoreHorizontal,
-  Check,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
@@ -139,14 +137,6 @@ export function NetworkTopology() {
     localStorage.setItem('topology-device-types', JSON.stringify(Array.from(enabledDeviceTypes)))
   }, [enabledDeviceTypes])
 
-  // Device type filter overflow state
-  const deviceTypeContainerRef = useRef<HTMLDivElement>(null)
-  const overflowMenuRef = useRef<HTMLDivElement>(null)
-  const [showOverflowMenu, setShowOverflowMenu] = useState(false)
-
-  // Fixed number of visible device types (rest go to overflow)
-  const VISIBLE_DEVICE_TYPES = 6
-
   // Derive selected device from URL param
   const selectedDeviceId = searchParams.get('device')
   const selectedDevice = useMemo(() => {
@@ -219,30 +209,6 @@ export function NetworkTopology() {
   useEffect(() => {
     localStorage.setItem('debug-console-width', String(consoleWidth))
   }, [consoleWidth])
-
-  // Simple overflow calculation - first N visible, rest in overflow
-  const visibleDeviceTypes = deviceTypeOptions.slice(0, VISIBLE_DEVICE_TYPES)
-  const overflowDeviceTypes = deviceTypeOptions.slice(VISIBLE_DEVICE_TYPES)
-
-  // Close overflow menu on outside click
-  useEffect(() => {
-    if (!showOverflowMenu) return
-
-    const handleClickOutside = (e: MouseEvent) => {
-      // Check if click is outside both the menu and the device type container
-      const isOutsideMenu = overflowMenuRef.current && !overflowMenuRef.current.contains(e.target as Node)
-      const isOutsideContainer = deviceTypeContainerRef.current && !deviceTypeContainerRef.current.contains(e.target as Node)
-
-      if (isOutsideMenu && isOutsideContainer) {
-        setShowOverflowMenu(false)
-      }
-    }
-
-    // Use mousedown to detect clicks before they bubble
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showOverflowMenu])
-
 
   async function loadNetworkData() {
     try {
@@ -1027,10 +993,7 @@ export function NetworkTopology() {
           </div>
 
           {/* Device Type Filter Pill */}
-          <div
-            ref={deviceTypeContainerRef}
-            className="relative inline-flex items-center rounded-md sm:rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76]"
-          >
+          <div className="inline-flex items-center rounded-md sm:rounded-lg border border-slate-200 dark:border-[#0f5e76] bg-white dark:bg-slate-800 divide-x divide-slate-200 dark:divide-[#0f5e76]">
             {/* All/None toggle */}
             <Tooltip content={allDeviceTypesEnabled ? "Hide all device types" : "Show all device types"}>
               <button
@@ -1048,8 +1011,8 @@ export function NetworkTopology() {
                 {allDeviceTypesEnabled ? '✓' : noDeviceTypesEnabled ? '✗' : '~'}
               </button>
             </Tooltip>
-            {/* Visible device type buttons */}
-            {visibleDeviceTypes.map(({ value, label, icon: Icon }) => (
+            {/* Device type buttons */}
+            {deviceTypeOptions.map(({ value, label, icon: Icon }) => (
               <Tooltip key={value} content={`${label} — ${enabledDeviceTypes.has(value) ? 'Click to hide' : 'Click to show'}`}>
                 <button
                   onClick={() => toggleDeviceType(value)}
@@ -1065,50 +1028,6 @@ export function NetworkTopology() {
                 </button>
               </Tooltip>
             ))}
-            {/* Overflow dropdown - always show since we have fixed overflow */}
-            {overflowDeviceTypes.length > 0 && (
-              <div className="relative flex-shrink-0">
-                <button
-                  title={`${overflowDeviceTypes.length} more device types`}
-                  onClick={() => setShowOverflowMenu(!showOverflowMenu)}
-                  className={`
-                    px-1.5 sm:px-2 py-1.5 sm:py-2 text-[10px] sm:text-xs transition-colors
-                    ${overflowDeviceTypes.some(opt => enabledDeviceTypes.has(opt.value))
-                      ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300'
-                      : 'text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-600 dark:hover:text-slate-300'
-                    }
-                  `}
-                >
-                  <MoreHorizontal className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                </button>
-                {showOverflowMenu && (
-                  <div
-                    ref={overflowMenuRef}
-                    className="absolute top-full right-0 mt-1 py-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 z-50 min-w-[160px]"
-                  >
-                    {overflowDeviceTypes.map(({ value, label, icon: Icon }) => (
-                      <button
-                        key={value}
-                        onClick={() => toggleDeviceType(value)}
-                        className={`
-                          w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors
-                          ${enabledDeviceTypes.has(value)
-                            ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300'
-                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                          }
-                        `}
-                      >
-                        <Icon className="w-4 h-4 shrink-0" />
-                        <span className="flex-1 text-left">{label}</span>
-                        {enabledDeviceTypes.has(value) && (
-                          <Check className="w-4 h-4 shrink-0 text-cyan-500" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
