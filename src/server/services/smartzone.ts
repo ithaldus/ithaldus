@@ -25,6 +25,16 @@ export interface SmartZoneAP {
   status: 'Online' | 'Offline' | 'Flagged'
 }
 
+export interface SmartZoneClient {
+  mac: string           // Client MAC (normalized AA:BB:CC:DD:EE:FF)
+  apMac: string         // Parent AP MAC (normalized)
+  ip: string | null
+  hostname: string | null
+  deviceType: string | null
+  osVendor: string | null
+  model: string | null
+}
+
 interface SmartZoneAPRaw {
   apMac: string
   ip: string
@@ -44,6 +54,23 @@ interface APQueryResponse {
   hasMore: boolean
   firstIndex: number
   list: SmartZoneAPRaw[]
+}
+
+interface SmartZoneClientRaw {
+  clientMac: string
+  apMac: string
+  ipAddress?: string
+  hostname?: string
+  deviceType?: string
+  osVendorType?: string
+  modelName?: string
+}
+
+interface ClientQueryResponse {
+  totalCount: number
+  hasMore: boolean
+  firstIndex: number
+  list: SmartZoneClientRaw[]
 }
 
 // Normalize MAC address to uppercase with colons (AA:BB:CC:DD:EE:FF)
@@ -140,6 +167,45 @@ export class SmartZoneService {
   }
 
   /**
+   * Query all wireless clients from SmartZone
+   */
+  async getClients(serviceTicket: string): Promise<SmartZoneClient[]> {
+    const originalTLS = process.env.NODE_TLS_REJECT_UNAUTHORIZED
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+
+    try {
+      const response = await fetch(`${this.baseUrl}/query/client?serviceTicket=${serviceTicket}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}), // Empty query = all clients
+      })
+
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`SmartZone client query failed: ${response.status} ${response.statusText} - ${text}`)
+      }
+
+      const data = await response.json() as ClientQueryResponse
+
+      return data.list.map((client): SmartZoneClient => ({
+        mac: normalizeMac(client.clientMac),
+        apMac: normalizeMac(client.apMac),
+        ip: client.ipAddress || null,
+        hostname: client.hostname || null,
+        deviceType: client.deviceType || null,
+        osVendor: client.osVendorType || null,
+        model: client.modelName || null,
+      }))
+    } finally {
+      if (originalTLS !== undefined) {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTLS
+      } else {
+        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
+      }
+    }
+  }
+
+  /**
    * Test connection to SmartZone and return AP count
    */
   async testConnection(): Promise<{ success: boolean; apCount: number; error?: string }> {
@@ -157,17 +223,30 @@ export class SmartZoneService {
   }
 
   /**
-   * Fetch all APs and return as a Map keyed by normalized MAC address
+   * Fetch all APs and clients with a single authentication
+   * Returns Maps keyed by normalized MAC address
    */
-  async fetchAPsByMac(): Promise<Map<string, SmartZoneAP>> {
+  async fetchAll(): Promise<{
+    aps: Map<string, SmartZoneAP>
+    clients: Map<string, SmartZoneClient>
+  }> {
     const ticket = await this.authenticate()
-    const aps = await this.getAPs(ticket)
+    const [aps, clients] = await Promise.all([
+      this.getAPs(ticket),
+      this.getClients(ticket),
+    ])
 
-    const map = new Map<string, SmartZoneAP>()
+    const apMap = new Map<string, SmartZoneAP>()
     for (const ap of aps) {
-      map.set(ap.mac, ap)
+      apMap.set(ap.mac, ap)
     }
-    return map
+
+    const clientMap = new Map<string, SmartZoneClient>()
+    for (const client of clients) {
+      clientMap.set(client.mac, client)
+    }
+
+    return { aps: apMap, clients: clientMap }
   }
 }
 

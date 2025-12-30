@@ -20,7 +20,7 @@ import { snmpQuery, type SnmpDeviceInfo } from './snmp'
 import { limitConcurrency } from './concurrency'
 import { wsManager } from './websocket'
 import { ensureStockImageEntry } from '../routes/stock-images'
-import { SmartZoneService, type SmartZoneAP } from './smartzone'
+import { SmartZoneService, type SmartZoneAP, type SmartZoneClient } from './smartzone'
 
 export type { LogLevel }
 
@@ -809,6 +809,7 @@ export class NetworkScanner {
   private mdnsDevices: Map<string, MdnsDevice> = new Map()  // IP -> mDNS device info
   private snmpDevices: Map<string, SnmpDeviceInfo> = new Map()  // IP -> SNMP device info
   private smartzoneCache: Map<string, SmartZoneAP> = new Map()  // MAC -> SmartZone AP data
+  private smartzoneClientsCache: Map<string, SmartZoneClient> = new Map()  // MAC -> SmartZone client data
   private activeChannels: Map<string, { ip: string; action: string }> = new Map()  // channelId -> info
   private channelCounter: number = 0
 
@@ -1401,6 +1402,71 @@ export class NetworkScanner {
     return device?.hostname || null
   }
 
+  /**
+   * Re-parent SmartZone wireless clients under their actual AP
+   * Called after an AP is scanned and its interfaces are saved
+   */
+  private async reparentSmartZoneClients(
+    apMac: string,
+    apInterfaces: DiscoveredInterface[],
+    apIp: string,
+    depth: number
+  ): Promise<void> {
+    if (this.smartzoneClientsCache.size === 0) return
+
+    // Find wireless interface (prefer wlan0, then wlan1)
+    const wirelessInterface = apInterfaces.find(i => i.name === 'wlan0') ||
+                              apInterfaces.find(i => i.name === 'wlan1') ||
+                              apInterfaces.find(i => i.name.startsWith('wlan'))
+
+    if (!wirelessInterface || !wirelessInterface.id) {
+      return  // No wireless interface with ID found
+    }
+
+    // Find all clients connected to this AP
+    const apClients: SmartZoneClient[] = []
+    for (const client of this.smartzoneClientsCache.values()) {
+      if (client.apMac === apMac) {
+        apClients.push(client)
+      }
+    }
+
+    if (apClients.length === 0) return
+    this.log('info', `${apIp}: SmartZone reports ${apClients.length} wireless clients`)
+
+    const clientDepth = depth + 1
+    let reparentedCount = 0
+
+    for (const client of apClients) {
+      // Find existing device by MAC (or IP fallback)
+      let existingDevice = await this.findDeviceByMac(client.mac)
+      if (!existingDevice && client.ip) {
+        existingDevice = await this.findDeviceByIp(client.ip)
+      }
+      if (!existingDevice) continue  // Only re-parent existing devices
+
+      // Skip if already correctly parented to this wireless interface
+      if (existingDevice.parentInterfaceId === wirelessInterface.id) continue
+
+      // Re-parent the device under the AP's wireless interface
+      await db.update(devices)
+        .set({
+          parentInterfaceId: wirelessInterface.id,
+          upstreamInterface: wirelessInterface.name,
+          lastSeenAt: new Date().toISOString(),
+        })
+        .where(eq(devices.id, existingDevice.id))
+
+      this.deviceDepths.set(existingDevice.id, clientDepth)
+      reparentedCount++
+      this.log('info', `${apIp}: Re-parented wireless client "${existingDevice.hostname || client.mac}" to ${wirelessInterface.name}`)
+    }
+
+    if (reparentedCount > 0) {
+      this.log('success', `${apIp}: Re-parented ${reparentedCount} wireless clients`)
+    }
+  }
+
   // Save failed credentials for a device (to skip on future scans)
   private async saveFailedCredentials(
     ip: string,
@@ -1555,7 +1621,7 @@ export class NetworkScanner {
       const failedCount = existingFailed.length
       this.log('info', `Loaded ${this.credentialsList.length} credentials to try${failedCount > 0 ? ` (${failedCount} known failures will be skipped)` : ''}`)
 
-      // Pre-fetch SmartZone AP data if configured
+      // Pre-fetch SmartZone AP and client data if configured
       if (network.smartzoneHost && network.smartzoneUsername && network.smartzonePassword) {
         this.log('info', `Querying SmartZone at ${network.smartzoneHost}...`)
         try {
@@ -1565,8 +1631,10 @@ export class NetworkScanner {
             username: network.smartzoneUsername,
             password: network.smartzonePassword,
           })
-          this.smartzoneCache = await szService.fetchAPsByMac()
-          this.log('success', `SmartZone: Loaded ${this.smartzoneCache.size} APs`)
+          const szData = await szService.fetchAll()
+          this.smartzoneCache = szData.aps
+          this.smartzoneClientsCache = szData.clients
+          this.log('success', `SmartZone: Loaded ${this.smartzoneCache.size} APs, ${this.smartzoneClientsCache.size} wireless clients`)
           for (const [mac, ap] of this.smartzoneCache) {
             this.log('info', `  ${mac}: ${ap.name} (${ap.model}, S/N: ${ap.serial})`)
           }
@@ -2667,6 +2735,12 @@ export class NetworkScanner {
           linkUp: iface.linkUp,
         })
       }
+    }
+
+    // Re-parent SmartZone wireless clients if this is a Ruckus AP
+    if (vendor === 'Ruckus' && this.smartzoneClientsCache.size > 0 && newDevice.interfaces.length > 0) {
+      const normalizedMac = deviceMac.toUpperCase().replace(/[:-]/g, '').match(/.{2}/g)?.join(':') || deviceMac
+      await this.reparentSmartZoneClients(normalizedMac, newDevice.interfaces, ip, depth)
     }
 
     // Notify about discovered device
