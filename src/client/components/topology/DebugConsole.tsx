@@ -287,58 +287,6 @@ export function DebugConsole({
             )}
           </div>
 
-          {/* Severity filter buttons */}
-          <div className="flex items-center gap-0.5 shrink-0 border-l border-slate-600 pl-2 ml-1">
-            <Tooltip content={enabledLevels.has('error') ? 'Hide errors' : 'Show errors'} position="bottom">
-              <button
-                onClick={() => toggleLevel('error')}
-                className={`p-1 rounded transition-colors ${
-                  enabledLevels.has('error')
-                    ? 'text-red-400 bg-red-400/20'
-                    : 'text-slate-600 hover:text-slate-400'
-                }`}
-              >
-                <AlertCircle className="w-3.5 h-3.5" />
-              </button>
-            </Tooltip>
-            <Tooltip content={enabledLevels.has('warn') ? 'Hide warnings' : 'Show warnings'} position="bottom">
-              <button
-                onClick={() => toggleLevel('warn')}
-                className={`p-1 rounded transition-colors ${
-                  enabledLevels.has('warn')
-                    ? 'text-amber-400 bg-amber-400/20'
-                    : 'text-slate-600 hover:text-slate-400'
-                }`}
-              >
-                <AlertTriangle className="w-3.5 h-3.5" />
-              </button>
-            </Tooltip>
-            <Tooltip content={enabledLevels.has('success') ? 'Hide success' : 'Show success'} position="bottom">
-              <button
-                onClick={() => toggleLevel('success')}
-                className={`p-1 rounded transition-colors ${
-                  enabledLevels.has('success')
-                    ? 'text-green-400 bg-green-400/20'
-                    : 'text-slate-600 hover:text-slate-400'
-                }`}
-              >
-                <CheckCircle className="w-3.5 h-3.5" />
-              </button>
-            </Tooltip>
-            <Tooltip content={enabledLevels.has('info') ? 'Hide info' : 'Show info'} position="bottom">
-              <button
-                onClick={() => toggleLevel('info')}
-                className={`p-1 rounded transition-colors ${
-                  enabledLevels.has('info')
-                    ? 'text-slate-400 bg-slate-400/20'
-                    : 'text-slate-600 hover:text-slate-400'
-                }`}
-              >
-                <Info className="w-3.5 h-3.5" />
-              </button>
-            </Tooltip>
-          </div>
-
           <div className="flex items-center gap-1 shrink-0">
             <Tooltip content={autoExpand ? "Disable auto-expand" : "Enable auto-expand"} position="bottom">
               <button
@@ -425,15 +373,68 @@ export function DebugConsole({
               <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-green-400 animate-pulse" />
               <span>Listening for updates...</span>
             </div>
-            <Tooltip content={copied ? "Copied!" : "Copy all logs"} position="top">
-              <button
-                onClick={copyAllLogs}
-                disabled={filteredLogs.length === 0}
-                className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-            </Tooltip>
+            <div className="flex items-center gap-1">
+              {/* Severity filter buttons */}
+              <div className="flex items-center gap-0.5 shrink-0 border-r border-slate-600 pr-2 mr-1">
+                <Tooltip content={enabledLevels.has('error') ? 'Hide errors' : 'Show errors'} position="top">
+                  <button
+                    onClick={() => toggleLevel('error')}
+                    className={`p-1 rounded transition-colors ${
+                      enabledLevels.has('error')
+                        ? 'text-red-400 bg-red-400/20'
+                        : 'text-slate-600 hover:text-slate-400'
+                    }`}
+                  >
+                    <AlertCircle className="w-3.5 h-3.5" />
+                  </button>
+                </Tooltip>
+                <Tooltip content={enabledLevels.has('warn') ? 'Hide warnings' : 'Show warnings'} position="top">
+                  <button
+                    onClick={() => toggleLevel('warn')}
+                    className={`p-1 rounded transition-colors ${
+                      enabledLevels.has('warn')
+                        ? 'text-amber-400 bg-amber-400/20'
+                        : 'text-slate-600 hover:text-slate-400'
+                    }`}
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                  </button>
+                </Tooltip>
+                <Tooltip content={enabledLevels.has('success') ? 'Hide success' : 'Show success'} position="top">
+                  <button
+                    onClick={() => toggleLevel('success')}
+                    className={`p-1 rounded transition-colors ${
+                      enabledLevels.has('success')
+                        ? 'text-green-400 bg-green-400/20'
+                        : 'text-slate-600 hover:text-slate-400'
+                    }`}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" />
+                  </button>
+                </Tooltip>
+                <Tooltip content={enabledLevels.has('info') ? 'Hide info' : 'Show info'} position="top">
+                  <button
+                    onClick={() => toggleLevel('info')}
+                    className={`p-1 rounded transition-colors ${
+                      enabledLevels.has('info')
+                        ? 'text-slate-400 bg-slate-400/20'
+                        : 'text-slate-600 hover:text-slate-400'
+                    }`}
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                  </button>
+                </Tooltip>
+              </div>
+              <Tooltip content={copied ? "Copied!" : "Copy all logs"} position="top">
+                <button
+                  onClick={copyAllLogs}
+                  disabled={filteredLogs.length === 0}
+                  className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </Tooltip>
+            </div>
           </div>
         </div>
       </div>
