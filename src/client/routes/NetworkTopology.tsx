@@ -1032,18 +1032,18 @@ export function NetworkTopology() {
         {/* Filter input and expand/collapse buttons */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
+            <Search className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 dark:text-slate-400" />
             <input
               type="text"
               value={deviceFilter}
               onChange={(e) => updateDeviceFilter(e.target.value)}
               placeholder="Filter by IP, MAC, hostnan..."
-              className="w-full pl-7 sm:pl-9 pr-7 sm:pr-9 py-1.5 sm:py-2 text-xs sm:text-sm bg-slate-800 border border-slate-600 rounded-md sm:rounded-lg text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+              className="w-full pl-7 sm:pl-9 pr-7 sm:pr-9 py-1.5 sm:py-2 text-xs sm:text-sm bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md sm:rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
             {deviceFilter && (
               <button
                 onClick={() => updateDeviceFilter('')}
-                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               >
                 <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
@@ -1054,8 +1054,8 @@ export function NetworkTopology() {
               onClick={() => setExpandAll(expandAll === true ? null : true)}
               className={`p-1.5 sm:p-2 rounded-md sm:rounded-lg border transition-colors ${
                 expandAll === true
-                  ? 'bg-cyan-900/30 border-cyan-700 text-cyan-400'
-                  : 'bg-slate-800 border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500'
+                  ? 'bg-cyan-100 dark:bg-cyan-900/30 border-cyan-300 dark:border-cyan-700 text-cyan-600 dark:text-cyan-400'
+                  : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500'
               }`}
             >
               <ChevronsUpDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -1066,8 +1066,8 @@ export function NetworkTopology() {
               onClick={() => setExpandAll(expandAll === false ? null : false)}
               className={`p-1.5 sm:p-2 rounded-md sm:rounded-lg border transition-colors ${
                 expandAll === false
-                  ? 'bg-cyan-900/30 border-cyan-700 text-cyan-400'
-                  : 'bg-slate-800 border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500'
+                  ? 'bg-cyan-100 dark:bg-cyan-900/30 border-cyan-300 dark:border-cyan-700 text-cyan-600 dark:text-cyan-400'
+                  : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500'
               }`}
             >
               <ChevronsDownUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />

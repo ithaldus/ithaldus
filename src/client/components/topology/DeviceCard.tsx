@@ -595,10 +595,10 @@ export function DeviceCard({
                     <div className="flex items-center gap-1.5 mb-1 pt-[2px]">
                       {/* Interface badge with optional expand/collapse chevron */}
                       <span
-                        className={`inline-flex items-center gap-0.5 text-[10px] font-mono px-1 rounded ${
+                        className={`inline-flex items-center gap-0.5 text-[10px] font-mono px-1 rounded border ${
                           isVirtual
-                            ? 'text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30'
-                            : 'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800'
+                            ? 'text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700'
+                            : 'text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600'
                         } ${(isVirtual || childCount > 3) ? 'cursor-pointer hover:opacity-80' : ''}`}
                         onClick={(isVirtual || childCount > 3) ? (e) => handleInterfaceToggle(ifaceName, e) : undefined}
                       >
@@ -619,21 +619,21 @@ export function DeviceCard({
                       )}
                       {ifaceInfo?.poeWatts && (
                         <Tooltip content={`PoE${ifaceInfo.poeStandard ? ` ${ifaceInfo.poeStandard.toUpperCase()}` : ''}: ${ifaceInfo.poeWatts}W`} position="bottom">
-                          <span className="flex items-center gap-0.5 text-[10px] font-mono text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1 rounded cursor-help">
+                          <span className="flex items-center gap-0.5 text-[10px] font-mono text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1 rounded border border-red-300 dark:border-red-700 cursor-help">
                             <Zap className="w-2.5 h-2.5" />
                             {ifaceInfo.poeWatts}W
                           </span>
                         </Tooltip>
                       )}
                       {ifaceInfo?.bridge && (
-                        <span className="text-[10px] font-mono text-violet-500 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-1 rounded">
+                        <span className="text-[10px] font-mono text-violet-500 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-1 rounded border border-violet-300 dark:border-violet-700">
                           {ifaceInfo.bridge}
                         </span>
                       )}
                       {ifaceInfo?.vlan && parseVlans(ifaceInfo.vlan).map((vlan, idx) => (
                         <span
                           key={`${vlan.id}-${idx}`}
-                          className="inline-flex items-center text-[10px] font-mono text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded overflow-hidden"
+                          className="inline-flex items-center text-[10px] font-mono text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded overflow-hidden border border-blue-300 dark:border-blue-700"
                         >
                           <span className="px-1 bg-blue-200 dark:bg-blue-800/50">
                             {vlan.tagged ? 'T' : 'U'}{vlan.id}

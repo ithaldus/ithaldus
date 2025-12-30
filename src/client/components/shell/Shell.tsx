@@ -141,8 +141,8 @@ export function Shell({ children }: ShellProps) {
       {/* Sidebar - using absolute on mobile, relative on desktop */}
       <aside
         className={`
-          bg-slate-900 text-white flex flex-col shrink-0
-          border-r border-slate-700
+          bg-[#f9f9f9] dark:bg-slate-900 text-[#0d0d0d] dark:text-white flex flex-col shrink-0
+          border-r border-slate-200 dark:border-slate-700
           transition-all duration-300 ease-in-out
           ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-60'}
           absolute inset-y-0 left-0 z-50 w-60
@@ -163,7 +163,7 @@ export function Shell({ children }: ShellProps) {
           <Tooltip content={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} position="right">
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="hidden lg:flex items-center justify-center w-8 h-8 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+              className="hidden lg:flex items-center justify-center w-8 h-8 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
             >
               {sidebarCollapsed ? (
                 <PanelLeft className="w-5 h-5" />
@@ -175,7 +175,7 @@ export function Shell({ children }: ShellProps) {
           {/* Mobile close button */}
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="lg:hidden flex items-center justify-center w-8 h-8 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+            className="lg:hidden flex items-center justify-center w-8 h-8 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -192,8 +192,8 @@ export function Shell({ children }: ShellProps) {
                 className={({ isActive }) =>
                   `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150 ${
                     isActive
-                      ? 'bg-cyan-500/20 text-cyan-400'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
                   } ${sidebarCollapsed ? 'lg:justify-center' : ''}`
                 }
               >
@@ -225,8 +225,8 @@ export function Shell({ children }: ShellProps) {
                         className={({ isActive }) =>
                           `w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors duration-150 text-sm ${
                             isActive
-                              ? 'text-cyan-400'
-                              : 'text-slate-500 hover:bg-slate-800 hover:text-white'
+                              ? 'text-cyan-600 dark:text-cyan-400'
+                              : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
                           }`
                         }
                       >
@@ -246,14 +246,14 @@ export function Shell({ children }: ShellProps) {
                           className={({ isActive }) =>
                             `w-full flex items-center gap-2 px-3 py-1.5 ml-5 rounded-lg transition-colors duration-150 text-sm ${
                               isActive
-                                ? 'text-violet-400'
-                                : 'text-slate-500 hover:bg-slate-800 hover:text-white'
+                                ? 'text-violet-600 dark:text-violet-400'
+                                : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
                             }`
                           }
                         >
                           <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
                           <span className="truncate flex-1">{loc.name}</span>
-                          <span className="text-xs bg-slate-700 px-1.5 py-0.5 rounded">
+                          <span className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded">
                             {loc.deviceCount || 0}
                           </span>
                         </NavLink>
@@ -274,7 +274,7 @@ export function Shell({ children }: ShellProps) {
               onClick={() => setUserMenuOpen(!userMenuOpen)}
               className={`
                 w-full flex items-center gap-3 p-3
-                text-slate-400 hover:bg-slate-800 hover:text-white
+                text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white
                 transition-colors duration-150
                 ${sidebarCollapsed ? 'lg:justify-center' : ''}
               `}
@@ -306,21 +306,21 @@ export function Shell({ children }: ShellProps) {
             {userMenuOpen && (
               <div
                 className={`
-                  absolute bottom-full mb-1 bg-slate-800 rounded-lg shadow-lg border border-slate-700
+                  absolute bottom-full mb-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700
                   overflow-hidden min-w-[160px]
                   ${sidebarCollapsed ? 'lg:left-full lg:ml-2 lg:bottom-0 lg:mb-0' : 'left-2 right-2'}
                 `}
               >
                 {sidebarCollapsed && (
-                  <div className="px-3 py-2 border-b border-slate-700 hidden lg:block">
-                    <p className="text-sm font-medium text-white">{user.name}</p>
+                  <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 hidden lg:block">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">{user.name}</p>
                   </div>
                 )}
                 <button
                   onClick={() => {
                     toggleDarkMode()
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:bg-slate-700 hover:text-white"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white"
                 >
                   {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                   <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
@@ -330,7 +330,7 @@ export function Shell({ children }: ShellProps) {
                     setUserMenuOpen(false)
                     handleLogout()
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:bg-slate-700 hover:text-white"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Logout</span>
@@ -344,10 +344,10 @@ export function Shell({ children }: ShellProps) {
       {/* Main content area */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Mobile header bar */}
-        <header className="lg:hidden h-14 bg-slate-900 flex items-center justify-between px-4 shrink-0">
+        <header className="lg:hidden h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-4 shrink-0">
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="p-2 -ml-2 text-slate-400 hover:text-white"
+            className="p-2 -ml-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
           >
             <Menu className="w-5 h-5" />
           </button>
