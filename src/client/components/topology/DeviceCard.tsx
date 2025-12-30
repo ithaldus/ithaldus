@@ -368,7 +368,7 @@ export function DeviceCard({
 
           {/* Vendor + Model + MAC Pill */}
           {(showVendor && (device.vendor || device.model)) || (showMac && device.primaryMac) ? (
-            <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
+            <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-medium border border-slate-300 dark:border-slate-600">
               {showVendor && (device.vendor || device.model) && (
                 <span className="px-1 sm:px-1.5 h-full flex items-center bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                   {device.vendor && <HighlightText text={device.vendor} filter={filterText} />}
@@ -379,7 +379,7 @@ export function DeviceCard({
               {showMac && device.primaryMac && (
                 <>
                   {showVendor && (device.vendor || device.model) && (
-                    <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
+                    <span className="w-px self-stretch bg-slate-300 dark:bg-slate-600" />
                   )}
                   <span className="px-0.5 sm:px-1 h-full flex items-center bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-500 font-mono">
                     <HighlightText text={device.primaryMac} filter={filterText} />
@@ -401,11 +401,11 @@ export function DeviceCard({
             {/* Always show when showInterfaces is enabled, even if IP is used as display name */}
             {showInterfaces && device.ip && (
               device.ownUpstreamInterface ? (
-                <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-mono border border-slate-300/50 dark:border-slate-600/50">
+                <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-mono border border-slate-300 dark:border-slate-600">
                   <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                     {device.ownUpstreamInterface}
                   </span>
-                  <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
+                  <span className="w-px self-stretch bg-slate-300 dark:bg-slate-600" />
                   <Tooltip content={copiedText === device.ip ? 'Copied!' : 'Click to copy'} position="bottom">
                     <button
                       onClick={(e) => handleCopy(device.ip!, e)}
@@ -419,7 +419,7 @@ export function DeviceCard({
                 <Tooltip content={copiedText === device.ip ? 'Copied!' : 'Click to copy'} position="bottom">
                   <button
                     onClick={(e) => handleCopy(device.ip!, e)}
-                    className="shrink-0 h-[14px] sm:h-[18px] px-0.5 sm:px-1 inline-flex items-center text-[7px] sm:text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50 hover:bg-slate-300 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                    className="shrink-0 h-[14px] sm:h-[18px] px-0.5 sm:px-1 inline-flex items-center text-[7px] sm:text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-200 dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-300 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                   >
                     <HighlightText text={device.ip} filter={filterText} />
                   </button>
@@ -436,11 +436,11 @@ export function DeviceCard({
 
             {/* Serial Number Badge - Two-part pill */}
             {showSerialNumber && device.serialNumber && (
-              <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
+              <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-medium border border-slate-300 dark:border-slate-600">
                 <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                   SN
                 </span>
-                <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
+                <span className="w-px self-stretch bg-slate-300 dark:bg-slate-600" />
                 <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
                   <HighlightText text={device.serialNumber} filter={filterText} />
                 </span>
@@ -449,11 +449,11 @@ export function DeviceCard({
 
             {/* Asset Tag Badge - Two-part pill */}
             {showAssetTag && device.assetTag && (
-              <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
+              <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-medium border border-slate-300 dark:border-slate-600">
                 <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                   <Tag className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
                 </span>
-                <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
+                <span className="w-px self-stretch bg-slate-300 dark:bg-slate-600" />
                 <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
                   <HighlightText text={device.assetTag} filter={filterText} />
                 </span>
@@ -614,7 +614,7 @@ export function DeviceCard({
                       </span>
                       {/* Collapsed child count */}
                       {isCollapsed && childCount > 0 && (
-                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded-full border border-slate-300/50 dark:border-slate-600/50">
+                        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded-full border border-slate-300 dark:border-slate-600">
                           {childCount} device{childCount !== 1 ? 's' : ''}
                         </span>
                       )}
@@ -647,7 +647,7 @@ export function DeviceCard({
                         </span>
                       ))}
                       {ifaceInfo?.comment && (
-                        <span className="text-[10px] italic text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 px-1 rounded border border-slate-300/50 dark:border-slate-600/50">
+                        <span className="text-[10px] italic text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 px-1 rounded border border-slate-300 dark:border-slate-600">
                           {ifaceInfo.comment}
                         </span>
                       )}
