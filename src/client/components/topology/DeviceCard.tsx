@@ -334,31 +334,31 @@ export function DeviceCard({
         <div
           onClick={() => onDeviceClick?.(device)}
           className={`
-            shrink-0 inline-flex items-center gap-2 px-2 py-1.5 rounded border text-xs cursor-pointer
+            shrink-0 inline-flex items-center gap-1 sm:gap-2 px-1 sm:px-2 py-1 sm:py-1.5 rounded border text-[10px] sm:text-xs cursor-pointer
             ${cardColor}
             ${device.accessible ? 'ring-1 ring-cyan-500/30' : ''}
             hover:opacity-80 transition-opacity
           `}
         >
           {/* Expand/Collapse Button - always reserve space for visual consistency */}
-          <div className="shrink-0 w-5 h-5 -ml-1 flex items-center justify-center">
+          <div className="shrink-0 w-4 h-4 sm:w-5 sm:h-5 -ml-0.5 sm:-ml-1 flex items-center justify-center">
             {hasInterfaceBranches && (
               <button
                 onClick={handleToggle}
                 className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
               >
                 {isExpanded ? (
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
                 ) : (
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
                 )}
               </button>
             )}
           </div>
 
           {/* Device Type Icon - shown before hostname */}
-          <span className={`shrink-0 p-1 rounded ${iconColor}`}>
-            <DeviceIcon className="w-3.5 h-3.5" />
+          <span className={`shrink-0 p-0.5 sm:p-1 rounded ${iconColor}`}>
+            <DeviceIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
           </span>
 
           {/* Hostname/IP */}
@@ -368,9 +368,9 @@ export function DeviceCard({
 
           {/* Vendor + Model + MAC Pill */}
           {(showVendor && (device.vendor || device.model)) || (showMac && device.primaryMac) ? (
-            <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
+            <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
               {showVendor && (device.vendor || device.model) && (
-                <span className="px-1.5 h-full flex items-center bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                <span className="px-1 sm:px-1.5 h-full flex items-center bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                   {device.vendor && <HighlightText text={device.vendor} filter={filterText} />}
                   {device.vendor && device.model && ' '}
                   {device.model && <HighlightText text={device.model} filter={filterText} />}
@@ -381,10 +381,10 @@ export function DeviceCard({
                   {showVendor && (device.vendor || device.model) && (
                     <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
                   )}
-                  <span className="px-1 h-full flex items-center bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-500 font-mono">
+                  <span className="px-0.5 sm:px-1 h-full flex items-center bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-500 font-mono">
                     <HighlightText text={device.primaryMac} filter={filterText} />
                     {device.macCount && device.macCount > 1 && (
-                      <span className="ml-1 px-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                      <span className="ml-0.5 sm:ml-1 px-0.5 sm:px-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                         +{device.macCount - 1}
                       </span>
                     )}
@@ -395,20 +395,20 @@ export function DeviceCard({
           ) : null}
 
           {/* Device Info */}
-          <div className="flex items-center gap-2 flex-nowrap">
+          <div className="flex items-center gap-1 sm:gap-2 flex-nowrap">
 
             {/* IP Address Pill with optional uplink interface - clickable to copy */}
             {showInterfaces && device.ip && device.hostname && (
               device.ownUpstreamInterface ? (
-                <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-mono border border-slate-300/50 dark:border-slate-600/50">
-                  <span className="px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-mono border border-slate-300/50 dark:border-slate-600/50">
+                  <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
                     {device.ownUpstreamInterface}
                   </span>
                   <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
                   <Tooltip content={copiedText === device.ip ? 'Copied!' : 'Click to copy'} position="bottom">
                     <button
                       onClick={(e) => handleCopy(device.ip!, e)}
-                      className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                      className="px-0.5 sm:px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                     >
                       <HighlightText text={device.ip} filter={filterText} />
                     </button>
@@ -418,7 +418,7 @@ export function DeviceCard({
                 <Tooltip content={copiedText === device.ip ? 'Copied!' : 'Click to copy'} position="bottom">
                   <button
                     onClick={(e) => handleCopy(device.ip!, e)}
-                    className="shrink-0 h-[18px] px-1 inline-flex items-center text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                    className="shrink-0 h-[14px] sm:h-[18px] px-0.5 sm:px-1 inline-flex items-center text-[7px] sm:text-[9px] font-mono text-slate-500 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 rounded border border-slate-300/50 dark:border-slate-600/50 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                   >
                     <HighlightText text={device.ip} filter={filterText} />
                   </button>
@@ -428,19 +428,19 @@ export function DeviceCard({
 
             {/* Firmware Badge */}
             {showFirmware && device.firmwareVersion && (
-              <span className="shrink-0 h-[18px] px-1 inline-flex items-center text-[9px] font-medium bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 rounded border border-cyan-300/50 dark:border-cyan-600/50">
+              <span className="shrink-0 h-[14px] sm:h-[18px] px-0.5 sm:px-1 inline-flex items-center text-[7px] sm:text-[9px] font-medium bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 rounded border border-cyan-300/50 dark:border-cyan-600/50">
                 {device.firmwareVersion}
               </span>
             )}
 
             {/* Serial Number Badge - Two-part pill */}
             {showSerialNumber && device.serialNumber && (
-              <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
-                <span className="px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+              <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
+                <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
                   SN
                 </span>
                 <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
-                <span className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
+                <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
                   <HighlightText text={device.serialNumber} filter={filterText} />
                 </span>
               </span>
@@ -448,12 +448,12 @@ export function DeviceCard({
 
             {/* Asset Tag Badge - Two-part pill */}
             {showAssetTag && device.assetTag && (
-              <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
-                <span className="px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
-                  <Tag className="w-2.5 h-2.5" />
+              <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-medium border border-slate-300/50 dark:border-slate-600/50">
+                <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                  <Tag className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
                 </span>
                 <span className="w-px self-stretch bg-slate-300/50 dark:bg-slate-600/50" />
-                <span className="px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
+                <span className="px-0.5 sm:px-1 flex items-center h-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono">
                   <HighlightText text={device.assetTag} filter={filterText} />
                 </span>
               </span>
@@ -461,7 +461,7 @@ export function DeviceCard({
 
             {/* Open Ports */}
             {showPorts && openPorts.length > 0 && (
-              <span className="shrink-0 h-[18px] inline-flex items-center rounded overflow-hidden text-[9px] font-medium font-mono bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-700/25 dark:border-emerald-500/25">
+              <span className="shrink-0 h-[14px] sm:h-[18px] inline-flex items-center rounded overflow-hidden text-[7px] sm:text-[9px] font-medium font-mono bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-700/25 dark:border-emerald-500/25">
                 {openPorts.slice(0, 6).map((port, idx) => {
                   const webUrl = webPorts.has(port) ? getWebUrl(port) : null
                   const isWarning = warningPorts.has(port)

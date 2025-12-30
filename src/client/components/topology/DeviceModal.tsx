@@ -493,25 +493,25 @@ export function DeviceModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg lg:max-w-2xl xl:max-w-3xl 2xl:max-w-[85vw] mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg lg:max-w-2xl xl:max-w-3xl 2xl:max-w-[85vw] mx-2 sm:mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between px-3 py-2 sm:px-6 sm:py-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div className={`
-              p-2.5 rounded-lg
+              p-1.5 sm:p-2.5 rounded-lg shrink-0
               ${device.accessible
                 ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
                 : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
               }
             `}>
-              <DeviceIcon className="w-5 h-5" />
+              <DeviceIcon className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                {device.vendor && <VendorLogo vendor={device.vendor} className="h-5 max-w-20 shrink-0" />}
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 sm:gap-2">
+                {device.vendor && <VendorLogo vendor={device.vendor} className="h-4 sm:h-5 max-w-16 sm:max-w-20 shrink-0" />}
                 <span className="truncate">{device.hostname || device.ip || 'Unknown Device'}</span>
               </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 font-mono truncate">
+              <p className="text-[10px] sm:text-sm text-slate-500 dark:text-slate-400 font-mono truncate">
                 {[
                   device.primaryMac,
                   device.ip,
@@ -523,9 +523,9 @@ export function DeviceModal({
           </div>
           <button
             onClick={handleClose}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+            className="p-1.5 sm:p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
@@ -650,10 +650,10 @@ export function DeviceModal({
             </div>
 
             {/* Asset Tag + Comment */}
-            <div className="px-4 py-3 shrink-0 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-              <div className="flex gap-2">
+            <div className="px-2 py-2 sm:px-4 sm:py-3 shrink-0 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="flex gap-1.5 sm:gap-2">
                 <div className="relative shrink-0">
-                  <Tag className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Tag className="absolute left-2 sm:left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4 text-slate-400" />
                   <input
                     type="text"
                     value={assetTag}
@@ -664,10 +664,10 @@ export function DeviceModal({
                       }
                     }}
                     placeholder="Tag"
-                    className="w-28 pl-8 pr-3 py-2 text-sm font-mono rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-transparent placeholder-slate-400 dark:placeholder-slate-500"
+                    className="w-20 sm:w-28 pl-6 sm:pl-8 pr-2 sm:pr-3 py-1.5 sm:py-2 text-xs sm:text-sm font-mono rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-transparent placeholder-slate-400 dark:placeholder-slate-500"
                   />
                   {isSavingAssetTag && (
-                    <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500 animate-spin" />
+                    <Loader2 className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4 text-amber-500 animate-spin" />
                   )}
                 </div>
                 <input
@@ -679,30 +679,30 @@ export function DeviceModal({
                       handleSaveComment()
                     }
                   }}
-                  placeholder="Add a note about this device (e.g., location, purpose, owner...)"
-                  className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-slate-400 dark:placeholder-slate-500"
+                  placeholder="Add a note..."
+                  className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-cyan-500 focus:border-transparent placeholder-slate-400 dark:placeholder-slate-500"
                 />
                 {isSavingComment && (
-                  <Loader2 className="shrink-0 w-5 h-5 text-cyan-500 animate-spin self-center" />
+                  <Loader2 className="shrink-0 w-4 h-4 sm:w-5 sm:h-5 text-cyan-500 animate-spin self-center" />
                 )}
               </div>
             </div>
 
             {/* Content */}
-            <div className="flex-1 px-6 py-4 overflow-y-auto space-y-6">
+            <div className="flex-1 px-3 py-2 sm:px-6 sm:py-4 overflow-y-auto space-y-3 sm:space-y-6">
 
           {/* Type and Location dropdowns - same row for aesthetics */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4">
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              <label className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Type
               </label>
-              <div className="mt-1 relative">
+              <div className="mt-0.5 sm:mt-1 relative">
                 <select
                   value={deviceType}
                   onChange={(e) => handleTypeChange(e.target.value as DeviceType)}
                   disabled={isSavingType}
-                  className="appearance-none w-full px-3 py-1.5 pr-8 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent cursor-pointer disabled:opacity-50"
+                  className="appearance-none w-full px-2 sm:px-3 py-1 sm:py-1.5 pr-6 sm:pr-8 text-xs sm:text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-cyan-500 focus:border-transparent cursor-pointer disabled:opacity-50"
                 >
                   {deviceTypeOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -710,24 +710,24 @@ export function DeviceModal({
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <ChevronDown className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4 text-slate-400 pointer-events-none" />
                 {isSavingType && (
-                  <Loader2 className="absolute right-7 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-500 animate-spin" />
+                  <Loader2 className="absolute right-5 sm:right-7 top-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4 text-cyan-500 animate-spin" />
                 )}
               </div>
             </div>
             {/* Location dropdown */}
             {networkId ? (
               <div>
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                <label className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                   Location
                 </label>
-                <div className="mt-1 relative">
+                <div className="mt-0.5 sm:mt-1 relative">
                   <select
                     value={selectedLocationId || ''}
                     onChange={(e) => handleLocationChange(e.target.value || null)}
                     disabled={isSavingLocation}
-                    className="appearance-none w-full px-3 py-1.5 pr-8 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent cursor-pointer disabled:opacity-50"
+                    className="appearance-none w-full px-2 sm:px-3 py-1 sm:py-1.5 pr-6 sm:pr-8 text-xs sm:text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-violet-500 focus:border-transparent cursor-pointer disabled:opacity-50"
                   >
                     <option value="">No location</option>
                     {locations.map((location) => (
@@ -737,9 +737,9 @@ export function DeviceModal({
                     ))}
                     <option value="new">+ Create new location...</option>
                   </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4 text-slate-400 pointer-events-none" />
                   {isSavingLocation && (
-                    <Loader2 className="absolute right-7 top-1/2 -translate-y-1/2 w-4 h-4 text-violet-500 animate-spin" />
+                    <Loader2 className="absolute right-5 sm:right-7 top-1/2 -translate-y-1/2 w-3 h-3 sm:w-4 sm:h-4 text-violet-500 animate-spin" />
                   )}
                 </div>
               </div>
@@ -749,80 +749,80 @@ export function DeviceModal({
           </div>
 
           {/* Device Info */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4">
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              <label className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 IP Address
               </label>
-              <p className="mt-1 text-sm font-mono text-slate-900 dark:text-white">
+              <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm font-mono text-slate-900 dark:text-white">
                 {device.ip || '-'}
               </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              <label className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Vendor
               </label>
-              <p className={`mt-1 text-sm ${device.vendor ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+              <p className={`mt-0.5 sm:mt-1 text-xs sm:text-sm ${device.vendor ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
                 {device.vendor || '—'}
               </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              <label className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Model
               </label>
-              <p className={`mt-1 text-sm ${device.model ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+              <p className={`mt-0.5 sm:mt-1 text-xs sm:text-sm ${device.model ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
                 {device.model || '—'}
               </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              <label className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Firmware
               </label>
-              <p className={`mt-1 text-sm ${device.firmwareVersion ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+              <p className={`mt-0.5 sm:mt-1 text-xs sm:text-sm ${device.firmwareVersion ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
                 {device.firmwareVersion || '—'}
               </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              <label className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Driver
               </label>
-              <p className={`mt-1 text-sm font-mono ${device.driver ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+              <p className={`mt-0.5 sm:mt-1 text-xs sm:text-sm font-mono ${device.driver ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
                 {device.driver || '—'}
               </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              <label className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Status
               </label>
-              <p className={`mt-1 text-sm font-medium ${device.accessible ? 'text-green-600 dark:text-green-400' : 'text-slate-500 dark:text-slate-400'}`}>
+              <p className={`mt-0.5 sm:mt-1 text-xs sm:text-sm font-medium ${device.accessible ? 'text-green-600 dark:text-green-400' : 'text-slate-500 dark:text-slate-400'}`}>
                 {device.accessible ? 'Accessible' : 'Not Accessible'}
               </p>
             </div>
             {/* Working Credential */}
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              <label className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Credentials
               </label>
-              <div className="mt-1">
+              <div className="mt-0.5 sm:mt-1">
                 {loadingCredential ? (
-                  <span className="text-sm text-slate-400 dark:text-slate-500">Loading...</span>
+                  <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500">Loading...</span>
                 ) : workingCredential ? (
                   <Link
                     to={`/credentials?highlight=${workingCredential.id}`}
-                    className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:underline"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium text-green-600 dark:text-green-400 hover:underline"
                   >
-                    <Key className="w-3.5 h-3.5" />
+                    <Key className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     {workingCredential.username}
                   </Link>
                 ) : device.accessible ? (
-                  <span className="text-sm text-cyan-600 dark:text-cyan-400">Root credentials</span>
+                  <span className="text-xs sm:text-sm text-cyan-600 dark:text-cyan-400">Root credentials</span>
                 ) : openPorts.includes(22) ? (
-                  <span className="inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400">
-                    <KeyRound className="w-3.5 h-3.5" />
+                  <span className="inline-flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm text-red-600 dark:text-red-400">
+                    <KeyRound className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     No working credentials
                   </span>
                 ) : (
-                  <span className="text-sm text-slate-400 dark:text-slate-500">N/A</span>
+                  <span className="text-xs sm:text-sm text-slate-400 dark:text-slate-500">N/A</span>
                 )}
               </div>
             </div>
@@ -831,10 +831,10 @@ export function DeviceModal({
           {/* Open Ports */}
           {openPorts.length > 0 && (
             <div>
-              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+              <label className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 Open Ports
               </label>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-1 sm:mt-2 flex flex-wrap gap-1 sm:gap-2">
                 {openPorts.map((port) => {
                   // Color coding for ports:
                   // - Red: warning ports (telnet, HTTP without redirect)
