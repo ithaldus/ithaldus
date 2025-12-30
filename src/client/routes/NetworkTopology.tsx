@@ -133,8 +133,14 @@ export function NetworkTopology() {
   const [logFilter, setLogFilter] = useState(() => searchParams.get('logFilter') || searchParams.get('filter') || '')
   // Expand/collapse all interfaces - null means use default behavior
   const [expandAll, setExpandAll] = useState<boolean | null>(null)
-  // Mobile header collapsed state - hides action buttons and filters
-  const [headerExpanded, setHeaderExpanded] = useState(false)
+  // Header collapsed state - hides action buttons and filters
+  // Can be set via URL param: ?toolbar=0 to collapse, ?toolbar=1 to expand
+  const toolbarFromUrl = searchParams.get('toolbar')
+  const [headerExpanded, setHeaderExpanded] = useState(() => {
+    if (toolbarFromUrl === '0' || toolbarFromUrl === 'false') return false
+    if (toolbarFromUrl === '1' || toolbarFromUrl === 'true') return true
+    return true // Default to expanded
+  })
 
   // Sync device filter with URL
   const updateDeviceFilter = useCallback((value: string) => {
@@ -162,6 +168,23 @@ export function NetworkTopology() {
       }
       return newParams
     }, { replace: true })
+  }, [setSearchParams])
+
+  // Toggle header expanded state and sync with URL
+  const toggleHeaderExpanded = useCallback(() => {
+    setHeaderExpanded(prev => {
+      const newValue = !prev
+      setSearchParams(params => {
+        const newParams = new URLSearchParams(params)
+        if (newValue) {
+          newParams.delete('toolbar') // expanded is default, remove param
+        } else {
+          newParams.set('toolbar', '0')
+        }
+        return newParams
+      }, { replace: true })
+      return newValue
+    })
   }, [setSearchParams])
 
   // Device type filter - which types to show
@@ -995,23 +1018,23 @@ export function NetworkTopology() {
       <div className="topology-content h-full flex flex-col">
       {/* Header */}
       <div className="mb-2 sm:mb-4 flex-shrink-0 p-2 sm:p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50">
-        {/* Row 1: Network name + mobile expand toggle */}
+        {/* Row 1: Network name + expand/collapse toggle */}
         <div className="flex items-center justify-between">
           <h1 className="text-sm sm:text-lg font-semibold text-slate-900 dark:text-white">
             {network.name}
           </h1>
-          {/* Mobile expand/collapse toggle - only visible on mobile */}
+          {/* Expand/collapse toggle for toolbar */}
           <button
-            onClick={() => setHeaderExpanded(!headerExpanded)}
-            className="sm:hidden p-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
+            onClick={toggleHeaderExpanded}
+            className="p-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
             aria-label={headerExpanded ? 'Collapse toolbar' : 'Expand toolbar'}
           >
-            {headerExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            {headerExpanded ? <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
           </button>
         </div>
 
-        {/* Collapsible rows - hidden on mobile unless expanded, always visible on sm+ */}
-        <div className={`mt-1 sm:mt-2 space-y-1 sm:space-y-2 ${headerExpanded ? 'block' : 'hidden'} sm:block`}>
+        {/* Collapsible rows - controlled by headerExpanded state */}
+        <div className={`mt-1 sm:mt-2 space-y-1 sm:space-y-2 ${headerExpanded ? 'block' : 'hidden'}`}>
         {/* Device count and scanned date */}
         <div className="flex items-center gap-3">
           {totalDeviceCount > 0 && (
