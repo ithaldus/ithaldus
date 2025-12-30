@@ -260,7 +260,8 @@ export function NetworkTopology() {
       if (statusData.logCount > 0) {
         const logsData = await api.scan.logs(networkId!)
         setLogs(logsData.logs)
-        if (logsData.logs.length > 0) {
+        // Only auto-open if user hasn't explicitly set a preference
+        if (logsData.logs.length > 0 && localStorage.getItem('debug-console-open') === null) {
           setConsoleOpen(true)
         }
       }
@@ -268,7 +269,10 @@ export function NetworkTopology() {
       // Check if there's a scan in progress
       if (statusData.status === 'running') {
         setScanStatus('running')
-        setConsoleOpen(true)
+        // Only auto-open if user hasn't explicitly closed it
+        if (localStorage.getItem('debug-console-open') !== 'false') {
+          setConsoleOpen(true)
+        }
         // Connect via WebSocket to receive real-time updates
         connectWebSocket().catch(err => {
           console.error('Failed to connect WebSocket:', err)
