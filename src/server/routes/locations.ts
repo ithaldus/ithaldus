@@ -129,7 +129,7 @@ locationRoutes.put('/:networkId/:locationId', requireAdmin, async (c) => {
   return c.json(updated)
 })
 
-// Delete a location (devices will have locationId set to null via foreign key)
+// Delete a location (devices will have locationId set to null)
 locationRoutes.delete('/:networkId/:locationId', requireAdmin, async (c) => {
   const locationId = c.req.param('locationId')
 
@@ -142,7 +142,11 @@ locationRoutes.delete('/:networkId/:locationId', requireAdmin, async (c) => {
     return c.json({ error: 'Location not found' }, 404)
   }
 
-  // Delete the location (devices will have locationId set to null via ON DELETE SET NULL)
+  // Set locationId to null for all devices in this location
+  // (ON DELETE SET NULL not applied in original migration)
+  await db.update(devices).set({ locationId: null }).where(eq(devices.locationId, locationId))
+
+  // Delete the location
   await db.delete(locations).where(eq(locations.id, locationId))
 
   return c.json({ success: true })
