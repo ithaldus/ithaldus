@@ -162,3 +162,31 @@ Production requires:
 - `SESSION_SECRET` - Session encryption
 - `APP_URL` - Application URL (should match PORT_WEB)
 - `DATABASE_URL` - SQLite file path
+
+## Deployment
+
+Production runs on `veemonula.ee` as a Podman container.
+
+```bash
+# SSH to server (use root user)
+ssh root@veemonula.ee
+
+# App location
+/sites/topograph.torva.ee/app/
+
+# Rebuild and restart container
+cd /sites/topograph.torva.ee/app
+podman build -t topograph .
+podman stop topograph && podman rm topograph
+podman run -d --name topograph \
+    --cap-add=NET_ADMIN \
+    --device=/dev/net/tun \
+    --network=slirp4netns \
+    -p 3001:3000 \
+    -v /sites/topograph.torva.ee/data:/data \
+    --env-file /sites/topograph.torva.ee/.env \
+    topograph
+
+# View logs
+podman logs -f topograph
+```
