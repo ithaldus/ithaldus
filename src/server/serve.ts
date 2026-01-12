@@ -5,6 +5,16 @@ import { wsManager, type ScanWebSocket } from './services/websocket'
 // Serve static files in production
 app.use('/*', serveStatic({ root: './dist/client' }))
 
+// SPA fallback - serve index.html for non-API routes that don't match static files
+app.use('*', async (c, next) => {
+  // Skip API routes
+  if (c.req.path.startsWith('/api')) {
+    return next()
+  }
+  // Serve index.html for SPA routing
+  return c.html(await Bun.file('./dist/client/index.html').text())
+})
+
 const port = parseInt(process.env.PORT || '3000')
 
 interface WebSocketData {
