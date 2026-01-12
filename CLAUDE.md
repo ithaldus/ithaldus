@@ -165,7 +165,14 @@ Production requires:
 
 ## Deployment
 
-Production runs on `veemonula.ee` as a Podman container.
+Production runs on `veemonula.ee` as a Podman container with OpenVPN for network access.
+
+### Environment Variables (in `/sites/topograph.torva.ee/.env`)
+- `VPN_USERNAME`, `VPN_PASSWORD` - OpenVPN credentials for network access
+- `DATABASE_URL` - SQLite path (default: `file:/data/topograph.db`)
+- `AUTH_BYPASS=true` - Bypass MS365 auth (optional)
+
+### Deployment Commands
 
 ```bash
 # SSH to server (use root user)
@@ -174,9 +181,9 @@ ssh root@veemonula.ee
 # App location
 /sites/topograph.torva.ee/app/
 
-# Rebuild and restart container
+# Rebuild and restart container (use Dockerfile.prod for VPN support)
 cd /sites/topograph.torva.ee/app
-podman build -t topograph .
+podman build -t topograph -f Dockerfile.prod .
 podman stop topograph && podman rm topograph
 podman run -d --name topograph \
     --cap-add=NET_ADMIN \
@@ -189,4 +196,13 @@ podman run -d --name topograph \
 
 # View logs
 podman logs -f topograph
+
+# Check VPN status
+podman exec topograph cat /var/log/supervisor/openvpn.out.log | tail -20
 ```
+
+### Container Architecture
+- Uses `supervisord` to run both OpenVPN and the Bun app
+- VPN connects via TCP to `80.235.43.5:1194` (Bussijaam)
+- Routes `10.11.13.0/24` through VPN for device access
+- Credentials are created at startup from env vars
