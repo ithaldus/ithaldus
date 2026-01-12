@@ -2,18 +2,49 @@ import type { Client, ClientChannel } from 'ssh2'
 import type { DeviceInfo, InterfaceInfo, NeighborInfo, Driver, LogLevel } from './types'
 import https from 'https'
 import http from 'http'
+import { httpFetchViaJumpHost } from '../http-tunnel'
 
 // Try to fetch serial from web using a specific protocol (http or https)
-function tryFetchSerial(
+// Supports optional SSH jump host for tunneled HTTP requests
+async function tryFetchSerial(
   ip: string,
   webPassword: string,
   useHttps: boolean,
-  log?: (level: LogLevel, message: string) => void
+  log?: (level: LogLevel, message: string) => void,
+  jumpHost?: Client
 ): Promise<string | null> {
+  const auth = Buffer.from(`admin:${webPassword}`).toString('base64')
+  const port = useHttps ? 443 : 80
+
+  // If jump host provided, use tunneled HTTP
+  if (jumpHost) {
+    try {
+      const response = await httpFetchViaJumpHost(jumpHost, ip, port, {
+        path: '/FirstPage.html',
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${auth}`
+        },
+        timeout: 5000,
+        https: useHttps,
+      })
+
+      // Extract serial number pattern: S + 3 digits + letter + numbers
+      const match = response.data.match(/S\d{3}[A-Z]\d+/)
+      if (match) {
+        if (log) log('info', `Got serial from web via tunnel (${useHttps ? 'HTTPS' : 'HTTP'}): ${match[0]}`)
+        return match[0]
+      }
+      return null
+    } catch (err) {
+      if (log) log('info', `Tunneled ${useHttps ? 'HTTPS' : 'HTTP'} failed: ${(err as Error).message}`)
+      return null
+    }
+  }
+
+  // Direct HTTP request (no jump host)
   return new Promise((resolve) => {
-    const auth = Buffer.from(`admin:${webPassword}`).toString('base64')
     const protocol = useHttps ? https : http
-    const port = useHttps ? 443 : 80
 
     const req = protocol.request({
       hostname: ip,
@@ -52,17 +83,19 @@ function tryFetchSerial(
 
 // Fetch serial number from Zyxel web interface (CLI doesn't expose it)
 // Tries HTTPS first, then falls back to HTTP
+// Supports optional SSH jump host for tunneled HTTP requests
 async function fetchSerialFromWeb(
   ip: string,
   webPassword: string,
-  log?: (level: LogLevel, message: string) => void
+  log?: (level: LogLevel, message: string) => void,
+  jumpHost?: Client
 ): Promise<string | null> {
   // Try HTTPS first
-  let serial = await tryFetchSerial(ip, webPassword, true, log)
+  let serial = await tryFetchSerial(ip, webPassword, true, log, jumpHost)
   if (serial) return serial
 
   // Fall back to HTTP
-  serial = await tryFetchSerial(ip, webPassword, false, log)
+  serial = await tryFetchSerial(ip, webPassword, false, log, jumpHost)
   if (serial) return serial
 
   if (log) log('info', `Web interface not reachable (HTTP/HTTPS) - serial number unavailable`)
@@ -318,7 +351,8 @@ async function getZyxelInfo(
   log?: (level: LogLevel, message: string) => void,
   credentials?: { username: string; password: string },
   deviceIp?: string,  // Pass IP explicitly for jump host connections
-  parentMacs: string[] = []  // Parent device's MACs for reliable uplink detection (may have multiple: bridge, port, vlan)
+  parentMacs: string[] = [],  // Parent device's MACs for reliable uplink detection (may have multiple: bridge, port, vlan)
+  jumpHost?: Client  // Optional SSH jump host for tunneled HTTP requests
 ): Promise<DeviceInfo> {
   // Zyxel switches use a Cisco-like CLI and only support interactive shell (not exec)
   // Run ALL commands in a SINGLE shell session (connection closes after shell exits)
@@ -403,8 +437,8 @@ async function getZyxelInfo(
   // If serial not in CLI output, try fetching from web interface
   // The web interface at /FirstPage.html shows the serial number
   if (!serialNumber && webPassword && targetIp) {
-    if (log) log('info', `Serial not in CLI, trying web interface at ${targetIp}`)
-    serialNumber = await fetchSerialFromWeb(targetIp, webPassword, log)
+    if (log) log('info', `Serial not in CLI, trying web interface at ${targetIp}${jumpHost ? ' via tunnel' : ''}`)
+    serialNumber = await fetchSerialFromWeb(targetIp, webPassword, log, jumpHost)
   }
 
   // Parse VLAN configuration from "show vlan" output

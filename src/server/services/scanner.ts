@@ -1623,14 +1623,14 @@ export class NetworkScanner {
 
       // Pre-fetch SmartZone AP and client data if configured
       if (network.smartzoneHost && network.smartzoneUsername && network.smartzonePassword) {
-        this.log('info', `Querying SmartZone at ${network.smartzoneHost}...`)
+        this.log('info', `Querying SmartZone at ${network.smartzoneHost}${this.jumpHostClient ? ' via tunnel' : ''}...`)
         try {
           const szService = new SmartZoneService({
             host: network.smartzoneHost,
             port: network.smartzonePort || 8443,
             username: network.smartzoneUsername,
             password: network.smartzonePassword,
-          })
+          }, this.jumpHostClient || undefined)
           const szData = await szService.fetchAll()
           this.smartzoneCache = szData.aps
           this.smartzoneClientsCache = szData.clients
@@ -2187,7 +2187,8 @@ export class NetworkScanner {
             (level, msg) => this.log(level, `${ip}: ${msg}`),
             { username: successfulCreds!.username, password: successfulCreds!.password },
             ip,  // Pass IP explicitly for jump host connections
-            parentMacs  // Pass parent MACs for uplink detection
+            parentMacs,  // Pass parent MACs for uplink detection
+            this.jumpHostClient || undefined  // Pass jump host for tunneled HTTP (serial number scraping)
           )
           vendorInfo = { vendor: 'Zyxel', driver: 'zyxel' }
           this.log('info', `${ip}: Detected Zyxel ${deviceInfo.model || 'switch'}${deviceInfo.serialNumber ? ' (S/N: ' + deviceInfo.serialNumber + ')' : ''}`)

@@ -5,6 +5,9 @@
  * to obtain via direct SSH/CLI access to managed APs.
  */
 
+import type { Client } from 'ssh2'
+import { httpFetchViaJumpHost } from './http-tunnel'
+
 // For self-signed certificates, we use process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
 // This is set before the fetch calls in the methods below
 
@@ -84,125 +87,141 @@ function normalizeMac(mac: string): string {
 export class SmartZoneService {
   private baseUrl: string
   private config: SmartZoneConfig
+  private jumpHost?: Client
 
-  constructor(config: SmartZoneConfig) {
+  constructor(config: SmartZoneConfig, jumpHost?: Client) {
     this.config = config
+    this.jumpHost = jumpHost
     this.baseUrl = `https://${config.host}:${config.port}/wsg/api/public/v9_1`
+  }
+
+  /**
+   * Make a fetch request, using tunnel if jump host is available
+   */
+  private async fetchWithTunnel(
+    url: string,
+    options: { method?: string; headers?: Record<string, string>; body?: string }
+  ): Promise<{ ok: boolean; status: number; statusText: string; text: () => Promise<string>; json: () => Promise<any> }> {
+    const urlObj = new URL(url)
+    const port = urlObj.port ? parseInt(urlObj.port, 10) : 443
+    const path = urlObj.pathname + urlObj.search
+
+    if (this.jumpHost) {
+      // Use tunneled HTTP
+      const response = await httpFetchViaJumpHost(this.jumpHost, urlObj.hostname, port, {
+        path,
+        method: options.method || 'GET',
+        headers: options.headers || {},
+        body: options.body,
+        timeout: 30000,
+        https: true,
+      })
+
+      const data = response.data
+      return {
+        ok: response.status >= 200 && response.status < 300,
+        status: response.status,
+        statusText: response.status === 200 ? 'OK' : `Status ${response.status}`,
+        text: async () => data,
+        json: async () => JSON.parse(data),
+      }
+    }
+
+    // Direct fetch
+    const originalTLS = process.env.NODE_TLS_REJECT_UNAUTHORIZED
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+    try {
+      const response = await fetch(url, {
+        method: options.method || 'GET',
+        headers: options.headers,
+        body: options.body,
+      })
+      return response
+    } finally {
+      if (originalTLS !== undefined) {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTLS
+      } else {
+        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
+      }
+    }
   }
 
   /**
    * Authenticate with SmartZone and get a service ticket
    */
   async authenticate(): Promise<string> {
-    // Allow self-signed certificates
-    const originalTLS = process.env.NODE_TLS_REJECT_UNAUTHORIZED
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+    const response = await this.fetchWithTunnel(`${this.baseUrl}/serviceTicket`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: this.config.username,
+        password: this.config.password,
+      }),
+    })
 
-    try {
-      const response = await fetch(`${this.baseUrl}/serviceTicket`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: this.config.username,
-          password: this.config.password,
-        }),
-      })
-
-      if (!response.ok) {
-        const text = await response.text()
-        throw new Error(`SmartZone authentication failed: ${response.status} ${response.statusText} - ${text}`)
-      }
-
-      const data = await response.json() as ServiceTicketResponse
-      return data.serviceTicket
-    } finally {
-      // Restore original TLS setting
-      if (originalTLS !== undefined) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTLS
-      } else {
-        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
-      }
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`SmartZone authentication failed: ${response.status} ${response.statusText} - ${text}`)
     }
+
+    const data = await response.json() as ServiceTicketResponse
+    return data.serviceTicket
   }
 
   /**
    * Query all APs from SmartZone
    */
   async getAPs(serviceTicket: string): Promise<SmartZoneAP[]> {
-    // Allow self-signed certificates
-    const originalTLS = process.env.NODE_TLS_REJECT_UNAUTHORIZED
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+    const response = await this.fetchWithTunnel(`${this.baseUrl}/query/ap?serviceTicket=${serviceTicket}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}), // Empty query = all APs
+    })
 
-    try {
-      const response = await fetch(`${this.baseUrl}/query/ap?serviceTicket=${serviceTicket}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}), // Empty query = all APs
-      })
-
-      if (!response.ok) {
-        const text = await response.text()
-        throw new Error(`SmartZone AP query failed: ${response.status} ${response.statusText} - ${text}`)
-      }
-
-      const data = await response.json() as APQueryResponse
-
-      return data.list.map((ap): SmartZoneAP => ({
-        mac: normalizeMac(ap.apMac),
-        ip: ap.ip || '',
-        name: ap.deviceName || '',
-        serial: ap.serial || '',
-        model: ap.model || '',
-        firmware: ap.firmwareVersion || '',
-        status: ap.status,
-      }))
-    } finally {
-      // Restore original TLS setting
-      if (originalTLS !== undefined) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTLS
-      } else {
-        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
-      }
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`SmartZone AP query failed: ${response.status} ${response.statusText} - ${text}`)
     }
+
+    const data = await response.json() as APQueryResponse
+
+    return data.list.map((ap): SmartZoneAP => ({
+      mac: normalizeMac(ap.apMac),
+      ip: ap.ip || '',
+      name: ap.deviceName || '',
+      serial: ap.serial || '',
+      model: ap.model || '',
+      firmware: ap.firmwareVersion || '',
+      status: ap.status,
+    }))
   }
 
   /**
    * Query all wireless clients from SmartZone
    */
   async getClients(serviceTicket: string): Promise<SmartZoneClient[]> {
-    const originalTLS = process.env.NODE_TLS_REJECT_UNAUTHORIZED
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+    const response = await this.fetchWithTunnel(`${this.baseUrl}/query/client?serviceTicket=${serviceTicket}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}), // Empty query = all clients
+    })
 
-    try {
-      const response = await fetch(`${this.baseUrl}/query/client?serviceTicket=${serviceTicket}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}), // Empty query = all clients
-      })
-
-      if (!response.ok) {
-        const text = await response.text()
-        throw new Error(`SmartZone client query failed: ${response.status} ${response.statusText} - ${text}`)
-      }
-
-      const data = await response.json() as ClientQueryResponse
-
-      return data.list.map((client): SmartZoneClient => ({
-        mac: normalizeMac(client.clientMac),
-        apMac: normalizeMac(client.apMac),
-        ip: client.ipAddress || null,
-        hostname: client.hostname || null,
-        deviceType: client.deviceType || null,
-        osVendor: client.osVendorType || null,
-        model: client.modelName || null,
-      }))
-    } finally {
-      if (originalTLS !== undefined) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTLS
-      } else {
-        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
-      }
+    if (!response.ok) {
+      const text = await response.text()
+      throw new Error(`SmartZone client query failed: ${response.status} ${response.statusText} - ${text}`)
     }
+
+    const data = await response.json() as ClientQueryResponse
+
+    return data.list.map((client): SmartZoneClient => ({
+      mac: normalizeMac(client.clientMac),
+      apMac: normalizeMac(client.apMac),
+      ip: client.ipAddress || null,
+      hostname: client.hostname || null,
+      deviceType: client.deviceType || null,
+      osVendor: client.osVendorType || null,
+      model: client.modelName || null,
+    }))
   }
 
   /**
@@ -253,6 +272,6 @@ export class SmartZoneService {
 /**
  * Create a SmartZone service instance from network config
  */
-export function createSmartZoneService(config: SmartZoneConfig): SmartZoneService {
-  return new SmartZoneService(config)
+export function createSmartZoneService(config: SmartZoneConfig, jumpHost?: Client): SmartZoneService {
+  return new SmartZoneService(config, jumpHost)
 }
