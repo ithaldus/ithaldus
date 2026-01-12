@@ -810,6 +810,7 @@ export class NetworkScanner {
   private snmpDevices: Map<string, SnmpDeviceInfo> = new Map()  // IP -> SNMP device info
   private smartzoneCache: Map<string, SmartZoneAP> = new Map()  // MAC -> SmartZone AP data
   private smartzoneClientsCache: Map<string, SmartZoneClient> = new Map()  // MAC -> SmartZone client data
+  private smartzoneConfig: { host: string; port: number; username: string; password: string } | null = null  // SmartZone config for deferred query
   private activeChannels: Map<string, { ip: string; action: string }> = new Map()  // channelId -> info
   private channelCounter: number = 0
 
@@ -1621,25 +1622,13 @@ export class NetworkScanner {
       const failedCount = existingFailed.length
       this.log('info', `Loaded ${this.credentialsList.length} credentials to try${failedCount > 0 ? ` (${failedCount} known failures will be skipped)` : ''}`)
 
-      // Pre-fetch SmartZone AP and client data if configured
+      // Store SmartZone config for deferred query (after jump host is established)
       if (network.smartzoneHost && network.smartzoneUsername && network.smartzonePassword) {
-        this.log('info', `Querying SmartZone at ${network.smartzoneHost}${this.jumpHostClient ? ' via tunnel' : ''}...`)
-        try {
-          const szService = new SmartZoneService({
-            host: network.smartzoneHost,
-            port: network.smartzonePort || 8443,
-            username: network.smartzoneUsername,
-            password: network.smartzonePassword,
-          }, this.jumpHostClient || undefined)
-          const szData = await szService.fetchAll()
-          this.smartzoneCache = szData.aps
-          this.smartzoneClientsCache = szData.clients
-          this.log('success', `SmartZone: Loaded ${this.smartzoneCache.size} APs, ${this.smartzoneClientsCache.size} wireless clients`)
-          for (const [mac, ap] of this.smartzoneCache) {
-            this.log('info', `  ${mac}: ${ap.name} (${ap.model}, S/N: ${ap.serial})`)
-          }
-        } catch (err) {
-          this.log('warn', `SmartZone query failed: ${err instanceof Error ? err.message : err}`)
+        this.smartzoneConfig = {
+          host: network.smartzoneHost,
+          port: network.smartzonePort || 8443,
+          username: network.smartzoneUsername,
+          password: network.smartzonePassword,
         }
       }
 
@@ -2315,6 +2304,23 @@ export class NetworkScanner {
 
             if (this.jumpHostSupported) {
               this.log('success', `${ip}: Jump host ready - TCP forwarding supported, will use for all downstream devices`)
+
+              // Now query SmartZone via the jump host tunnel
+              if (this.smartzoneConfig) {
+                this.log('info', `Querying SmartZone at ${this.smartzoneConfig.host} via tunnel...`)
+                try {
+                  const szService = new SmartZoneService(this.smartzoneConfig, this.jumpHostClient || undefined)
+                  const szData = await szService.fetchAll()
+                  this.smartzoneCache = szData.aps
+                  this.smartzoneClientsCache = szData.clients
+                  this.log('success', `SmartZone: Loaded ${this.smartzoneCache.size} APs, ${this.smartzoneClientsCache.size} wireless clients`)
+                  for (const [mac, ap] of this.smartzoneCache) {
+                    this.log('info', `  ${mac}: ${ap.name} (${ap.model}, S/N: ${ap.serial})`)
+                  }
+                } catch (err) {
+                  this.log('warn', `SmartZone query failed: ${err instanceof Error ? err.message : err}`)
+                }
+              }
             } else {
               this.log('warn', `${ip}: TCP forwarding not supported - will use direct connections only`)
               // Close the jump host connection since we can't use it
