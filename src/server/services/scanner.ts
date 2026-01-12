@@ -1,5 +1,5 @@
 import { Client } from 'ssh2'
-import getVendor from 'mac-oui-lookup'
+import { getVendor } from 'mac-oui-lookup'
 import { db } from '../db/client'
 import { devices, interfaces, networks, scans, credentials, dhcpLeases, matchedDevices, failedCredentials, deviceMacs } from '../db/schema'
 import { eq, isNull, or, and } from 'drizzle-orm'
