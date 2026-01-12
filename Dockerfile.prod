@@ -1,0 +1,53 @@
+# Build stage
+FROM oven/bun:1 AS builder
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json bun.lockb* ./
+RUN bun install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN bun run build
+
+# Production stage with OpenVPN
+FROM oven/bun:1-slim
+
+WORKDIR /app
+
+# Install OpenVPN and supervisor
+RUN apt-get update && apt-get install -y \
+    openvpn \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy built files
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+
+# Create directories
+RUN mkdir -p /data /etc/openvpn /var/log/supervisor
+
+# Copy OpenVPN config (without credentials)
+COPY vpn/bussijaam.ovpn /etc/openvpn/bussijaam.conf
+
+# Copy supervisor config
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Copy startup script
+COPY docker/start.sh /start.sh
+RUN chmod +x /start.sh
+
+# Set environment
+ENV NODE_ENV=production
+ENV DATABASE_URL=file:/data/topograph.db
+
+# Expose port
+EXPOSE 3000
+
+# Start with startup script (creates auth file from env vars, then runs supervisor)
+CMD ["/start.sh"]

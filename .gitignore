@@ -50,3 +50,6 @@ logos/
 
 # Local Claude instructions
 CLAUDE.local.md
+
+# VPN credentials
+vpn/auth.txt
