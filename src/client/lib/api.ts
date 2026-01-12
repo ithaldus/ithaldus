@@ -280,6 +280,57 @@ export const api = {
       request<{ success: boolean }>(`/locations/${networkId}/${locationId}`, { method: 'DELETE' }),
   },
 
+  // Floorplans
+  floorplans: {
+    listAll: () =>
+      request<(FloorplanMeta & { networkName: string })[]>(`/floorplans`),
+    list: (networkId: string) =>
+      request<FloorplanMeta[]>(`/floorplans/${networkId}`),
+    get: (networkId: string, id: string) =>
+      request<Floorplan>(`/floorplans/${networkId}/${id}`),
+    create: (networkId: string, data: { name: string; svgData: string; viewBox: string; width: number; height: number }) =>
+      request<FloorplanMeta>(`/floorplans/${networkId}`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    createPdf: (networkId: string, data: { name: string; pdfData: string }) =>
+      request<FloorplanMeta>(`/floorplans/${networkId}/pdf`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (networkId: string, id: string, data: { name?: string; displayOrder?: number }) =>
+      request<FloorplanMeta>(`/floorplans/${networkId}/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    delete: (networkId: string, id: string) =>
+      request<{ success: boolean }>(`/floorplans/${networkId}/${id}`, { method: 'DELETE' }),
+    getDevices: (networkId: string, id: string) =>
+      request<FloorplanDeviceGroup[]>(`/floorplans/${networkId}/${id}/devices`),
+    exportPdf: async (networkId: string, id: string): Promise<Blob> => {
+      const response = await fetch(`${API_BASE}/floorplans/${networkId}/${id}/export-pdf`, {
+        credentials: 'same-origin',
+      })
+      if (!response.ok) {
+        throw new Error('Failed to export PDF')
+      }
+      return response.blob()
+    },
+    // Polygon operations
+    createPolygon: (networkId: string, floorplanId: string, data: { locationId: string; points: [number, number][]; fillColor?: string; fillOpacity?: number }) =>
+      request<LocationPolygon>(`/floorplans/${networkId}/${floorplanId}/polygons`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updatePolygon: (networkId: string, floorplanId: string, polygonId: string, data: { points?: [number, number][]; fillColor?: string; fillOpacity?: number }) =>
+      request<LocationPolygon>(`/floorplans/${networkId}/${floorplanId}/polygons/${polygonId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    deletePolygon: (networkId: string, floorplanId: string, polygonId: string) =>
+      request<{ success: boolean }>(`/floorplans/${networkId}/${floorplanId}/polygons/${polygonId}`, { method: 'DELETE' }),
+  },
+
   // Stock Images (device image gallery by vendor+model)
   stockImages: {
     list: () =>
@@ -443,6 +494,51 @@ export interface Location {
   name: string
   createdAt: string
   deviceCount?: number
+}
+
+// Floorplan metadata (without SVG/PDF data, for listing)
+export interface FloorplanMeta {
+  id: string
+  networkId: string
+  name: string
+  sourceType: 'svg' | 'pdf'
+  viewBox: string | null      // SVG only
+  width: number
+  height: number
+  pdfPageWidth: number | null  // PDF only
+  pdfPageHeight: number | null // PDF only
+  displayOrder: number
+  createdAt: string
+  updatedAt: string | null
+}
+
+// Full floorplan with SVG/PDF data and polygons
+export interface Floorplan extends FloorplanMeta {
+  svgData: string | null      // SVG only
+  pdfData: string | null      // PDF only (base64)
+  polygons: LocationPolygon[]
+}
+
+export interface LocationPolygon {
+  id: string
+  locationId: string
+  floorplanId: string
+  points: [number, number][]
+  fillColor: string | null
+  fillOpacity: number | null
+  locationName: string
+  deviceCount: number
+  createdAt: string
+  updatedAt: string | null
+}
+
+// Device group for floorplan display (devices grouped by location polygon)
+export interface FloorplanDeviceGroup {
+  locationId: string
+  locationName: string
+  polygonId: string
+  devices: Device[]
+  centroid: [number, number]
 }
 
 export interface Interface {

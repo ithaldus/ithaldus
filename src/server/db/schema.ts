@@ -48,6 +48,46 @@ export const locations = sqliteTable('locations', {
   index('idx_locations_network').on(table.networkId),
 ])
 
+// Floorplans table (SVG or PDF floor plan images per network)
+export const floorplans = sqliteTable('floorplans', {
+  id: text('id').primaryKey(),
+  networkId: text('network_id').notNull().references(() => networks.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  sourceType: text('source_type').notNull().default('svg'),  // 'svg' or 'pdf'
+  // SVG fields (used when sourceType='svg')
+  svgData: text('svg_data'),  // Raw SVG content
+  viewBox: text('view_box'),   // Original SVG viewBox (e.g., "0 0 1000 800")
+  // PDF fields (used when sourceType='pdf')
+  pdfData: text('pdf_data'),  // Base64-encoded PDF content
+  pdfPageWidth: real('pdf_page_width'),  // PDF page width in points (72 points = 1 inch)
+  pdfPageHeight: real('pdf_page_height'),  // PDF page height in points
+  // Common fields
+  width: integer('width').notNull(),     // viewBox/page width (for reference)
+  height: integer('height').notNull(),   // viewBox/page height (for reference)
+  displayOrder: integer('display_order').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at'),
+}, (table) => [
+  index('idx_floorplans_network').on(table.networkId),
+])
+
+// Location polygons table (links locations to polygon areas on floorplans)
+export const locationPolygons = sqliteTable('location_polygons', {
+  id: text('id').primaryKey(),
+  locationId: text('location_id').notNull().references(() => locations.id, { onDelete: 'cascade' }),
+  floorplanId: text('floorplan_id').notNull().references(() => floorplans.id, { onDelete: 'cascade' }),
+  // Polygon points stored as JSON: [[x1,y1], [x2,y2], ...]
+  // Coordinates are relative to SVG viewBox
+  points: text('points').notNull(),  // JSON array of [x, y] pairs
+  fillColor: text('fill_color').default('#8b5cf6'),  // Violet default to match location theme
+  fillOpacity: real('fill_opacity').default(0.3),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at'),
+}, (table) => [
+  index('idx_location_polygons_location').on(table.locationId),
+  index('idx_location_polygons_floorplan').on(table.floorplanId),
+])
+
 // Credentials table
 export const credentials = sqliteTable('credentials', {
   id: text('id').primaryKey(),
@@ -253,3 +293,7 @@ export type StockImage = typeof stockImages.$inferSelect
 export type NewStockImage = typeof stockImages.$inferInsert
 export type FailedCredential = typeof failedCredentials.$inferSelect
 export type NewFailedCredential = typeof failedCredentials.$inferInsert
+export type Floorplan = typeof floorplans.$inferSelect
+export type NewFloorplan = typeof floorplans.$inferInsert
+export type LocationPolygon = typeof locationPolygons.$inferSelect
+export type NewLocationPolygon = typeof locationPolygons.$inferInsert

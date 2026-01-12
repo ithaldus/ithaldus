@@ -6,6 +6,7 @@ import { Login } from './routes/Login'
 import { Networks } from './routes/Networks'
 import { NetworkTopology } from './routes/NetworkTopology'
 import { Locations } from './routes/Locations'
+import { Floorplans } from './routes/Floorplans'
 import { Credentials } from './routes/Credentials'
 import { Users } from './routes/Users'
 import { StockImages } from './routes/StockImages'
@@ -56,6 +57,7 @@ export function App() {
                     <Route path="/networks/:networkId/locations" element={<Locations />} />
                     <Route path="/credentials" element={<Credentials />} />
                     <Route path="/locations" element={<Locations />} />
+                    <Route path="/floorplans" element={<Floorplans />} />
                     <Route
                       path="/users"
                       element={

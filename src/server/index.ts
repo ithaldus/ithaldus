@@ -7,6 +7,7 @@ import { credentialsRoutes } from './routes/credentials'
 import { devicesRoutes } from './routes/devices'
 import { scanRoutes } from './routes/scan'
 import { locationRoutes } from './routes/locations'
+import { floorplanRoutes } from './routes/floorplans'
 import { stockImagesRoutes } from './routes/stock-images'
 import { authMiddleware } from './middleware/auth'
 
@@ -35,6 +36,7 @@ api.route('/credentials', credentialsRoutes)
 api.route('/devices', devicesRoutes)
 api.route('/scan', scanRoutes)
 api.route('/locations', locationRoutes)
+api.route('/floorplans', floorplanRoutes)
 api.route('/stock-images', stockImagesRoutes)
 
 app.route('/api', api)

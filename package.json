@@ -14,6 +14,7 @@
     "db:seed": "bun src/server/db/seed.ts"
   },
   "dependencies": {
+    "@panzoom/panzoom": "^4.6.1",
     "drizzle-orm": "^0.36.0",
     "hono": "^4.6.0",
     "html2canvas": "^1.4.1",
@@ -23,6 +24,8 @@
     "multicast-dns": "^7.2.5",
     "nanoid": "^5.0.9",
     "node-routeros": "^1.6.9",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^5.4.530",
     "playwright": "^1.57.0",
     "puppeteer": "^24.34.0",
     "puppeteer-extra": "^3.3.6",
