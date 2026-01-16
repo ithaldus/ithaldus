@@ -36,5 +36,28 @@ services:
       - ./data:/data
     restart: unless-stopped
 
+  # Staging service - mirrors production with VPN (use: docker compose up staging)
+  staging:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    ports:
+      - "${STAGING_PORT:-3200}:3000"
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - DATABASE_URL=file:/data/topograph.db
+      - VPN_USERNAME=${VPN_USERNAME}
+      - VPN_PASSWORD=${VPN_PASSWORD}
+      - AUTH_BYPASS=${AUTH_BYPASS:-true}
+      - SESSION_SECRET=${SESSION_SECRET:-staging-secret}
+      - APP_URL=http://localhost:${STAGING_PORT:-3200}
+      - NODE_ENV=production
+    volumes:
+      - ./data-staging:/data
+    restart: unless-stopped
+
 volumes:
   node_modules:

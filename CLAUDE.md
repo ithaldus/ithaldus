@@ -163,6 +163,48 @@ Production requires:
 - `APP_URL` - Application URL (should match PORT_WEB)
 - `DATABASE_URL` - SQLite file path
 
+## Staging
+
+Staging runs the production build with VPN connectivity to target networks.
+
+### Linux (Docker/Podman)
+```bash
+docker compose up staging
+```
+VPN runs natively inside the container.
+
+### Mac (OrbStack VM)
+Docker containers on Mac cannot properly route VPN traffic, so we use an OrbStack Linux VM:
+
+```bash
+./staging.sh start    # Start VM + VPN + container
+./staging.sh status   # Check status and get URL
+./staging.sh logs     # View container logs
+./staging.sh build    # Rebuild image
+./staging.sh stop     # Stop container (VM keeps running)
+./staging.sh vm-stop  # Stop the entire VM
+```
+
+**First-time VM setup:**
+```bash
+# Create VM
+orb create ubuntu staging-vm
+
+# Install OpenVPN in VM
+orb run -m staging-vm sudo apt update
+orb run -m staging-vm sudo apt install -y openvpn
+
+# Copy VPN config to VM
+orb run -m staging-vm sudo mkdir -p /etc/openvpn/client
+# Place bussijaam.conf in /etc/openvpn/client/
+
+# Enable VPN service
+orb run -m staging-vm sudo systemctl enable openvpn-client@bussijaam
+```
+
+### Windows (WSL2)
+Use WSL2 with Docker, or set up a Linux VM manually with VPN configured at the system level.
+
 ## Deployment
 
 Production runs on `veemonula.ee` as a Podman container with OpenVPN for network access.

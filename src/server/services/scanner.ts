@@ -10,6 +10,7 @@ import {
   getZyxelInfo,
   getRuckusInfo,
   isRkscliDevice,
+  get3ComInfo,
   type DeviceInfo,
   type LogLevel,
   type NeighborInfo,
@@ -456,6 +457,17 @@ async function tryConnectOnce(
           'rsa-sha2-256',
           'ssh-rsa',  // Legacy algorithm for older devices like Ruckus APs
         ],
+        cipher: [
+          'aes128-gcm@openssh.com',
+          'aes256-gcm@openssh.com',
+          'aes128-ctr',
+          'aes192-ctr',
+          'aes256-ctr',
+          'aes128-cbc',  // Legacy cipher for older devices like 3Com switches
+          'aes192-cbc',
+          'aes256-cbc',
+          '3des-cbc',    // Legacy cipher for very old devices
+        ],
       },
     })
   })
@@ -566,6 +578,17 @@ async function tryConnectViaJumpHost(
               'rsa-sha2-512',
               'rsa-sha2-256',
               'ssh-rsa',  // Legacy algorithm for older devices like Ruckus APs
+            ],
+            cipher: [
+              'aes128-gcm@openssh.com',
+              'aes256-gcm@openssh.com',
+              'aes128-ctr',
+              'aes192-ctr',
+              'aes256-ctr',
+              'aes128-cbc',  // Legacy cipher for older devices like 3Com switches
+              'aes192-cbc',
+              'aes256-cbc',
+              '3des-cbc',    // Legacy cipher for very old devices
             ],
           },
         })
@@ -2249,8 +2272,22 @@ export class NetworkScanner {
             )
             this.log('info', `${ip}: Detected ${deviceInfo.model || 'Ruckus AP'}${deviceInfo.serialNumber ? ' (S/N: ' + deviceInfo.serialNumber + ')' : ''}`)
           }
+        } else if (macVendor === '3Com' || banner.toLowerCase().includes('3com')) {
+          // 3Com detected from MAC or banner - use shell-based driver
+          // 3Com switches require interactive shell mode (no exec support)
+          this.log('info', `${ip}: 3Com detected from ${macVendor === '3Com' ? 'MAC OUI' : 'banner'}, using shell mode`)
+          deviceInfo = await get3ComInfo(
+            connectedClient,
+            (level, msg) => this.log(level, `${ip}: ${msg}`),
+            { username: successfulCreds!.username, password: successfulCreds!.password },
+            ip,
+            parentMacs,
+            this.jumpHostClient || undefined
+          )
+          vendorInfo = { vendor: '3Com', driver: '3com' }
+          this.log('info', `${ip}: Detected 3Com ${deviceInfo.model || 'switch'}${deviceInfo.version ? ' (' + deviceInfo.version + ')' : ''}`)
         } else {
-          // Not Zyxel - safe to use exec channel for detection
+          // Not Zyxel/Ruckus/3Com - safe to use exec channel for detection
           // Try MikroTik first (most common in this network)
           const testOutput = await sshExec(connectedClient, '/system resource print').catch(() => '')
           vendorInfo = detectVendor(banner, testOutput)
@@ -2614,61 +2651,87 @@ export class NetworkScanner {
         // Release any stale IP claim before inserting (handles DHCP IP reuse)
         await this.releaseStaleIpClaim(ip)
 
-        // Insert new device
-        await db.insert(devices).values({
-          id: deviceId,
-          primaryMac: deviceMac,
-          parentInterfaceId,
-          networkId: this.networkId,
-          upstreamInterface: actualUpstreamInterface,
-          ownUpstreamInterface: deviceInfo?.ownUpstreamInterface || null,
-          hostname: newDevice.hostname,
-          ip,
-          vendor: newDevice.vendor,
-          model: newDevice.model,
-          serialNumber: newDevice.serialNumber,
-          firmwareVersion: newDevice.firmwareVersion,
-          type: deviceType,
-          accessible: newDevice.accessible,
-          openPorts: JSON.stringify(openPorts),
-          warningPorts: JSON.stringify(warningPorts),
-          driver: newDevice.driver,
-          smartzoneEnriched: isSmartZoneEnriched,
-          vlans: discoveryData?.vlans?.length
-            ? discoveryData.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',')
-            : null,
-          lastSeenAt: new Date().toISOString(),
-        })
-
-        // Add MAC to deviceMacs table (skip UNKNOWN MACs)
-        if (!deviceMac.startsWith('UNKNOWN-')) {
-          await this.addMacToDevice(deviceId, deviceMac, 'ssh')
+        // Insert new device (with retry on UNIQUE constraint for race conditions)
+        let insertSucceeded = false
+        try {
+          await db.insert(devices).values({
+            id: deviceId,
+            primaryMac: deviceMac,
+            parentInterfaceId,
+            networkId: this.networkId,
+            upstreamInterface: actualUpstreamInterface,
+            ownUpstreamInterface: deviceInfo?.ownUpstreamInterface || null,
+            hostname: newDevice.hostname,
+            ip,
+            vendor: newDevice.vendor,
+            model: newDevice.model,
+            serialNumber: newDevice.serialNumber,
+            firmwareVersion: newDevice.firmwareVersion,
+            type: deviceType,
+            accessible: newDevice.accessible,
+            openPorts: JSON.stringify(openPorts),
+            warningPorts: JSON.stringify(warningPorts),
+            driver: newDevice.driver,
+            smartzoneEnriched: isSmartZoneEnriched,
+            vlans: discoveryData?.vlans?.length
+              ? discoveryData.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',')
+              : null,
+            lastSeenAt: new Date().toISOString(),
+          })
+          insertSucceeded = true
+        } catch (insertError: unknown) {
+          // Handle UNIQUE constraint violation (race condition: another parallel scan inserted this IP)
+          if (insertError instanceof Error && insertError.message.includes('UNIQUE constraint failed')) {
+            const existingByIpRace = await this.findDeviceByIp(ip)
+            if (existingByIpRace) {
+              // Update the existing device instead
+              if (!deviceMac.startsWith('UNKNOWN-')) {
+                await this.addMacToDevice(existingByIpRace.id, deviceMac, 'ssh')
+                this.macToDeviceId.set(deviceMac, existingByIpRace.id)
+              }
+              actualDeviceId = existingByIpRace.id
+              newDevice.id = existingByIpRace.id
+              this.log('info', `${ip}: Merged with existing device (race condition resolved)`)
+              // Skip the rest of the insert logic
+            } else {
+              throw insertError  // Re-throw if we can't find the conflicting device
+            }
+          } else {
+            throw insertError  // Re-throw non-UNIQUE errors
+          }
         }
 
-        // Also add knownMac if it's different from deviceMac
-        // This handles cases where a managed switch reports a different interface MAC
-        // than the one seen in ARP/bridge tables (e.g., management vs switching fabric MAC)
-        if (knownMac && !knownMac.startsWith('UNKNOWN-') && knownMac !== deviceMac) {
-          await this.addMacToDevice(deviceId, knownMac, 'arp')
-          this.log('info', `${ip}: Added neighbor MAC ${knownMac} to device (interface MAC: ${deviceMac})`)
-        }
+        if (insertSucceeded) {
+          // Add MAC to deviceMacs table (skip UNKNOWN MACs)
+          if (!deviceMac.startsWith('UNKNOWN-')) {
+            await this.addMacToDevice(deviceId, deviceMac, 'ssh')
+          }
 
-        // Ensure stock image entry exists for this vendor+model
-        if (newDevice.vendor && newDevice.model) {
-          await ensureStockImageEntry(newDevice.vendor, newDevice.model)
-        }
+          // Also add knownMac if it's different from deviceMac
+          // This handles cases where a managed switch reports a different interface MAC
+          // than the one seen in ARP/bridge tables (e.g., management vs switching fabric MAC)
+          if (knownMac && !knownMac.startsWith('UNKNOWN-') && knownMac !== deviceMac) {
+            await this.addMacToDevice(deviceId, knownMac, 'arp')
+            this.log('info', `${ip}: Added neighbor MAC ${knownMac} to device (interface MAC: ${deviceMac})`)
+          }
 
-        actualDeviceId = deviceId
-        this.deviceCount++
-        let newAccessStatus: string
-        if (newDevice.accessible) {
-          newAccessStatus = 'accessible'
-        } else if (connectedClient && !ruckusCliWorked) {
-          newAccessStatus = 'not accessible (CLI login failed)'
-        } else {
-          newAccessStatus = 'not accessible (no SSH login)'
+          // Ensure stock image entry exists for this vendor+model
+          if (newDevice.vendor && newDevice.model) {
+            await ensureStockImageEntry(newDevice.vendor, newDevice.model)
+          }
+
+          actualDeviceId = deviceId
+          this.deviceCount++
+          let newAccessStatus: string
+          if (newDevice.accessible) {
+            newAccessStatus = 'accessible'
+          } else if (connectedClient && !ruckusCliWorked) {
+            newAccessStatus = 'not accessible (CLI login failed)'
+          } else {
+            newAccessStatus = 'not accessible (no SSH login)'
+          }
+          this.log('success', `${ip}: Added as ${deviceType} (MAC: ${deviceMac}, ${newAccessStatus})`)
         }
-        this.log('success', `${ip}: Added as ${deviceType} (MAC: ${deviceMac}, ${newAccessStatus})`)
       }
     }
 

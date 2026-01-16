@@ -14,6 +14,7 @@
         "mac-oui-lookup": "^1.1.4",
         "multicast-dns": "^7.2.5",
         "nanoid": "^5.0.9",
+        "net-snmp": "^3.26.0",
         "node-routeros": "^1.6.9",
         "pdf-lib": "^1.17.1",
         "pdfjs-dist": "^5.4.530",
@@ -382,6 +383,8 @@
 
     "asn1": ["asn1@0.2.6", "", { "dependencies": { "safer-buffer": "~2.1.0" } }, "sha512-ix/FxPn0MDjeyJ7i/yoHGFt/EX6LyNbxSEhPPXODPL+KB0VPk86UYfL0lMdy+KCnv+fmvIzySwaK5COwqVbWTQ=="],
 
+    "asn1-ber": ["asn1-ber@1.2.2", "", {}, "sha512-CbNem/7hxrjSiOAOOTX4iZxu+0m3jiLqlsERQwwPM1IDR/22M8IPpA1VVndCLw5KtjRYyRODbvAEIfuTogNDng=="],
+
     "ast-types": ["ast-types@0.13.4", "", { "dependencies": { "tslib": "^2.0.1" } }, "sha512-x1FCFnFifvYDDzTaLII71vG5uvDwgtmDTEVWAxrgeiR8VjMONcCXJx7E+USjDtHlwFmt9MysbqgF9b9Vjr6w+w=="],
 
     "autoprefixer": ["autoprefixer@10.4.23", "", { "dependencies": { "browserslist": "^4.28.1", "caniuse-lite": "^1.0.30001760", "fraction.js": "^5.3.4", "picocolors": "^1.1.1", "postcss-value-parser": "^4.2.0" }, "peerDependencies": { "postcss": "^8.1.0" }, "bin": { "autoprefixer": "bin/autoprefixer" } }, "sha512-YYTXSFulfwytnjAPlw8QHncHJmlvFKtczb8InXaAx9Q0LbfDnfEYDE55omerIJKihhmU61Ft+cAOSzQVaBUmeA=="],
@@ -667,6 +670,8 @@
     "nan": ["nan@2.24.0", "", {}, "sha512-Vpf9qnVW1RaDkoNKFUvfxqAbtI8ncb8OJlqZ9wwpXzWPEsvsB1nvdUi6oYrHIkQ1Y/tMDnr1h4nczS0VB9Xykg=="],
 
     "nanoid": ["nanoid@5.1.6", "", { "bin": { "nanoid": "bin/nanoid.js" } }, "sha512-c7+7RQ+dMB5dPwwCp4ee1/iV/q2P6aK1mTZcfr1BTuVlyW9hJYiMPybJCcnBlQtuSmTIWNeazm/zqNoZSSElBg=="],
+
+    "net-snmp": ["net-snmp@3.26.0", "", { "dependencies": { "asn1-ber": "^1.2.1", "smart-buffer": "^4.1.0" } }, "sha512-sjL3tRHjSRHFfExXeY1kXwFcwlZnmGAJOMWK6MQT/7MMnJZaCM/n/U/03gLM1zOdUKI1+xUwlDAX/F4m8v86AA=="],
 
     "netmask": ["netmask@2.0.2", "", {}, "sha512-dBpDMdxv9Irdq66304OLfEmQ9tbNRFnFTuZiLo+bD+r332bBmMJ8GBLXklIXXgxd3+v9+KUnZaUR5PJMa75Gsg=="],
 

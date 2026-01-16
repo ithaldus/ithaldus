@@ -12,23 +12,27 @@ Network topology discovery and visualization tool for municipal institutions. Au
 
 ## Prerequisites
 
-- [Docker](https://www.docker.com/products/docker-desktop/) installed and running
+- **Docker** (any of the following):
+  - **Mac**: [OrbStack](https://orbstack.dev/) (recommended) or Docker Desktop
+  - **Windows**: Docker Desktop
+  - **Linux**: Docker or Podman
 
 ## Quick Start
 
-### Windows
-
-```cmd
-dev.cmd
-```
-
-### Linux/Mac
-
 ```bash
-./dev.sh
-```
+# 1. Copy environment file
+cp .env.example .env
 
-Then open http://localhost:3000 (or the port configured in `.env`)
+# 2. Start development server
+./dev.sh          # Linux/Mac
+dev.cmd           # Windows
+
+# 3. Run migrations and seed (first time only, in another terminal)
+docker compose exec dev bun run db:migrate
+docker compose exec dev bun run db:seed
+
+# 4. Open http://localhost:3000 and login with admin / admin123
+```
 
 ## Available Commands
 
@@ -39,14 +43,6 @@ Then open http://localhost:3000 (or the port configured in `.env`)
 | `migrate.cmd` | `docker compose exec dev bun run db:migrate` | Run database migrations |
 | `seed.cmd` | `docker compose exec dev bun run db:seed` | Seed database with admin user |
 | `logs.cmd` | `docker compose logs -f dev` | View server logs |
-
-## First Time Setup
-
-1. Start the dev server: `dev.cmd`
-2. Run migrations: `migrate.cmd`
-3. Seed the database: `seed.cmd`
-4. Open http://localhost:3000
-5. Login with: `admin` / `admin123`
 
 ## Tech Stack
 
@@ -131,6 +127,26 @@ The development environment runs two processes inside Docker:
 - **Bun API** (port 3000) - Backend server
 
 All requests go through port 3000, with the API proxying frontend requests to Vite.
+
+## Staging Environment
+
+Staging runs the production build with VPN connectivity to target networks.
+
+**Linux:**
+```bash
+docker compose up staging
+```
+
+**Mac (OrbStack):**
+```bash
+./staging.sh start    # Start VM and container
+./staging.sh status   # Check status and get URL
+./staging.sh logs     # View container logs
+./staging.sh stop     # Stop container
+./staging.sh vm-stop  # Stop the VM completely
+```
+
+Note: The Mac staging script uses an OrbStack Linux VM because Docker containers on Mac cannot properly route VPN traffic. Requires VPN credentials in `.env`.
 
 ## Microsoft 365 Authentication Setup
 
