@@ -1383,39 +1383,63 @@ export class NetworkScanner {
       // Release any stale IP claim before inserting (handles DHCP IP reuse)
       await this.releaseStaleIpClaim(neighborIp)
 
-      // Insert new device with MNDP/CDP/LLDP discovery data if available
-      await db.insert(devices).values({
-        id: endDeviceId,
-        primaryMac: neighbor.mac,
-        parentInterfaceId: parentIface?.id || null,
-        networkId: this.networkId,
-        upstreamInterface: neighbor.interface,
-        hostname,
-        ip: neighborIp,
-        vendor: endDeviceVendor,
-        model: neighbor.model || null,
-        firmwareVersion: neighbor.version || null,
-        type: endDevice.type,
-        accessible: false,
-        openPorts: '[]',
-        warningPorts: '[]',
-        driver: null,
-        vlans: neighbor.vlans?.length ? neighbor.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',') : null,
-        lastSeenAt: new Date().toISOString(),
-      })
-
-      // Add MAC to deviceMacs table
-      await this.addMacToDevice(endDeviceId, neighbor.mac, 'bridge-host')
-
-      // Ensure stock image entry exists for this vendor+model
-      if (endDeviceVendor && neighbor.model) {
-        await ensureStockImageEntry(endDeviceVendor, neighbor.model)
+      // Insert new device with MNDP/CDP/LLDP discovery data if available (with retry on UNIQUE constraint for race conditions)
+      let insertSucceeded = false
+      try {
+        await db.insert(devices).values({
+          id: endDeviceId,
+          primaryMac: neighbor.mac,
+          parentInterfaceId: parentIface?.id || null,
+          networkId: this.networkId,
+          upstreamInterface: neighbor.interface,
+          hostname,
+          ip: neighborIp,
+          vendor: endDeviceVendor,
+          model: neighbor.model || null,
+          firmwareVersion: neighbor.version || null,
+          type: endDevice.type,
+          accessible: false,
+          openPorts: '[]',
+          warningPorts: '[]',
+          driver: null,
+          vlans: neighbor.vlans?.length ? neighbor.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',') : null,
+          lastSeenAt: new Date().toISOString(),
+        })
+        insertSucceeded = true
+      } catch (insertError: unknown) {
+        // Handle UNIQUE constraint violation (race condition: another parallel scan inserted this IP)
+        if (insertError instanceof Error && insertError.message.includes('UNIQUE constraint failed')) {
+          const existingByIpRace = await this.findDeviceByIp(neighborIp)
+          if (existingByIpRace) {
+            // Update the existing device instead
+            await this.addMacToDevice(existingByIpRace.id, neighbor.mac, 'bridge-host')
+            this.macToDeviceId.set(neighbor.mac, existingByIpRace.id)
+            endDevice.id = existingByIpRace.id
+            this.log('info', `${parentIp}: Merged bridge host with existing device (race condition resolved)`)
+            this.callbacks.onDeviceDiscovered(endDevice)
+            return existingByIpRace.id
+          } else {
+            throw insertError  // Re-throw if we can't find the conflicting device
+          }
+        } else {
+          throw insertError  // Re-throw non-UNIQUE errors
+        }
       }
 
-      this.log('success', `${parentIp}: Added bridge host as ${endDevice.type} on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
+      if (insertSucceeded) {
+        // Add MAC to deviceMacs table
+        await this.addMacToDevice(endDeviceId, neighbor.mac, 'bridge-host')
 
-      this.deviceCount++
-      this.callbacks.onDeviceDiscovered(endDevice)
+        // Ensure stock image entry exists for this vendor+model
+        if (endDeviceVendor && neighbor.model) {
+          await ensureStockImageEntry(endDeviceVendor, neighbor.model)
+        }
+
+        this.log('success', `${parentIp}: Added bridge host as ${endDevice.type} on ${neighbor.interface} (MAC: ${neighbor.mac}${hostname ? ', hostname: ' + hostname : ''})`)
+
+        this.deviceCount++
+        this.callbacks.onDeviceDiscovered(endDevice)
+      }
       return endDeviceId
     }
   }
@@ -1903,39 +1927,64 @@ export class NetworkScanner {
           // Release any stale IP claim before inserting (handles DHCP IP reuse)
           await this.releaseStaleIpClaim(ip)
 
-          // Insert new device with MNDP/CDP/LLDP discovery data if available
-          await db.insert(devices).values({
-            id: deviceId,
-            primaryMac: deviceMac,
-            parentInterfaceId,
-            networkId: this.networkId,
-            upstreamInterface,
-            hostname,
-            ip,
-            vendor,
-            model: discoveryData?.model || null,
-            firmwareVersion: discoveryData?.version || null,
-            type: newDevice.type,
-            accessible: false,
-            openPorts: '[]',
-            warningPorts: '[]',
-            driver: null,
-            vlans: discoveryData?.vlans?.length ? discoveryData.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',') : null,
-            lastSeenAt: new Date().toISOString(),
-          })
-
-          // Add MAC to deviceMacs table (skip UNKNOWN MACs)
-          if (!deviceMac.startsWith('UNKNOWN-')) {
-            await this.addMacToDevice(deviceId, deviceMac, 'arp')
+          // Insert new device with MNDP/CDP/LLDP discovery data if available (with retry on UNIQUE constraint for race conditions)
+          let insertSucceeded = false
+          try {
+            await db.insert(devices).values({
+              id: deviceId,
+              primaryMac: deviceMac,
+              parentInterfaceId,
+              networkId: this.networkId,
+              upstreamInterface,
+              hostname,
+              ip,
+              vendor,
+              model: discoveryData?.model || null,
+              firmwareVersion: discoveryData?.version || null,
+              type: newDevice.type,
+              accessible: false,
+              openPorts: '[]',
+              warningPorts: '[]',
+              driver: null,
+              vlans: discoveryData?.vlans?.length ? discoveryData.vlans.sort((a, b) => parseInt(a) - parseInt(b)).join(',') : null,
+              lastSeenAt: new Date().toISOString(),
+            })
+            insertSucceeded = true
+          } catch (insertError: unknown) {
+            // Handle UNIQUE constraint violation (race condition: another parallel scan inserted this IP)
+            if (insertError instanceof Error && insertError.message.includes('UNIQUE constraint failed')) {
+              const existingByIpRace = await this.findDeviceByIp(ip)
+              if (existingByIpRace) {
+                // Update the existing device instead
+                if (!deviceMac.startsWith('UNKNOWN-')) {
+                  await this.addMacToDevice(existingByIpRace.id, deviceMac, 'arp')
+                  this.macToDeviceId.set(deviceMac, existingByIpRace.id)
+                }
+                actualDeviceId = existingByIpRace.id
+                newDevice.id = existingByIpRace.id
+                this.log('info', `${ip}: Merged with existing device (race condition resolved)`)
+              } else {
+                throw insertError  // Re-throw if we can't find the conflicting device
+              }
+            } else {
+              throw insertError  // Re-throw non-UNIQUE errors
+            }
           }
 
-          // Ensure stock image entry exists for this vendor+model
-          if (vendor && discoveryData?.model) {
-            await ensureStockImageEntry(vendor, discoveryData.model)
-          }
+          if (insertSucceeded) {
+            // Add MAC to deviceMacs table (skip UNKNOWN MACs)
+            if (!deviceMac.startsWith('UNKNOWN-')) {
+              await this.addMacToDevice(deviceId, deviceMac, 'arp')
+            }
 
-          actualDeviceId = deviceId
-          this.log('success', `${ip}: Added as ${newDevice.type} (MAC: ${deviceMac}${hostname ? ', hostname: ' + hostname : ''})`)
+            // Ensure stock image entry exists for this vendor+model
+            if (vendor && discoveryData?.model) {
+              await ensureStockImageEntry(vendor, discoveryData.model)
+            }
+
+            actualDeviceId = deviceId
+            this.log('success', `${ip}: Added as ${newDevice.type} (MAC: ${deviceMac}${hostname ? ', hostname: ' + hostname : ''})`)
+          }
         }
       }
 
