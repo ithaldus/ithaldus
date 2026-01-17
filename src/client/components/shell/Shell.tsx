@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { NavLink, useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom'
-import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin, Map as MapIcon, Loader2, Image } from 'lucide-react'
+import { Menu, PanelLeftClose, PanelLeft, X, LogOut, ChevronUp, Network, Key, Users, Sun, Moon, MapPin, Map as MapIcon, Loader2, Image, Languages, Check } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Tooltip } from '../ui/Tooltip'
 import { useAuth } from '../../hooks/useAuth'
 import { api, type Network as NetworkType, type Location, onConnectionChange, isConnected } from '../../lib/api'
@@ -11,10 +12,12 @@ interface ShellProps {
 }
 
 export function Shell({ children }: ShellProps) {
+  const { t, i18n } = useTranslation()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
+  const [langMenuOpen, setLangMenuOpen] = useState(false)
 
   // Sidebar state - can be set via URL param (?sidebar=0 to collapse/hide)
   const sidebarFromUrl = searchParams.get('sidebar')
@@ -118,17 +121,22 @@ export function Shell({ children }: ShellProps) {
   }
 
   const navItems = [
-    { to: '/networks', label: 'Networks', icon: Network },
-    { to: '/credentials', label: 'Credentials', icon: Key },
-    { to: '/locations', label: 'Locations', icon: MapPin },
-    { to: '/floorplans', label: 'Floorplans', icon: MapIcon },
+    { to: '/networks', label: t('nav.networks'), icon: Network },
+    { to: '/credentials', label: t('nav.credentials'), icon: Key },
+    { to: '/locations', label: t('nav.locations'), icon: MapPin },
+    { to: '/floorplans', label: t('nav.floorplans'), icon: MapIcon },
     ...(user?.role === 'admin'
       ? [
-          { to: '/users', label: 'Users', icon: Users },
-          { to: '/stock-images', label: 'Stock Images', icon: Image },
+          { to: '/users', label: t('nav.users'), icon: Users },
+          { to: '/stock-images', label: t('nav.stockImages'), icon: Image },
         ]
       : []),
   ]
+
+  const changeLanguage = (lng: string) => {
+    i18n.changeLanguage(lng)
+    setLangMenuOpen(false)
+  }
 
   const initials = user?.name
     ? user.name
@@ -172,7 +180,7 @@ export function Shell({ children }: ShellProps) {
             <Logo className={`w-6 h-6 ${logoColor} hidden lg:block`} />
           )}
           {/* Desktop collapse toggle */}
-          <Tooltip content={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} position="right">
+          <Tooltip content={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')} position="right">
             <button
               onClick={() => {
                 const newCollapsed = !sidebarCollapsed
@@ -341,6 +349,35 @@ export function Shell({ children }: ShellProps) {
                     <p className="text-sm font-medium text-slate-900 dark:text-white">{user.name}</p>
                   </div>
                 )}
+                {/* Language selector */}
+                <div className="relative">
+                  <button
+                    onClick={() => setLangMenuOpen(!langMenuOpen)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white"
+                  >
+                    <Languages className="w-4 h-4" />
+                    <span>{t('language.select')}</span>
+                    <span className="ml-auto text-xs text-slate-400">{i18n.language === 'et' ? 'ET' : 'EN'}</span>
+                  </button>
+                  {langMenuOpen && (
+                    <div className="absolute left-full top-0 ml-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden min-w-[120px]">
+                      <button
+                        onClick={() => changeLanguage('en')}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white"
+                      >
+                        {i18n.language === 'en' && <Check className="w-3 h-3" />}
+                        <span className={i18n.language !== 'en' ? 'ml-5' : ''}>English</span>
+                      </button>
+                      <button
+                        onClick={() => changeLanguage('et')}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white"
+                      >
+                        {i18n.language === 'et' && <Check className="w-3 h-3" />}
+                        <span className={i18n.language !== 'et' ? 'ml-5' : ''}>Eesti</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={() => {
                     toggleDarkMode()
@@ -348,7 +385,7 @@ export function Shell({ children }: ShellProps) {
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white"
                 >
                   {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                  <span>{isDark ? 'Light mode' : 'Dark mode'}</span>
+                  <span>{isDark ? t('user.lightMode') : t('user.darkMode')}</span>
                 </button>
                 <button
                   onClick={() => {
@@ -358,7 +395,7 @@ export function Shell({ children }: ShellProps) {
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span>Logout</span>
+                  <span>{t('user.logout')}</span>
                 </button>
               </div>
             )}

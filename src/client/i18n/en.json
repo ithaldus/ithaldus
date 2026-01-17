@@ -1,0 +1,212 @@
+{
+  "app": {
+    "title": "IT Haldus",
+    "subtitle": "IT management environment"
+  },
+  "nav": {
+    "networks": "Networks",
+    "credentials": "Credentials",
+    "locations": "Locations",
+    "floorplans": "Floorplans",
+    "users": "Users",
+    "stockImages": "Stock Images"
+  },
+  "login": {
+    "signIn": "Sign in with Microsoft",
+    "signingIn": "Signing in...",
+    "tryDifferent": "Try different account",
+    "onlyAuthorized": "Only authorized users can access this application.",
+    "errors": {
+      "accessDenied": "Your email is not authorized to access this application.",
+      "oauthError": "Authentication failed. Please try again.",
+      "tokenError": "Could not complete authentication. Please try again.",
+      "userError": "Could not retrieve user information.",
+      "configError": "Authentication is not configured. Contact administrator.",
+      "noCode": "Authentication was cancelled.",
+      "callbackError": "An error occurred during authentication.",
+      "invalidState": "Security validation failed. Please try again.",
+      "unknown": "An error occurred. Please try again."
+    }
+  },
+  "user": {
+    "lightMode": "Light mode",
+    "darkMode": "Dark mode",
+    "logout": "Logout"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "close": "Close",
+    "search": "Search",
+    "filter": "Filter",
+    "loading": "Loading...",
+    "noResults": "No results",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Info",
+    "actions": "Actions",
+    "name": "Name",
+    "description": "Description",
+    "status": "Status",
+    "type": "Type",
+    "created": "Created",
+    "updated": "Updated",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "refresh": "Refresh",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "download": "Download",
+    "upload": "Upload",
+    "export": "Export",
+    "import": "Import"
+  },
+  "networks": {
+    "title": "Networks",
+    "addNetwork": "Add Network",
+    "editNetwork": "Edit Network",
+    "deleteNetwork": "Delete Network",
+    "networkName": "Network name",
+    "rootIp": "Root device IP",
+    "noNetworks": "No networks configured",
+    "createFirst": "Create your first network to start scanning",
+    "confirmDelete": "Are you sure you want to delete this network?",
+    "scan": {
+      "start": "Start Scan",
+      "stop": "Stop Scan",
+      "status": "Scan Status",
+      "running": "Scanning...",
+      "completed": "Scan completed",
+      "failed": "Scan failed",
+      "idle": "Ready to scan"
+    }
+  },
+  "credentials": {
+    "title": "Credentials",
+    "addCredential": "Add Credential",
+    "editCredential": "Edit Credential",
+    "deleteCredential": "Delete Credential",
+    "username": "Username",
+    "password": "Password",
+    "description": "Description",
+    "noCredentials": "No credentials configured",
+    "addFirst": "Add credentials to access network devices",
+    "confirmDelete": "Are you sure you want to delete this credential?",
+    "bulkAdd": "Bulk Add",
+    "bulkFormat": "Format: username|password (one per line)",
+    "test": "Test",
+    "testing": "Testing...",
+    "testSuccess": "Connection successful",
+    "testFailed": "Connection failed"
+  },
+  "users": {
+    "title": "Users",
+    "addUser": "Add User",
+    "editUser": "Edit User",
+    "deleteUser": "Delete User",
+    "email": "Email",
+    "name": "Name",
+    "role": "Role",
+    "roles": {
+      "admin": "Admin",
+      "user": "User"
+    },
+    "noUsers": "No users",
+    "confirmDelete": "Are you sure you want to delete this user?"
+  },
+  "locations": {
+    "title": "Locations",
+    "addLocation": "Add Location",
+    "editLocation": "Edit Location",
+    "deleteLocation": "Delete Location",
+    "noLocations": "No locations",
+    "confirmDelete": "Are you sure you want to delete this location?",
+    "deviceCount": "Devices"
+  },
+  "floorplans": {
+    "title": "Floorplans",
+    "upload": "Upload Floorplan",
+    "noFloorplans": "No floorplans uploaded"
+  },
+  "devices": {
+    "title": "Devices",
+    "noDevices": "No devices found",
+    "type": {
+      "router": "Router",
+      "switch": "Switch",
+      "accessPoint": "Access Point",
+      "server": "Server",
+      "computer": "Computer",
+      "phone": "Phone",
+      "desktopPhone": "Desktop Phone",
+      "tv": "TV",
+      "tablet": "Tablet",
+      "printer": "Printer",
+      "camera": "Camera",
+      "iot": "IoT Device",
+      "endDevice": "End Device",
+      "unknown": "Unknown"
+    },
+    "status": {
+      "online": "Online",
+      "offline": "Offline",
+      "unknown": "Unknown"
+    },
+    "details": {
+      "hostname": "Hostname",
+      "ip": "IP Address",
+      "mac": "MAC Address",
+      "vendor": "Vendor",
+      "model": "Model",
+      "firmware": "Firmware",
+      "serial": "Serial Number",
+      "uptime": "Uptime",
+      "interfaces": "Interfaces",
+      "ports": "Ports",
+      "lastSeen": "Last Seen",
+      "comment": "Comment"
+    },
+    "actions": {
+      "ping": "Ping",
+      "ssh": "SSH",
+      "http": "Open Web UI",
+      "testCredentials": "Test Credentials"
+    }
+  },
+  "topology": {
+    "title": "Network Topology",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "resetView": "Reset View",
+    "expandAll": "Expand All",
+    "collapseAll": "Collapse All",
+    "showLabels": "Show Labels",
+    "hideLabels": "Hide Labels",
+    "filterDevices": "Filter devices...",
+    "noMatchingDevices": "No matching devices"
+  },
+  "console": {
+    "title": "Debug Console",
+    "clear": "Clear",
+    "export": "Export Logs",
+    "autoScroll": "Auto-scroll",
+    "showTimestamps": "Show timestamps"
+  },
+  "language": {
+    "select": "Language",
+    "en": "English",
+    "et": "Eesti"
+  },
+  "sidebar": {
+    "expand": "Expand sidebar",
+    "collapse": "Collapse sidebar"
+  }
+}

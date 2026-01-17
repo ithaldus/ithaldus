@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../hooks/useAuth'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { Logo } from '../components/Logo'
@@ -17,6 +18,7 @@ function MicrosoftLogo({ className }: { className?: string }) {
 }
 
 export function Login() {
+  const { t } = useTranslation()
   const { user, loading } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -41,14 +43,14 @@ export function Login() {
   }
 
   const errorMessages: Record<string, string> = {
-    access_denied: 'Your email is not authorized to access this application.',
-    oauth_error: 'Authentication failed. Please try again.',
-    token_error: 'Could not complete authentication. Please try again.',
-    user_error: 'Could not retrieve user information.',
-    config_error: 'Authentication is not configured. Contact administrator.',
-    no_code: 'Authentication was cancelled.',
-    callback_error: 'An error occurred during authentication.',
-    invalid_state: 'Security validation failed. Please try again.',
+    access_denied: t('login.errors.accessDenied'),
+    oauth_error: t('login.errors.oauthError'),
+    token_error: t('login.errors.tokenError'),
+    user_error: t('login.errors.userError'),
+    config_error: t('login.errors.configError'),
+    no_code: t('login.errors.noCode'),
+    callback_error: t('login.errors.callbackError'),
+    invalid_state: t('login.errors.invalidState'),
   }
 
   const hasError = !!error
@@ -72,11 +74,11 @@ export function Login() {
             <div className="flex items-center justify-center gap-3 mb-2">
               <Logo className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
               <h1 className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
-                IT Haldus
+                {t('app.title')}
               </h1>
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Torva valla IT halduskeskkond
+              {t('app.subtitle')}
             </p>
           </div>
 
@@ -87,7 +89,7 @@ export function Login() {
                 <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm text-red-700 dark:text-red-300">
-                    {errorMessages[error] || 'An error occurred. Please try again.'}
+                    {errorMessages[error] || t('login.errors.unknown')}
                   </p>
                 </div>
               </div>
@@ -105,14 +107,14 @@ export function Login() {
                 <>
                   <Loader2 className="w-5 h-5 text-slate-600 dark:text-slate-300 animate-spin" />
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    Signing in...
+                    {t('login.signingIn')}
                   </span>
                 </>
               ) : (
                 <>
                   <MicrosoftLogo className="w-5 h-5" />
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    Sign in with Microsoft
+                    {t('login.signIn')}
                   </span>
                 </>
               )}
@@ -127,7 +129,7 @@ export function Login() {
             >
               <MicrosoftLogo className="w-5 h-5" />
               <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                Try different account
+                {t('login.tryDifferent')}
               </span>
             </button>
           )}
@@ -135,7 +137,7 @@ export function Login() {
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
-          Only authorized users can access this application.
+          {t('login.onlyAuthorized')}
         </p>
       </div>
     </div>

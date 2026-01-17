@@ -1,0 +1,212 @@
+{
+  "app": {
+    "title": "IT Haldus",
+    "subtitle": "IT halduskeskkond"
+  },
+  "nav": {
+    "networks": "Võrgud",
+    "credentials": "Paroolid",
+    "locations": "Asukohad",
+    "floorplans": "Plaanid",
+    "users": "Kasutajad",
+    "stockImages": "Pildipank"
+  },
+  "login": {
+    "signIn": "Logi sisse Microsoftiga",
+    "signingIn": "Sisselogimine...",
+    "tryDifferent": "Proovi teist kontot",
+    "onlyAuthorized": "Ainult volitatud kasutajad saavad sellele rakendusele ligi.",
+    "errors": {
+      "accessDenied": "Sinu e-posti aadress ei ole volitatud sellele rakendusele ligi pääsema.",
+      "oauthError": "Autentimine ebaõnnestus. Palun proovi uuesti.",
+      "tokenError": "Autentimist ei õnnestunud lõpule viia. Palun proovi uuesti.",
+      "userError": "Kasutaja andmeid ei õnnestunud hankida.",
+      "configError": "Autentimine ei ole seadistatud. Võta ühendust administraatoriga.",
+      "noCode": "Autentimine katkestati.",
+      "callbackError": "Autentimisel tekkis viga.",
+      "invalidState": "Turvavalideerimine ebaõnnestus. Palun proovi uuesti.",
+      "unknown": "Tekkis viga. Palun proovi uuesti."
+    }
+  },
+  "user": {
+    "lightMode": "Hele režiim",
+    "darkMode": "Tume režiim",
+    "logout": "Logi välja"
+  },
+  "common": {
+    "save": "Salvesta",
+    "cancel": "Tühista",
+    "delete": "Kustuta",
+    "edit": "Muuda",
+    "add": "Lisa",
+    "close": "Sulge",
+    "search": "Otsi",
+    "filter": "Filtreeri",
+    "loading": "Laadimine...",
+    "noResults": "Tulemusi ei leitud",
+    "confirm": "Kinnita",
+    "yes": "Jah",
+    "no": "Ei",
+    "error": "Viga",
+    "success": "Õnnestus",
+    "warning": "Hoiatus",
+    "info": "Info",
+    "actions": "Tegevused",
+    "name": "Nimi",
+    "description": "Kirjeldus",
+    "status": "Olek",
+    "type": "Tüüp",
+    "created": "Loodud",
+    "updated": "Uuendatud",
+    "back": "Tagasi",
+    "next": "Edasi",
+    "previous": "Eelmine",
+    "refresh": "Värskenda",
+    "copy": "Kopeeri",
+    "copied": "Kopeeritud!",
+    "download": "Laadi alla",
+    "upload": "Laadi üles",
+    "export": "Ekspordi",
+    "import": "Impordi"
+  },
+  "networks": {
+    "title": "Võrgud",
+    "addNetwork": "Lisa võrk",
+    "editNetwork": "Muuda võrku",
+    "deleteNetwork": "Kustuta võrk",
+    "networkName": "Võrgu nimi",
+    "rootIp": "Juurseadme IP",
+    "noNetworks": "Võrke ei ole seadistatud",
+    "createFirst": "Loo esimene võrk skannimise alustamiseks",
+    "confirmDelete": "Kas oled kindel, et soovid selle võrgu kustutada?",
+    "scan": {
+      "start": "Alusta skannimist",
+      "stop": "Peata skannimine",
+      "status": "Skannimise olek",
+      "running": "Skannimine...",
+      "completed": "Skannimine lõpetatud",
+      "failed": "Skannimine ebaõnnestus",
+      "idle": "Valmis skannimiseks"
+    }
+  },
+  "credentials": {
+    "title": "Paroolid",
+    "addCredential": "Lisa parool",
+    "editCredential": "Muuda parooli",
+    "deleteCredential": "Kustuta parool",
+    "username": "Kasutajanimi",
+    "password": "Parool",
+    "description": "Kirjeldus",
+    "noCredentials": "Paroole ei ole seadistatud",
+    "addFirst": "Lisa paroolid võrguseadmetele ligipääsuks",
+    "confirmDelete": "Kas oled kindel, et soovid selle parooli kustutada?",
+    "bulkAdd": "Hulgi lisamine",
+    "bulkFormat": "Formaat: kasutajanimi|parool (üks rea kohta)",
+    "test": "Testi",
+    "testing": "Testimine...",
+    "testSuccess": "Ühendus õnnestus",
+    "testFailed": "Ühendus ebaõnnestus"
+  },
+  "users": {
+    "title": "Kasutajad",
+    "addUser": "Lisa kasutaja",
+    "editUser": "Muuda kasutajat",
+    "deleteUser": "Kustuta kasutaja",
+    "email": "E-post",
+    "name": "Nimi",
+    "role": "Roll",
+    "roles": {
+      "admin": "Admin",
+      "user": "Kasutaja"
+    },
+    "noUsers": "Kasutajaid ei ole",
+    "confirmDelete": "Kas oled kindel, et soovid selle kasutaja kustutada?"
+  },
+  "locations": {
+    "title": "Asukohad",
+    "addLocation": "Lisa asukoht",
+    "editLocation": "Muuda asukohta",
+    "deleteLocation": "Kustuta asukoht",
+    "noLocations": "Asukohti ei ole",
+    "confirmDelete": "Kas oled kindel, et soovid selle asukoha kustutada?",
+    "deviceCount": "Seadmeid"
+  },
+  "floorplans": {
+    "title": "Plaanid",
+    "upload": "Laadi plaan üles",
+    "noFloorplans": "Plaane ei ole üles laaditud"
+  },
+  "devices": {
+    "title": "Seadmed",
+    "noDevices": "Seadmeid ei leitud",
+    "type": {
+      "router": "Ruuter",
+      "switch": "Kommutaator",
+      "accessPoint": "Pääsupunkt",
+      "server": "Server",
+      "computer": "Arvuti",
+      "phone": "Telefon",
+      "desktopPhone": "Lauatelefon",
+      "tv": "Teler",
+      "tablet": "Tahvel",
+      "printer": "Printer",
+      "camera": "Kaamera",
+      "iot": "IoT seade",
+      "endDevice": "Lõppseade",
+      "unknown": "Tundmatu"
+    },
+    "status": {
+      "online": "Võrgus",
+      "offline": "Võrgust väljas",
+      "unknown": "Tundmatu"
+    },
+    "details": {
+      "hostname": "Hostinimi",
+      "ip": "IP-aadress",
+      "mac": "MAC-aadress",
+      "vendor": "Tootja",
+      "model": "Mudel",
+      "firmware": "Püsivara",
+      "serial": "Seerianumber",
+      "uptime": "Tööaeg",
+      "interfaces": "Liidesed",
+      "ports": "Pordid",
+      "lastSeen": "Viimati nähtud",
+      "comment": "Kommentaar"
+    },
+    "actions": {
+      "ping": "Ping",
+      "ssh": "SSH",
+      "http": "Ava veebiliides",
+      "testCredentials": "Testi paroole"
+    }
+  },
+  "topology": {
+    "title": "Võrgutopoloogia",
+    "zoomIn": "Suumi sisse",
+    "zoomOut": "Suumi välja",
+    "resetView": "Lähtesta vaade",
+    "expandAll": "Laienda kõik",
+    "collapseAll": "Ahenda kõik",
+    "showLabels": "Näita silte",
+    "hideLabels": "Peida sildid",
+    "filterDevices": "Filtreeri seadmeid...",
+    "noMatchingDevices": "Sobivaid seadmeid ei leitud"
+  },
+  "console": {
+    "title": "Silumiskonsool",
+    "clear": "Tühjenda",
+    "export": "Ekspordi logid",
+    "autoScroll": "Automaatne kerimine",
+    "showTimestamps": "Näita ajatempleid"
+  },
+  "language": {
+    "select": "Keel",
+    "en": "English",
+    "et": "Eesti"
+  },
+  "sidebar": {
+    "expand": "Laienda külgriba",
+    "collapse": "Ahenda külgriba"
+  }
+}
