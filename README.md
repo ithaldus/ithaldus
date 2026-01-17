@@ -1,137 +1,106 @@
 # IT Haldus
 
-Torva valla IT halduskeskkond. Võrguseadmete kaardistamine, arvutite ja seadmete andmebaas, helpdesk ja turvasündmuste haldamine.
+Kohalike omavalitsuste ja koolide IT halduskeskkond.
 
 ## Funktsioonid
 
 - **Võrgukaart** - Võrguseadmete automaatne avastamine SSH/SNMP kaudu
-- **Arvutite andmebaas** - Omavalitsuse arvutite register
+- **Arvutite andmebaas** - Arvutite register
 - **Seadmete andmebaas** - Muude IT seadmete haldamine
 - **Helpdesk** - Kasutajate pöördumiste haldamine
 - **Turvasündmused** - Intsidentide registreerimine ja jälgimine
-- **MS365 autentimine** - Sisselogimine Microsoft 365 kontoga
+- **Mitmekeelsus** - Eesti ja inglise keel
 
-## Prerequisites
+## Eeldused
 
-- **Docker** (any of the following):
-  - **Mac**: [OrbStack](https://orbstack.dev/) (recommended) or Docker Desktop
+- **Docker** (üks järgmistest):
+  - **Mac**: [OrbStack](https://orbstack.dev/) (soovitatav) või Docker Desktop
   - **Windows**: Docker Desktop
-  - **Linux**: Docker or Podman
+  - **Linux**: Docker või Podman
 
-## Quick Start
+## Kiirstart
 
 ```bash
-# 1. Copy environment file
+# 1. Kopeeri seadistusfail
 cp .env.example .env
 
-# 2. Start development server
+# 2. Käivita arendusserver
 ./dev.sh          # Linux/Mac
 dev.cmd           # Windows
 
-# 3. Run migrations and seed (first time only, in another terminal)
+# 3. Käivita migratsioonid ja andmebaasi seedimine (ainult esimesel korral)
 docker compose exec dev bun run db:migrate
 docker compose exec dev bun run db:seed
 
-# 4. Open http://localhost:3000 and login with admin / admin123
+# 4. Ava http://localhost:3000 ja logi sisse: admin / admin123
 ```
 
-## Available Commands
+## Käsud
 
-| Windows | Linux/Mac | Description |
-|---------|-----------|-------------|
-| `dev.cmd` | `./dev.sh` | Start development server |
-| `stop.cmd` | `docker compose down` | Stop the server |
-| `migrate.cmd` | `docker compose exec dev bun run db:migrate` | Run database migrations |
-| `seed.cmd` | `docker compose exec dev bun run db:seed` | Seed database with admin user |
-| `logs.cmd` | `docker compose logs -f dev` | View server logs |
+```bash
+./it-haldus status          # Vaata olekut
+./it-haldus --dev start     # Käivita arendusserver (OrbStack VM-iga)
+./it-haldus --dev stop      # Peata arendusserver
+./it-haldus --dev logs      # Vaata logisid
 
-## Tech Stack
+./it-haldus build           # Ehita tootmisversioon
+./it-haldus start           # Käivita tootmisversioon
+./it-haldus stop            # Peata tootmisversioon
+```
 
-- **Runtime**: Bun
-- **Frontend**: React + Vite + TailwindCSS
-- **Backend**: Hono
-- **Database**: SQLite + Drizzle ORM
-- **Auth**: Microsoft 365 OAuth
+## Tehnoloogiad
 
-## Project Structure
+- **Käitusaeg**: Bun
+- **Kasutajaliides**: React + Vite + TailwindCSS
+- **Taustarakendus**: Hono
+- **Andmebaas**: SQLite + Drizzle ORM
+- **Autentimine**: Microsoft 365 OAuth
+
+## Projekti struktuur
 
 ```
 src/
-├── client/          # React frontend
-│   ├── components/  # UI components
-│   ├── pages/       # Page components
-│   └── lib/         # Utilities
-└── server/          # Hono backend
-    ├── db/          # Database schema & migrations
-    ├── routes/      # API routes
-    └── middleware/  # Auth middleware
+├── client/              # React kasutajaliides
+│   ├── components/      # UI komponendid
+│   ├── routes/          # Leheküljed
+│   ├── i18n/            # Tõlked (en.json, et.json)
+│   └── lib/             # Abifunktsioonid
+└── server/              # Hono taustarakendus
+    ├── db/              # Andmebaasi skeem ja migratsioonid
+    ├── routes/          # API marsruudid
+    ├── services/        # Skannerid ja draiverid
+    └── middleware/      # Autentimise vahevara
 ```
 
-## Running Multiple Instances
+## URL parameetrid (võrgukaart)
 
-You can run multiple instances of this project side by side (e.g., for parallel development). Each instance needs unique ports and a unique Docker project name.
+Võrgukaardi vaade toetab URL parameetreid:
 
-### Setup for Additional Instance
+| Parameeter | Näide | Kirjeldus |
+|------------|-------|-----------|
+| `sidebar` | `?sidebar=0` | Peida külgriba |
+| `console` | `?console=0` | Peida silumiskonsool |
+| `labels` | `?labels=f,v,p` | Näita ainult valitud silte |
+| `types` | `?types=router,switch` | Näita ainult valitud seadmetüüpe |
+| `filter` | `?filter=192.168` | Eeltäida filter |
 
-1. Copy the project folder to a new location
-2. Edit the `.env` file in the new folder and change:
-   ```env
-   # Use different ports (e.g., 3100, 3101 for second instance)
-   PORT_WEB=3100
-   PORT_API=3101
+### Sildi valikud
+Kasuta täisnimesid või lühendeid: `firmware`/`f`, `interfaces`/`i`, `vendor`/`v`, `enddevices`/`e`, `assettag`/`a`, `mac`/`m`, `ports`/`p`, `serialnumber`/`s`
 
-   # Give it a unique Docker project name
-   COMPOSE_PROJECT_NAME=topograph2
+### Seadmetüübid
+`router`, `switch`, `access-point`, `server`, `computer`, `phone`, `desktop-phone`, `tv`, `tablet`, `printer`, `camera`, `iot`, `end-device`
 
-   # Update APP_URL to match PORT_WEB
-   APP_URL=http://localhost:3100
-   ```
+## Arenduskeskkond
 
-3. Start the dev server normally: `./dev.sh` or `dev.cmd`
-4. Access at http://localhost:3100 (or your configured port)
+Arenduskeskkond käivitab Dockeris kaks protsessi:
+- **Vite** (port 5173) - Kasutajaliides koos kuumlaadimisega
+- **Bun API** (port 3001) - Taustarakendus
 
-Each instance will have its own:
-- Docker containers (isolated by `COMPOSE_PROJECT_NAME`)
-- Docker volumes (including `node_modules`)
-- SQLite database (in the local `./data` folder)
+Kõik päringud lähevad läbi pordi 3000.
 
-## URL Parameters (Topology View)
+## Staging keskkond
 
-The network topology view supports URL query parameters to customize the display:
-
-| Parameter | Example | Description |
-|-----------|---------|-------------|
-| `sidebar` | `?sidebar=0` | Hide the navigation sidebar |
-| `console` | `?console=0` | Hide the debug console |
-| `labels` | `?labels=f,v,p` | Show only specific labels |
-| `types` | `?types=router,switch` | Show only specific device types |
-| `filter` | `?filter=192.168` | Pre-fill the device filter |
-
-### Label Options
-Use full names or short codes: `firmware`/`f`, `interfaces`/`i`, `vendor`/`v`, `enddevices`/`e`, `assettag`/`a`, `mac`/`m`, `ports`/`p`, `serialnumber`/`s`
-
-Use `?labels=` (empty) to hide all labels.
-
-### Device Types
-Available types: `router`, `switch`, `access-point`, `server`, `computer`, `phone`, `desktop-phone`, `tv`, `tablet`, `printer`, `camera`, `iot`, `end-device`
-
-### Example
-```
-http://localhost:3000/networks/abc123?sidebar=0&console=0&types=router,switch&labels=f,v
-```
-Shows only routers and switches with firmware and vendor info, without sidebar or console.
-
-## Development
-
-The development environment runs two processes inside Docker:
-- **Vite** (port 5173 internal) - Frontend with hot reload
-- **Bun API** (port 3000) - Backend server
-
-All requests go through port 3000, with the API proxying frontend requests to Vite.
-
-## Staging Environment
-
-Staging runs the production build with VPN connectivity to target networks.
+Staging käitab tootmisversiooni koos VPN-ühendusega.
 
 **Linux:**
 ```bash
@@ -140,109 +109,43 @@ docker compose up staging
 
 **Mac (OrbStack):**
 ```bash
-./staging.sh start    # Start VM and container
-./staging.sh status   # Check status and get URL
-./staging.sh logs     # View container logs
-./staging.sh stop     # Stop container
-./staging.sh vm-stop  # Stop the VM completely
+./it-haldus --dev start     # Käivita VM + VPN + konteiner
+./it-haldus --dev status    # Vaata olekut
+./it-haldus --dev logs      # Vaata logisid
+./it-haldus --dev stop      # Peata
 ```
 
-Note: The Mac staging script uses an OrbStack Linux VM because Docker containers on Mac cannot properly route VPN traffic. Requires VPN credentials in `.env`.
+## Microsoft 365 autentimine
 
-## Microsoft 365 Authentication Setup
+### 1. Registreeri rakendus Azure AD-s
 
-TopoGraph uses Microsoft 365 OAuth for authentication. Follow these steps to configure it:
+1. Mine [Azure portaali](https://portal.azure.com)
+2. Ava **Microsoft Entra ID** → **App registrations** → **New registration**
+3. Seadista:
+   - **Nimi**: `IT Haldus`
+   - **Redirect URI**: `http://localhost:3000/api/auth/callback`
 
-### 1. Register an Application in Azure AD
+### 2. Loo kliendi saladus
 
-1. Go to [Azure Portal](https://portal.azure.com)
-2. Navigate to **Microsoft Entra ID** (formerly Azure Active Directory)
-3. Select **App registrations** → **New registration**
-4. Configure the application:
-   - **Name**: `TopoGraph` (or your preferred name)
-   - **Supported account types**: Select based on your needs:
-     - *Single tenant* - Only users from your organization
-     - *Multitenant* - Users from any Azure AD organization
-   - **Redirect URI**:
-     - Platform: `Web`
-     - URL: `http://localhost:3000/api/auth/callback` (for development)
-5. Click **Register**
+1. Ava **Certificates & secrets** → **New client secret**
+2. Kopeeri saladuse väärtus kohe
 
-### 2. Configure Client Secret
-
-1. In your app registration, go to **Certificates & secrets**
-2. Click **New client secret**
-3. Add a description (e.g., "TopoGraph Production")
-4. Select expiration period
-5. Click **Add**
-6. **Copy the secret value immediately** - it won't be shown again
-
-### 3. Note Your Application IDs
-
-From the app registration **Overview** page, copy:
-- **Application (client) ID** → `MICROSOFT_CLIENT_ID`
-- **Directory (tenant) ID** → `MICROSOFT_TENANT_ID`
-
-**Multi-tenant support**: Instead of your specific tenant ID, you can use:
-- `common` - Any Azure AD organization + personal Microsoft accounts
-- `organizations` - Any Azure AD organization (work/school only)
-- `consumers` - Personal Microsoft accounts only
-
-### 4. Configure API Permissions (Optional)
-
-By default, the app requests `openid`, `profile`, and `email` scopes. If you need additional permissions:
-
-1. Go to **API permissions**
-2. Click **Add a permission**
-3. Select **Microsoft Graph** → **Delegated permissions**
-4. Add required permissions
-5. Click **Grant admin consent** if required
-
-### 5. Add Production Redirect URI
-
-For production deployment:
-
-1. Go to **Authentication**
-2. Under **Web** → **Redirect URIs**, add your production URL:
-   ```
-   https://your-domain.com/api/auth/callback
-   ```
-
-### 6. Set Environment Variables
-
-Create a `.env` file or set these environment variables:
+### 3. Seadista keskkonnamuutujad
 
 ```env
-# Microsoft 365 OAuth
-MICROSOFT_CLIENT_ID=your-application-client-id
-MICROSOFT_CLIENT_SECRET=your-client-secret-value
-MICROSOFT_TENANT_ID=your-directory-tenant-id
-
-# Application URL (used for OAuth redirect)
+MICROSOFT_CLIENT_ID=sinu-rakenduse-id
+MICROSOFT_CLIENT_SECRET=sinu-saladus
+MICROSOFT_TENANT_ID=sinu-rentniku-id
 APP_URL=http://localhost:3000
-
-# Set to 'true' to bypass auth during development
-AUTH_BYPASS=false
 ```
 
-For Docker, add these to `docker-compose.yml` under the `dev` service environment.
+### Arendusrežiim
 
-### 7. Add Authorized Users
-
-Only users registered in the database can access the application. Add users to the seed file (`src/server/db/seed.ts`):
-
-```typescript
-const usersToSeed = [
-  {
-    email: 'user@yourdomain.com',
-    name: 'User Name',
-    role: 'admin' as const,  // or 'user'
-  },
-]
+Arendamiseks ilma Azure AD-ta lisa `.env` faili:
+```env
+AUTH_BYPASS=true
 ```
 
-Then run: `docker compose exec dev bun run db:seed`
+## Litsents
 
-### Development Mode
-
-For local development without Azure AD, set `AUTH_BYPASS=true` in your environment. This automatically logs you in as the first admin user.
+MIT
