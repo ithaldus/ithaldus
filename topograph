@@ -1,0 +1,320 @@
+#!/bin/bash
+# =============================================================================
+# Topograph - Unified Development and Production Runner
+# =============================================================================
+# This script manages both development and production environments.
+#
+# Development (--dev):
+#   Uses OrbStack VM on Mac for proper VPN routing, with source mounted
+#   for hot reload. Runs Vite + Bun dev servers.
+#
+# Production (default):
+#   Builds optimized container image for Podman/Docker deployment.
+#   Includes OpenVPN for network access.
+#
+# Usage:
+#   ./topograph --dev [command]    Development mode (OrbStack VM)
+#   ./topograph [command]          Production mode
+# =============================================================================
+set -e
+
+# Configuration
+VM_NAME="topograph-vm"
+CONTAINER_NAME="topograph"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_PATH_IN_VM="/mnt/mac${SCRIPT_DIR}"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+log() { echo -e "${GREEN}▶${NC} $1"; }
+warn() { echo -e "${YELLOW}⚠${NC} $1"; }
+error() { echo -e "${RED}✗${NC} $1"; }
+
+# =============================================================================
+# Development Mode (OrbStack VM)
+# =============================================================================
+
+dev_get_ip() {
+    orb list 2>/dev/null | grep "$VM_NAME" | awk '{print $NF}'
+}
+
+dev_vm_running() {
+    orb list 2>/dev/null | grep "$VM_NAME" | grep -q "running"
+}
+
+dev_container_exists() {
+    orb run -m "$VM_NAME" docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q "^${CONTAINER_NAME}-dev$"
+}
+
+dev_ensure_vm() {
+    if ! orb list 2>/dev/null | grep -q "$VM_NAME"; then
+        log "Creating OrbStack VM '$VM_NAME'..."
+        orb create ubuntu "$VM_NAME"
+
+        log "Installing dependencies in VM..."
+        orb run -m "$VM_NAME" sudo apt-get update
+        orb run -m "$VM_NAME" sudo apt-get install -y openvpn docker.io
+        orb run -m "$VM_NAME" sudo usermod -aG docker \$USER
+
+        warn "VM created. You need to configure VPN:"
+        echo "  1. Copy VPN config to VM:"
+        echo "     orb push bussijaam.ovpn $VM_NAME:/tmp/"
+        echo "     orb run -m $VM_NAME sudo mkdir -p /etc/openvpn/client"
+        echo "     orb run -m $VM_NAME sudo mv /tmp/bussijaam.ovpn /etc/openvpn/client/bussijaam.conf"
+        echo "  2. Enable VPN service:"
+        echo "     orb run -m $VM_NAME sudo systemctl enable openvpn-client@bussijaam"
+        exit 1
+    fi
+
+    if ! dev_vm_running; then
+        log "Starting VM..."
+        orb start "$VM_NAME"
+        sleep 3
+    fi
+}
+
+dev_start() {
+    dev_ensure_vm
+
+    # Start VPN
+    log "Starting VPN..."
+    orb run -m "$VM_NAME" sudo systemctl start openvpn-client@bussijaam 2>/dev/null || true
+    sleep 2
+
+    # Check VPN status
+    VPN_STATUS=$(orb run -m "$VM_NAME" systemctl is-active openvpn-client@bussijaam 2>/dev/null || echo "inactive")
+    if [ "$VPN_STATUS" != "active" ]; then
+        warn "VPN not running. Network scanning may not work."
+    else
+        log "VPN connected"
+    fi
+
+    # Run development container
+    log "Starting development server..."
+    orb run -m "$VM_NAME" docker rm -f "${CONTAINER_NAME}-dev" 2>/dev/null || true
+
+    orb run -m "$VM_NAME" docker run -d \
+        --name "${CONTAINER_NAME}-dev" \
+        --network host \
+        -v "$PROJECT_PATH_IN_VM:/app" \
+        -v "$PROJECT_PATH_IN_VM/data:/data" \
+        -w /app \
+        -e DATABASE_URL=file:/data/topograph.db \
+        -e AUTH_BYPASS=true \
+        oven/bun:1 \
+        sh -c "bun install && bun run dev"
+
+    IP=$(dev_get_ip)
+    echo ""
+    log "Development server starting..."
+    echo -e "${CYAN}   URL: http://$IP:3000${NC}"
+    echo ""
+    echo "Commands:"
+    echo "  ./topograph --dev logs     View logs"
+    echo "  ./topograph --dev stop     Stop server"
+    echo "  ./topograph --dev shell    Open shell in container"
+}
+
+dev_stop() {
+    log "Stopping development container..."
+    orb run -m "$VM_NAME" docker stop "${CONTAINER_NAME}-dev" 2>/dev/null || true
+    orb run -m "$VM_NAME" docker rm "${CONTAINER_NAME}-dev" 2>/dev/null || true
+    log "Stopped. VM still running."
+}
+
+dev_logs() {
+    orb run -m "$VM_NAME" docker logs -f "${CONTAINER_NAME}-dev"
+}
+
+dev_status() {
+    if ! dev_vm_running; then
+        echo "VM: stopped"
+        return
+    fi
+
+    echo "VM: running"
+    IP=$(dev_get_ip)
+    echo "IP: $IP"
+
+    VPN_STATUS=$(orb run -m "$VM_NAME" systemctl is-active openvpn-client@bussijaam 2>/dev/null || echo "unknown")
+    echo "VPN: $VPN_STATUS"
+
+    CONTAINER_STATUS=$(orb run -m "$VM_NAME" docker inspect -f '{{.State.Status}}' "${CONTAINER_NAME}-dev" 2>/dev/null || echo "not running")
+    echo "Container: $CONTAINER_STATUS"
+
+    if [ "$CONTAINER_STATUS" = "running" ]; then
+        echo ""
+        echo -e "${CYAN}URL: http://$IP:3000${NC}"
+    fi
+}
+
+dev_shell() {
+    orb run -m "$VM_NAME" docker exec -it "${CONTAINER_NAME}-dev" sh
+}
+
+dev_vm_shell() {
+    orb run -m "$VM_NAME" bash
+}
+
+dev_vm_stop() {
+    log "Stopping VM..."
+    orb stop "$VM_NAME"
+    log "VM stopped."
+}
+
+dev_open() {
+    IP=$(dev_get_ip)
+    open "http://$IP:3000"
+}
+
+dev_exec() {
+    shift  # Remove 'exec'
+    orb run -m "$VM_NAME" docker exec -it "${CONTAINER_NAME}-dev" "$@"
+}
+
+# =============================================================================
+# Production Mode
+# =============================================================================
+
+prod_build() {
+    log "Building production image..."
+
+    # Use podman if available, otherwise docker
+    if command -v podman &> /dev/null; then
+        RUNTIME="podman"
+    else
+        RUNTIME="docker"
+    fi
+
+    $RUNTIME build -t topograph -f Dockerfile.prod "$SCRIPT_DIR"
+    log "Image built: topograph"
+}
+
+prod_run() {
+    log "Starting production container..."
+
+    if command -v podman &> /dev/null; then
+        RUNTIME="podman"
+    else
+        RUNTIME="docker"
+    fi
+
+    # Stop existing container
+    $RUNTIME stop topograph 2>/dev/null || true
+    $RUNTIME rm topograph 2>/dev/null || true
+
+    # Load env file if exists
+    ENV_FILE=""
+    if [ -f "$SCRIPT_DIR/.env" ]; then
+        ENV_FILE="--env-file $SCRIPT_DIR/.env"
+    fi
+
+    $RUNTIME run -d \
+        --name topograph \
+        --cap-add=NET_ADMIN \
+        --device=/dev/net/tun \
+        -p 3000:3000 \
+        -v "$SCRIPT_DIR/data:/data" \
+        $ENV_FILE \
+        topograph
+
+    log "Production server running at http://localhost:3000"
+}
+
+prod_logs() {
+    if command -v podman &> /dev/null; then
+        podman logs -f topograph
+    else
+        docker logs -f topograph
+    fi
+}
+
+prod_stop() {
+    log "Stopping production container..."
+    if command -v podman &> /dev/null; then
+        podman stop topograph
+    else
+        docker stop topograph
+    fi
+}
+
+prod_status() {
+    if command -v podman &> /dev/null; then
+        podman ps -a --filter name=topograph
+    else
+        docker ps -a --filter name=topograph
+    fi
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+show_help() {
+    echo "Topograph - Network Topology Discovery Tool"
+    echo ""
+    echo "Usage: ./topograph [--dev] <command>"
+    echo ""
+    echo "Development Mode (--dev):"
+    echo "  Uses OrbStack VM on Mac with VPN for network access."
+    echo "  Source code is mounted for hot reload."
+    echo ""
+    echo "  ./topograph --dev start      Start dev server (VM + VPN + container)"
+    echo "  ./topograph --dev stop       Stop dev container"
+    echo "  ./topograph --dev logs       Follow dev logs"
+    echo "  ./topograph --dev status     Show status"
+    echo "  ./topograph --dev shell      Shell into dev container"
+    echo "  ./topograph --dev vm-shell   Shell into VM"
+    echo "  ./topograph --dev vm-stop    Stop the VM entirely"
+    echo "  ./topograph --dev open       Open in browser"
+    echo "  ./topograph --dev exec <cmd> Run command in container"
+    echo ""
+    echo "Production Mode (default):"
+    echo "  Builds and runs optimized container with VPN."
+    echo ""
+    echo "  ./topograph build            Build production image"
+    echo "  ./topograph run              Run production container"
+    echo "  ./topograph start            Build and run"
+    echo "  ./topograph stop             Stop production container"
+    echo "  ./topograph logs             Follow production logs"
+    echo "  ./topograph status           Show container status"
+    echo ""
+}
+
+# Check for --dev flag
+if [ "${1:-}" = "--dev" ]; then
+    shift
+    CMD="${1:-start}"
+
+    case "$CMD" in
+        start)   dev_start ;;
+        stop)    dev_stop ;;
+        logs)    dev_logs ;;
+        status)  dev_status ;;
+        shell)   dev_shell ;;
+        vm-shell) dev_vm_shell ;;
+        vm-stop) dev_vm_stop ;;
+        open)    dev_open ;;
+        exec)    dev_exec "$@" ;;
+        help|--help|-h) show_help ;;
+        *)       error "Unknown command: $CMD"; show_help; exit 1 ;;
+    esac
+else
+    CMD="${1:-help}"
+
+    case "$CMD" in
+        build)   prod_build ;;
+        run)     prod_run ;;
+        start)   prod_build && prod_run ;;
+        stop)    prod_stop ;;
+        logs)    prod_logs ;;
+        status)  prod_status ;;
+        help|--help|-h) show_help ;;
+        *)       error "Unknown command: $CMD"; show_help; exit 1 ;;
+    esac
+fi
