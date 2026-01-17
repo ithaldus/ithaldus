@@ -115,6 +115,24 @@ docker compose up staging
 ./ithaldus --dev stop      # Peata
 ```
 
+## VPN seadistus
+
+Tootmiskonteiner toetab kolme VPN protokolli: **OpenVPN**, **SSTP** ja **WireGuard**.
+
+```bash
+# Seadista .env failis
+VPN_PROTOCOL=openvpn  # või: sstp, wireguard, none
+VPN_USERNAME=kasutaja
+VPN_PASSWORD=parool
+
+# VPN käsud
+./ithaldus vpn-status      # Vaata VPN olekut
+./ithaldus vpn-logs        # Vaata VPN logisid
+./ithaldus vpn-test 10.0.0.1  # Testi ühendust
+```
+
+Täpsem juhend: [docs/VPN.md](docs/VPN.md)
+
 ## Microsoft 365 autentimine
 
 ### 1. Registreeri rakendus Azure AD-s

@@ -1,0 +1,25 @@
+# SSTP VPN Configuration Template
+#
+# SSTP (Secure Socket Tunneling Protocol) is commonly used with Windows servers.
+#
+# Required environment variables:
+#   SSTP_SERVER=vpn.example.com
+#   VPN_USERNAME=your-username
+#   VPN_PASSWORD=your-password
+#
+# Optional files:
+#   vpn/ca.crt - CA certificate for server verification
+#
+# The container will connect using:
+#   sstpc --user $VPN_USERNAME --password $VPN_PASSWORD $SSTP_SERVER
+#
+# If vpn/ca.crt exists, it will be used for server certificate verification.
+# Without a CA certificate, the connection may fail if the server uses
+# a self-signed certificate.
+#
+# To extract the CA certificate from a Windows server:
+#   1. On the VPN server, open Certificate Manager (certmgr.msc)
+#   2. Navigate to: Trusted Root Certification Authorities > Certificates
+#   3. Find your CA certificate, right-click > All Tasks > Export
+#   4. Export as "Base-64 encoded X.509 (.CER)"
+#   5. Rename to ca.crt and place in the vpn/ directory

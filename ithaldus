@@ -10,7 +10,7 @@
 #
 # Production (default):
 #   Builds optimized container image for Podman/Docker deployment.
-#   Includes OpenVPN for network access.
+#   Supports OpenVPN, SSTP, and WireGuard for network access.
 #
 # Usage:
 #   ./ithaldus --dev [command]    Development mode (OrbStack VM)
@@ -282,6 +282,56 @@ prod_status() {
 }
 
 # =============================================================================
+# VPN Commands
+# =============================================================================
+
+get_runtime() {
+    if command -v podman &> /dev/null; then
+        echo "podman"
+    else
+        echo "docker"
+    fi
+}
+
+vpn_status() {
+    RUNTIME=$(get_runtime)
+
+    echo -e "${CYAN}VPN Status${NC}"
+    echo ""
+
+    VPN_PROTOCOL=$($RUNTIME exec ithaldus printenv VPN_PROTOCOL 2>/dev/null || echo "unknown")
+    echo "Protocol: $VPN_PROTOCOL"
+    echo ""
+
+    echo "Network interfaces:"
+    $RUNTIME exec ithaldus ip addr show 2>/dev/null | grep -E "^[0-9]+:|inet " || echo "  (container not running)"
+    echo ""
+
+    echo "Routes:"
+    $RUNTIME exec ithaldus ip route 2>/dev/null || echo "  (container not running)"
+}
+
+vpn_logs() {
+    RUNTIME=$(get_runtime)
+    $RUNTIME exec ithaldus cat /var/log/supervisor/vpn.out.log 2>/dev/null || \
+        $RUNTIME exec ithaldus cat /var/log/supervisor/vpn.err.log 2>/dev/null || \
+        echo "No VPN logs available"
+}
+
+vpn_test() {
+    if [ -z "$1" ]; then
+        echo "Usage: ./ithaldus vpn-test <ip-address>"
+        echo ""
+        echo "Test connectivity to a target IP through the VPN."
+        exit 1
+    fi
+
+    RUNTIME=$(get_runtime)
+    log "Testing connectivity to $1..."
+    $RUNTIME exec ithaldus ping -c 3 "$1"
+}
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -314,6 +364,11 @@ show_help() {
     echo "  ./ithaldus logs             Follow production logs"
     echo "  ./ithaldus status           Show container status"
     echo ""
+    echo "VPN Commands:"
+    echo "  ./ithaldus vpn-status       Show VPN connection status"
+    echo "  ./ithaldus vpn-logs         Show VPN logs"
+    echo "  ./ithaldus vpn-test <ip>    Test connectivity through VPN"
+    echo ""
 }
 
 # Check for --dev flag
@@ -344,6 +399,9 @@ else
         stop)    prod_stop ;;
         logs)    prod_logs ;;
         status)  prod_status ;;
+        vpn-status)  vpn_status ;;
+        vpn-logs)    vpn_logs ;;
+        vpn-test)    vpn_test "$2" ;;
         help|--help|-h) show_help ;;
         *)       error "Unknown command: $CMD"; show_help; exit 1 ;;
     esac

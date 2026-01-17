@@ -1,0 +1,27 @@
+# WireGuard Configuration Template
+# Copy this file to wg0.conf and update with your VPN server details
+
+[Interface]
+# Your private key (generate with: wg genkey)
+PrivateKey = YOUR_PRIVATE_KEY_HERE
+
+# IP address assigned to this client
+Address = 10.0.0.2/24
+
+# Optional: DNS server to use when connected
+# DNS = 10.0.0.1
+
+[Peer]
+# Server's public key
+PublicKey = SERVER_PUBLIC_KEY_HERE
+
+# Server's endpoint (IP:port)
+Endpoint = YOUR_VPN_SERVER_IP:51820
+
+# Which IPs to route through the tunnel
+# For full tunnel: 0.0.0.0/0
+# For split tunnel: specify your internal networks
+AllowedIPs = 10.0.0.0/24
+
+# Keep connection alive (useful behind NAT)
+PersistentKeepalive = 25

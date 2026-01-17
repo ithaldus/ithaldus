@@ -53,4 +53,6 @@ CLAUDE.local.md
 
 # VPN configuration (organization-specific)
 vpn/client.ovpn
+vpn/wg0.conf
+vpn/ca.crt
 vpn/auth.txt
