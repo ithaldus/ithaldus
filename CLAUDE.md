@@ -150,7 +150,10 @@ Enabled via `dark:` Tailwind variants. Set via `darkMode: 'class'` in config.
 
 ## Git Commits
 
-Do NOT add "Co-Authored-By" lines to commit messages.
+Before committing, always set the commit author:
+```bash
+git commit --author="ithaldus <it@torva.ee>" -m "message"
+```
 
 ## Environment Variables
 
