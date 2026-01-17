@@ -152,7 +152,7 @@ Enabled via `dark:` Tailwind variants. Set via `darkMode: 'class'` in config.
 
 Before committing, always set the commit author:
 ```bash
-git commit --author="ithaldus <it@torva.ee>" -m "message"
+git commit --author="torvavv <it@torva.ee>" -m "message"
 ```
 
 ## Environment Variables
