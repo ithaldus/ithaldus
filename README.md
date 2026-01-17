@@ -38,14 +38,14 @@ docker compose exec dev bun run db:seed
 ## Käsud
 
 ```bash
-./it-haldus status          # Vaata olekut
-./it-haldus --dev start     # Käivita arendusserver (OrbStack VM-iga)
-./it-haldus --dev stop      # Peata arendusserver
-./it-haldus --dev logs      # Vaata logisid
+./ithaldus status          # Vaata olekut
+./ithaldus --dev start     # Käivita arendusserver (OrbStack VM-iga)
+./ithaldus --dev stop      # Peata arendusserver
+./ithaldus --dev logs      # Vaata logisid
 
-./it-haldus build           # Ehita tootmisversioon
-./it-haldus start           # Käivita tootmisversioon
-./it-haldus stop            # Peata tootmisversioon
+./ithaldus build           # Ehita tootmisversioon
+./ithaldus start           # Käivita tootmisversioon
+./ithaldus stop            # Peata tootmisversioon
 ```
 
 ## Tehnoloogiad
@@ -109,10 +109,10 @@ docker compose up staging
 
 **Mac (OrbStack):**
 ```bash
-./it-haldus --dev start     # Käivita VM + VPN + konteiner
-./it-haldus --dev status    # Vaata olekut
-./it-haldus --dev logs      # Vaata logisid
-./it-haldus --dev stop      # Peata
+./ithaldus --dev start     # Käivita VM + VPN + konteiner
+./ithaldus --dev status    # Vaata olekut
+./ithaldus --dev logs      # Vaata logisid
+./ithaldus --dev stop      # Peata
 ```
 
 ## Microsoft 365 autentimine
