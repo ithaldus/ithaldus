@@ -8,7 +8,7 @@
   "users": [
     {
       "id": "user-001",
-      "email": "admin@torva.ee",
+      "email": "admin@example.com",
       "name": "System Administrator",
       "role": "admin",
       "createdAt": "2024-01-15T10:00:00Z",
@@ -16,7 +16,7 @@
     },
     {
       "id": "user-002",
-      "email": "it.tugi@torva.ee",
+      "email": "it.support@example.com",
       "name": "IT Support",
       "role": "admin",
       "createdAt": "2024-03-20T09:15:00Z",
@@ -24,16 +24,16 @@
     },
     {
       "id": "user-003",
-      "email": "direktor@gumnaasium.torva.ee",
-      "name": "Kooli Direktor",
+      "email": "manager@example.com",
+      "name": "Department Manager",
       "role": "user",
       "createdAt": "2024-06-10T16:30:00Z",
       "lastLoginAt": "2024-12-18T11:20:00Z"
     },
     {
       "id": "user-004",
-      "email": "haldur@muusikakool.torva.ee",
-      "name": "Muusikakooli Haldur",
+      "email": "staff@example.com",
+      "name": "Staff Member",
       "role": "user",
       "createdAt": "2024-08-05T08:00:00Z",
       "lastLoginAt": null

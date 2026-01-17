@@ -32,7 +32,7 @@ dev.cmd           # Windows
 docker compose exec dev bun run db:migrate
 docker compose exec dev bun run db:seed
 
-# 4. Ava http://localhost:3000 ja logi sisse: admin / admin123
+# 4. Ava http://localhost:3000 (AUTH_BYPASS=true võimaldab sisselogimist)
 ```
 
 ## Käsud

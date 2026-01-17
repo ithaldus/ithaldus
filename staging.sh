@@ -12,13 +12,16 @@
 #   - OrbStack installed (https://orbstack.dev)
 #   - VM created: orb create ubuntu staging-vm
 #   - OpenVPN configured in VM: sudo apt install openvpn
-#   - VPN config at: /etc/openvpn/client/bussijaam.conf
+#   - VPN config at: /etc/openvpn/client/<vpn-name>.conf
 # =============================================================================
 set -e
 
-VM_NAME="staging-vm"
-CONTAINER_NAME="ithaldus-staging"
-PROJECT_PATH="/mnt/mac/Users/henno/projects/ithaldus"
+# Configuration - override these with environment variables
+VM_NAME="${STAGING_VM_NAME:-staging-vm}"
+CONTAINER_NAME="${STAGING_CONTAINER_NAME:-ithaldus-staging}"
+VPN_NAME="${VPN_NAME:-vpn}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_PATH="/mnt/mac${SCRIPT_DIR}"
 
 # Get VM IP
 get_ip() {
@@ -47,7 +50,7 @@ case "${1:-}" in
         fi
 
         # Start VPN if not running
-        orb run -m "$VM_NAME" sudo systemctl start openvpn-client@bussijaam 2>/dev/null || true
+        orb run -m "$VM_NAME" sudo systemctl start openvpn-client@$VPN_NAME 2>/dev/null || true
 
         # Start or create container
         if container_exists; then
@@ -107,7 +110,7 @@ case "${1:-}" in
             IP=$(get_ip)
             echo "IP: $IP"
 
-            VPN_STATUS=$(orb run -m "$VM_NAME" systemctl is-active openvpn-client@bussijaam 2>/dev/null || echo "unknown")
+            VPN_STATUS=$(orb run -m "$VM_NAME" systemctl is-active openvpn-client@$VPN_NAME 2>/dev/null || echo "unknown")
             echo "VPN: $VPN_STATUS"
 
             if container_exists; then

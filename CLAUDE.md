@@ -150,10 +150,7 @@ Enabled via `dark:` Tailwind variants. Set via `darkMode: 'class'` in config.
 
 ## Git Commits
 
-Before committing, always set the commit author:
-```bash
-git commit --author="torvavv <it@torva.ee>" -m "message"
-```
+Use conventional commit messages. The commit author is determined by your local git configuration.
 
 ## Environment Variables
 
@@ -201,12 +198,12 @@ orb create ubuntu staging-vm
 orb run -m staging-vm sudo apt update
 orb run -m staging-vm sudo apt install -y openvpn
 
-# Copy VPN config to VM
+# Copy VPN config to VM (use your own VPN config file)
 orb run -m staging-vm sudo mkdir -p /etc/openvpn/client
-# Place bussijaam.conf in /etc/openvpn/client/
+# Copy your VPN config to /etc/openvpn/client/<vpn-name>.conf
 
-# Enable VPN service
-orb run -m staging-vm sudo systemctl enable openvpn-client@bussijaam
+# Enable VPN service (replace <vpn-name> with your config name)
+orb run -m staging-vm sudo systemctl enable openvpn-client@<vpn-name>
 ```
 
 ### Windows (WSL2)
@@ -214,33 +211,31 @@ Use WSL2 with Docker, or set up a Linux VM manually with VPN configured at the s
 
 ## Deployment
 
-Production runs on `veemonula.ee` as a Podman container with OpenVPN for network access.
+Production uses Podman/Docker with OpenVPN for network access.
 
-### Environment Variables (in `/sites/ithaldus.torva.ee/.env`)
+### Prerequisites
+
+1. Copy `vpn/client.ovpn.example` to `vpn/client.ovpn` and configure with your VPN server details
+2. Create `.env` file with required environment variables
+
+### Environment Variables
 - `VPN_USERNAME`, `VPN_PASSWORD` - OpenVPN credentials for network access
 - `DATABASE_URL` - SQLite path (default: `file:/data/ithaldus.db`)
-- `AUTH_BYPASS=true` - Bypass MS365 auth (optional)
+- `AUTH_BYPASS=true` - Bypass MS365 auth (optional, for development)
 
 ### Deployment Commands
 
 ```bash
-# SSH to server (use root user)
-ssh root@veemonula.ee
-
-# App location
-/sites/ithaldus.torva.ee/app/
-
-# Rebuild and restart container (use Dockerfile.prod for VPN support)
-cd /sites/ithaldus.torva.ee/app
+# Build production image (requires vpn/client.ovpn)
 podman build -t ithaldus -f Dockerfile.prod .
-podman stop ithaldus && podman rm ithaldus
+
+# Run container
 podman run -d --name ithaldus \
     --cap-add=NET_ADMIN \
     --device=/dev/net/tun \
-    --network=slirp4netns \
-    -p 3001:3000 \
-    -v /sites/ithaldus.torva.ee/data:/data \
-    --env-file /sites/ithaldus.torva.ee/.env \
+    -p 3000:3000 \
+    -v ./data:/data \
+    --env-file .env \
     ithaldus
 
 # View logs
@@ -252,6 +247,5 @@ podman exec ithaldus cat /var/log/supervisor/openvpn.out.log | tail -20
 
 ### Container Architecture
 - Uses `supervisord` to run both OpenVPN and the Bun app
-- VPN connects via TCP to `80.235.43.5:1194` (Bussijaam)
-- Routes `10.11.13.0/24` through VPN for device access
+- VPN configuration is read from `/etc/openvpn/client.conf`
 - Credentials are created at startup from env vars

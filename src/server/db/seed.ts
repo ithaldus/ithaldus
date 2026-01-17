@@ -6,11 +6,11 @@ import { eq } from 'drizzle-orm'
 async function seed() {
   console.log('Seeding database...')
 
-  // Users to seed
+  // Users to seed - uses generic example data for development
   const usersToSeed = [
     {
-      email: 'henno.taht@torva.edu.ee',
-      name: 'Henno Täht',
+      email: 'admin@example.com',
+      name: 'Admin User',
       role: 'admin' as const,
     },
   ]

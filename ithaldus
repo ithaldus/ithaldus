@@ -63,11 +63,11 @@ dev_ensure_vm() {
 
         warn "VM created. You need to configure VPN:"
         echo "  1. Copy VPN config to VM:"
-        echo "     orb push bussijaam.ovpn $VM_NAME:/tmp/"
+        echo "     orb push <your-vpn>.ovpn $VM_NAME:/tmp/"
         echo "     orb run -m $VM_NAME sudo mkdir -p /etc/openvpn/client"
-        echo "     orb run -m $VM_NAME sudo mv /tmp/bussijaam.ovpn /etc/openvpn/client/bussijaam.conf"
+        echo "     orb run -m $VM_NAME sudo mv /tmp/<your-vpn>.ovpn /etc/openvpn/client/$VPN_NAME.conf"
         echo "  2. Enable VPN service:"
-        echo "     orb run -m $VM_NAME sudo systemctl enable openvpn-client@bussijaam"
+        echo "     orb run -m $VM_NAME sudo systemctl enable openvpn-client@$VPN_NAME"
         exit 1
     fi
 
@@ -83,11 +83,11 @@ dev_start() {
 
     # Start VPN
     log "Starting VPN..."
-    orb run -m "$VM_NAME" sudo systemctl start openvpn-client@bussijaam 2>/dev/null || true
+    orb run -m "$VM_NAME" sudo systemctl start openvpn-client@$VPN_NAME 2>/dev/null || true
     sleep 2
 
     # Check VPN status
-    VPN_STATUS=$(orb run -m "$VM_NAME" systemctl is-active openvpn-client@bussijaam 2>/dev/null || echo "inactive")
+    VPN_STATUS=$(orb run -m "$VM_NAME" systemctl is-active openvpn-client@$VPN_NAME 2>/dev/null || echo "inactive")
     if [ "$VPN_STATUS" != "active" ]; then
         warn "VPN not running. Network scanning may not work."
     else
@@ -141,7 +141,7 @@ dev_status() {
     IP=$(dev_get_ip)
     echo "IP: $IP"
 
-    VPN_STATUS=$(orb run -m "$VM_NAME" systemctl is-active openvpn-client@bussijaam 2>/dev/null || echo "unknown")
+    VPN_STATUS=$(orb run -m "$VM_NAME" systemctl is-active openvpn-client@$VPN_NAME 2>/dev/null || echo "unknown")
     echo "VPN: $VPN_STATUS"
 
     CONTAINER_STATUS=$(orb run -m "$VM_NAME" docker inspect -f '{{.State.Status}}' "${CONTAINER_NAME}-dev" 2>/dev/null || echo "not running")

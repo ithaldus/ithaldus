@@ -33,7 +33,8 @@ COPY --from=builder /app/node_modules ./node_modules
 RUN mkdir -p /data /etc/openvpn /var/log/supervisor
 
 # Copy OpenVPN config (without credentials)
-COPY vpn/bussijaam.ovpn /etc/openvpn/bussijaam.conf
+# Note: You must provide vpn/client.ovpn with your VPN configuration
+COPY vpn/client.ovpn /etc/openvpn/client.conf
 
 # Copy supervisor config
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf

@@ -1,0 +1,30 @@
+# OpenVPN Client Configuration Template
+# Copy this file to client.ovpn and update with your VPN server details
+
+client
+dev tap
+proto tcp
+remote YOUR_VPN_SERVER_IP 1194
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+auth-user-pass
+
+# Cipher settings (adjust for your server)
+data-ciphers AES-256-CBC:AES-128-CBC
+cipher AES-256-CBC
+
+auth SHA1
+verb 3
+remote-cert-tls server
+
+# Routes - add routes to your internal networks
+# route 10.0.0.0 255.255.255.0
+
+<ca>
+# Paste your CA certificate here
+-----BEGIN CERTIFICATE-----
+YOUR_CA_CERTIFICATE_HERE
+-----END CERTIFICATE-----
+</ca>

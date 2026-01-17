@@ -256,7 +256,7 @@ Test the user whitelist management system including viewing users, CRUD operatio
 const mockUsers: User[] = [
   {
     id: 'user-1',
-    email: 'admin@torva.ee',
+    email: 'admin@example.com',
     name: 'System Administrator',
     role: 'admin',
     createdAt: '2024-01-01T00:00:00Z',
@@ -264,7 +264,7 @@ const mockUsers: User[] = [
   },
   {
     id: 'user-2',
-    email: 'it.tugi@torva.ee',
+    email: 'it.support@example.com',
     name: 'IT Support',
     role: 'admin',
     createdAt: '2024-01-15T00:00:00Z',
@@ -272,16 +272,16 @@ const mockUsers: User[] = [
   },
   {
     id: 'user-3',
-    email: 'direktor@gumnaasium.torva.ee',
-    name: 'Kooli Direktor',
+    email: 'manager@example.com',
+    name: 'Department Manager',
     role: 'user',
     createdAt: '2024-02-01T00:00:00Z',
     lastLoginAt: '2024-12-18T09:00:00Z',
   },
   {
     id: 'user-4',
-    email: 'haldur@muusikakool.torva.ee',
-    name: 'Muusikakooli Haldur',
+    email: 'staff@example.com',
+    name: 'Staff Member',
     role: 'user',
     createdAt: '2024-03-01T00:00:00Z',
     lastLoginAt: null, // Never logged in
