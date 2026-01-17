@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "topograph",
+      "name": "ithaldus",
       "dependencies": {
         "@panzoom/panzoom": "^4.6.1",
         "drizzle-orm": "^0.36.0",

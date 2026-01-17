@@ -286,7 +286,7 @@ prod_status() {
 # =============================================================================
 
 show_help() {
-    echo "Topograph - Network Topology Discovery Tool"
+    echo "IT Haldus - Organization IT Management Tool"
     echo ""
     echo "Usage: ./ithaldus [--dev] <command>"
     echo ""

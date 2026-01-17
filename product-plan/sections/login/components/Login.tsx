@@ -30,10 +30,10 @@ export function Login({
           {/* Logo / Title */}
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-cyan-600 dark:text-cyan-400 mb-2">
-              TopoGraph
+              IT Haldus
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Network Topology Discovery
+              Organization IT Management
             </p>
           </div>
 

@@ -4,7 +4,7 @@ import * as schema from './schema'
 import { mkdirSync } from 'fs'
 import { dirname } from 'path'
 
-const dbPath = process.env.DATABASE_URL?.replace('file:', '') || './data/topograph.db'
+const dbPath = process.env.DATABASE_URL?.replace('file:', '') || './data/ithaldus.db'
 
 // Ensure data directory exists
 try {

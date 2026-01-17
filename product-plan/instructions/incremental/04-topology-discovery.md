@@ -9,7 +9,7 @@ Implement the real-time network topology discovery and visualization system.
 
 ## Overview
 
-The Topology Discovery section is the core feature of TopoGraph. Admins start a scan from a root router, and the system recursively discovers all connected devices via SSH, building a live tree visualization. A debug console shows real-time progress while device cards display detailed information about each discovered device.
+The Topology Discovery section is the core feature of IT Haldus. Admins start a scan from a root router, and the system recursively discovers all connected devices via SSH, building a live tree visualization. A debug console shows real-time progress while device cards display detailed information about each discovered device.
 
 **Key Functionality:**
 - Start network topology scan from root router (admin)

@@ -15,7 +15,7 @@ services:
       - ./data:/app/data
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=file:./data/topograph.db
+      - DATABASE_URL=file:./data/ithaldus.db
       - AUTH_BYPASS=true
 
   # Production service (use: docker compose up app)
@@ -24,7 +24,7 @@ services:
     ports:
       - "${PORT_WEB:-3000}:3000"
     environment:
-      - DATABASE_URL=file:/data/topograph.db
+      - DATABASE_URL=file:/data/ithaldus.db
       - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
       - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
       - MICROSOFT_TENANT_ID=${MICROSOFT_TENANT_ID}
@@ -48,7 +48,7 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     environment:
-      - DATABASE_URL=file:/data/topograph.db
+      - DATABASE_URL=file:/data/ithaldus.db
       - VPN_USERNAME=${VPN_USERNAME}
       - VPN_PASSWORD=${VPN_PASSWORD}
       - AUTH_BYPASS=${AUTH_BYPASS:-true}

@@ -3,7 +3,7 @@ import { mkdirSync, readdirSync, readFileSync } from 'fs'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 
-const dbPath = process.env.DATABASE_URL?.replace('file:', '') || './data/topograph.db'
+const dbPath = process.env.DATABASE_URL?.replace('file:', '') || './data/ithaldus.db'
 
 // Ensure data directory exists
 try {

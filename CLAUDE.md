@@ -162,7 +162,7 @@ Development uses `AUTH_BYPASS=true` for simplified login.
 Port configuration (for running multiple instances):
 - `PORT_WEB` - Web server port (default: 3000)
 - `PORT_API` - API/WebSocket port (default: 3001)
-- `COMPOSE_PROJECT_NAME` - Docker project name (default: topograph)
+- `COMPOSE_PROJECT_NAME` - Docker project name (default: ithaldus)
 
 Production requires:
 - `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID` - MS365 OAuth
@@ -216,9 +216,9 @@ Use WSL2 with Docker, or set up a Linux VM manually with VPN configured at the s
 
 Production runs on `veemonula.ee` as a Podman container with OpenVPN for network access.
 
-### Environment Variables (in `/sites/topograph.torva.ee/.env`)
+### Environment Variables (in `/sites/ithaldus.torva.ee/.env`)
 - `VPN_USERNAME`, `VPN_PASSWORD` - OpenVPN credentials for network access
-- `DATABASE_URL` - SQLite path (default: `file:/data/topograph.db`)
+- `DATABASE_URL` - SQLite path (default: `file:/data/ithaldus.db`)
 - `AUTH_BYPASS=true` - Bypass MS365 auth (optional)
 
 ### Deployment Commands
@@ -228,26 +228,26 @@ Production runs on `veemonula.ee` as a Podman container with OpenVPN for network
 ssh root@veemonula.ee
 
 # App location
-/sites/topograph.torva.ee/app/
+/sites/ithaldus.torva.ee/app/
 
 # Rebuild and restart container (use Dockerfile.prod for VPN support)
-cd /sites/topograph.torva.ee/app
-podman build -t topograph -f Dockerfile.prod .
-podman stop topograph && podman rm topograph
-podman run -d --name topograph \
+cd /sites/ithaldus.torva.ee/app
+podman build -t ithaldus -f Dockerfile.prod .
+podman stop ithaldus && podman rm ithaldus
+podman run -d --name ithaldus \
     --cap-add=NET_ADMIN \
     --device=/dev/net/tun \
     --network=slirp4netns \
     -p 3001:3000 \
-    -v /sites/topograph.torva.ee/data:/data \
-    --env-file /sites/topograph.torva.ee/.env \
-    topograph
+    -v /sites/ithaldus.torva.ee/data:/data \
+    --env-file /sites/ithaldus.torva.ee/.env \
+    ithaldus
 
 # View logs
-podman logs -f topograph
+podman logs -f ithaldus
 
 # Check VPN status
-podman exec topograph cat /var/log/supervisor/openvpn.out.log | tail -20
+podman exec ithaldus cat /var/log/supervisor/openvpn.out.log | tail -20
 ```
 
 ### Container Architecture

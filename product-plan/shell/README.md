@@ -2,7 +2,7 @@
 
 ## Overview
 
-TopoGraph uses a collapsible sidebar navigation pattern optimized for a technical utility tool. The sidebar provides quick access to all sections while maximizing screen space for the topology map visualization.
+IT Haldus uses a collapsible sidebar navigation pattern optimized for a technical utility tool. The sidebar provides quick access to all sections while maximizing screen space for the topology map visualization.
 
 ## Components
 
@@ -17,7 +17,7 @@ Main layout wrapper providing the overall page structure.
 | user | AppShellUser \| null | Current user info |
 | onNavigate | (href: string) => void | Navigation callback |
 | onLogout | () => void | Logout callback |
-| appTitle | string | App name (default: "TopoGraph") |
+| appTitle | string | App name (default: "IT Haldus") |
 
 ### MainNav
 Navigation component with role-based filtering.

@@ -5,6 +5,6 @@ export default {
   out: './src/server/db/migrations',
   dialect: 'sqlite',
   dbCredentials: {
-    url: process.env.DATABASE_URL?.replace('file:', '') || './data/topograph.db',
+    url: process.env.DATABASE_URL?.replace('file:', '') || './data/ithaldus.db',
   },
 } satisfies Config

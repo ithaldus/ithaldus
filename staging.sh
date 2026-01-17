@@ -17,8 +17,8 @@
 set -e
 
 VM_NAME="staging-vm"
-CONTAINER_NAME="topograph-staging"
-PROJECT_PATH="/mnt/mac/Users/henno/projects/topograph"
+CONTAINER_NAME="ithaldus-staging"
+PROJECT_PATH="/mnt/mac/Users/henno/projects/ithaldus"
 
 # Get VM IP
 get_ip() {
@@ -89,7 +89,7 @@ case "${1:-}" in
             --name "$CONTAINER_NAME" \
             --network host \
             -v "$PROJECT_PATH/data-staging:/data" \
-            -e DATABASE_URL=file:/data/topograph.db \
+            -e DATABASE_URL=file:/data/ithaldus.db \
             -e AUTH_BYPASS=true \
             -e NODE_ENV=production \
             "$CONTAINER_NAME"

@@ -2,7 +2,7 @@
 
 ## Overview
 
-TopoGraph's data model centers around network topology discovery. The core entities support multi-network management, device discovery, credential storage, and user access control.
+IT Haldus data model centers around network topology discovery. The core entities support multi-network management, device discovery, credential storage, and user access control.
 
 ## Core Entities
 

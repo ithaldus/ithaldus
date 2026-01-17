@@ -12,7 +12,7 @@ A simple login screen that provides MS365 (Microsoft 365) OAuth authentication. 
 - If email NOT in whitelist: show "Access Denied" message with option to sign in with different account
 
 ## UI Requirements
-- Centered card layout with app logo/title (TopoGraph)
+- Centered card layout with app logo/title (IT Haldus)
 - Subtle tagline or description
 - Single "Sign in with Microsoft" button with Microsoft icon
 - Button uses standard Microsoft branding (white background, dark text, Microsoft logo)

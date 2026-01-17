@@ -1,6 +1,6 @@
 -- ============================================================================
--- TopoGraph Database Schema
--- Network topology discovery and management tool
+-- IT Haldus Database Schema
+-- Organization IT Management Tool
 -- Database: SQLite
 -- ============================================================================
 

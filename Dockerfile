@@ -28,7 +28,7 @@ RUN mkdir -p /data
 
 # Set environment
 ENV NODE_ENV=production
-ENV DATABASE_URL=file:/data/topograph.db
+ENV DATABASE_URL=file:/data/ithaldus.db
 
 # Expose port
 EXPOSE 3000

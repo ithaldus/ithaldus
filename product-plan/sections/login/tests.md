@@ -22,8 +22,8 @@ Test the MS365 OAuth login flow including successful authentication, unauthorize
 1. User navigates to `/login`
 
 **Expected Results:**
-- [ ] App title "TopoGraph" is visible
-- [ ] Tagline "Network Topology Discovery" is visible
+- [ ] App title "IT Haldus" is visible
+- [ ] Tagline "Organization IT Management" is visible
 - [ ] "Sign in with Microsoft" button is visible and enabled
 - [ ] Microsoft logo is displayed on button
 - [ ] Footer text "Only authorized users can access this application" is visible
@@ -113,8 +113,8 @@ Test the MS365 OAuth login flow including successful authentication, unauthorize
 ### Login Component
 
 **Renders correctly (idle state):**
-- [ ] Displays "TopoGraph" title
-- [ ] Displays "Network Topology Discovery" subtitle
+- [ ] Displays "IT Haldus" title
+- [ ] Displays "Organization IT Management" subtitle
 - [ ] Displays "Sign in with Microsoft" button with Microsoft icon
 - [ ] Button is enabled and clickable
 

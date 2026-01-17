@@ -31,7 +31,7 @@ export function AppShell({
   user,
   onNavigate,
   onLogout,
-  appTitle = 'TopoGraph',
+  appTitle = 'IT Haldus',
 }: AppShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)

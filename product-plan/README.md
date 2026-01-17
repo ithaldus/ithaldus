@@ -1,6 +1,6 @@
-# TopoGraph — Design Handoff
+# IT Haldus — Design Handoff
 
-This folder contains everything needed to implement TopoGraph.
+This folder contains everything needed to implement IT Haldus.
 
 ## What's Included
 
