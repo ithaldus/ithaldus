@@ -244,10 +244,40 @@ prod_stop() {
 }
 
 prod_status() {
-    if command -v podman &> /dev/null; then
-        podman ps -a --filter name=it-haldus
+    echo -e "${CYAN}IT Haldus - Status${NC}"
+    echo ""
+
+    # Check dev container (docker-compose)
+    DEV_STATUS=$(docker compose ps --format json 2>/dev/null | grep -o '"State":"[^"]*"' | head -1 | cut -d'"' -f4)
+    if [ -n "$DEV_STATUS" ] && [ "$DEV_STATUS" = "running" ]; then
+        echo -e "Dev:  ${GREEN}running${NC} → http://localhost:3000"
     else
-        docker ps -a --filter name=it-haldus
+        echo -e "Dev:  ${RED}stopped${NC}"
+    fi
+
+    # Check prod container
+    if command -v podman &> /dev/null; then
+        RUNTIME="podman"
+    else
+        RUNTIME="docker"
+    fi
+
+    PROD_STATUS=$($RUNTIME ps --filter "name=^it-haldus$" --format '{{.Status}}' 2>/dev/null || true)
+    if [ -n "$PROD_STATUS" ]; then
+        echo -e "Prod: ${GREEN}running${NC} ($PROD_STATUS)"
+    else
+        echo -e "Prod: ${RED}stopped${NC}"
+    fi
+
+    # Check OrbStack dev VM (if on Mac)
+    if command -v orb &> /dev/null; then
+        VM_STATUS=$(orb list 2>/dev/null | grep "$VM_NAME" | awk '{print $2}')
+        if [ "$VM_STATUS" = "running" ]; then
+            VM_IP=$(orb list 2>/dev/null | grep "$VM_NAME" | awk '{print $NF}')
+            echo -e "VM:   ${GREEN}running${NC} ($VM_IP)"
+        else
+            echo -e "VM:   ${RED}stopped${NC}"
+        fi
     fi
 }
 
