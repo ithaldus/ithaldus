@@ -1,6 +1,6 @@
 # IT Haldus
 
-Kohalike omavalitsuste ja koolide IT halduskeskkond.
+Organisatsiooni IT halduskeskkond.
 
 ## Funktsioonid
 
