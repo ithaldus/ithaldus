@@ -166,7 +166,7 @@ export function Shell({ children }: ShellProps) {
         <div className={`h-14 flex items-center shrink-0 ${sidebarCollapsed ? 'lg:justify-center lg:px-2' : ''} px-4`}>
           <div className={`flex items-center gap-2 flex-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
             <Logo className={`w-6 h-6 ${logoColor}`} />
-            <span className={`text-lg font-semibold ${logoColor}`}>TopoGraph</span>
+            <span className={`text-lg font-semibold ${logoColor}`}>IT Haldus</span>
           </div>
           {sidebarCollapsed && (
             <Logo className={`w-6 h-6 ${logoColor} hidden lg:block`} />
@@ -380,7 +380,7 @@ export function Shell({ children }: ShellProps) {
             </button>
             <div className="flex items-center gap-2">
               <Logo className={`w-5 h-5 ${logoColor}`} />
-              <span className={`font-semibold ${logoColor}`}>TopoGraph</span>
+              <span className={`font-semibold ${logoColor}`}>IT Haldus</span>
             </div>
             <div className="w-9" /> {/* Spacer for centering */}
           </header>

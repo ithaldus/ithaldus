@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Topograph - Unified Development and Production Runner
+# IT Haldus - Unified Development and Production Runner
 # =============================================================================
 # This script manages both development and production environments.
 #
@@ -13,14 +13,14 @@
 #   Includes OpenVPN for network access.
 #
 # Usage:
-#   ./topograph --dev [command]    Development mode (OrbStack VM)
-#   ./topograph [command]          Production mode
+#   ./it-haldus --dev [command]    Development mode (OrbStack VM)
+#   ./it-haldus [command]          Production mode
 # =============================================================================
 set -e
 
 # Configuration
-VM_NAME="topograph-vm"
-CONTAINER_NAME="topograph"
+VM_NAME="it-haldus-vm"
+CONTAINER_NAME="it-haldus"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_PATH_IN_VM="/mnt/mac${SCRIPT_DIR}"
 
@@ -104,7 +104,7 @@ dev_start() {
         -v "$PROJECT_PATH_IN_VM:/app" \
         -v "$PROJECT_PATH_IN_VM/data:/data" \
         -w /app \
-        -e DATABASE_URL=file:/data/topograph.db \
+        -e DATABASE_URL=file:/data/it-haldus.db \
         -e AUTH_BYPASS=true \
         oven/bun:1 \
         sh -c "bun install && bun run dev"
@@ -115,9 +115,9 @@ dev_start() {
     echo -e "${CYAN}   URL: http://$IP:3000${NC}"
     echo ""
     echo "Commands:"
-    echo "  ./topograph --dev logs     View logs"
-    echo "  ./topograph --dev stop     Stop server"
-    echo "  ./topograph --dev shell    Open shell in container"
+    echo "  ./it-haldus --dev logs     View logs"
+    echo "  ./it-haldus --dev stop     Stop server"
+    echo "  ./it-haldus --dev shell    Open shell in container"
 }
 
 dev_stop() {
@@ -191,8 +191,8 @@ prod_build() {
         RUNTIME="docker"
     fi
 
-    $RUNTIME build -t topograph -f Dockerfile.prod "$SCRIPT_DIR"
-    log "Image built: topograph"
+    $RUNTIME build -t it-haldus -f Dockerfile.prod "$SCRIPT_DIR"
+    log "Image built: it-haldus"
 }
 
 prod_run() {
@@ -205,8 +205,8 @@ prod_run() {
     fi
 
     # Stop existing container
-    $RUNTIME stop topograph 2>/dev/null || true
-    $RUNTIME rm topograph 2>/dev/null || true
+    $RUNTIME stop it-haldus 2>/dev/null || true
+    $RUNTIME rm it-haldus 2>/dev/null || true
 
     # Load env file if exists
     ENV_FILE=""
@@ -215,39 +215,39 @@ prod_run() {
     fi
 
     $RUNTIME run -d \
-        --name topograph \
+        --name it-haldus \
         --cap-add=NET_ADMIN \
         --device=/dev/net/tun \
         -p 3000:3000 \
         -v "$SCRIPT_DIR/data:/data" \
         $ENV_FILE \
-        topograph
+        it-haldus
 
     log "Production server running at http://localhost:3000"
 }
 
 prod_logs() {
     if command -v podman &> /dev/null; then
-        podman logs -f topograph
+        podman logs -f it-haldus
     else
-        docker logs -f topograph
+        docker logs -f it-haldus
     fi
 }
 
 prod_stop() {
     log "Stopping production container..."
     if command -v podman &> /dev/null; then
-        podman stop topograph
+        podman stop it-haldus
     else
-        docker stop topograph
+        docker stop it-haldus
     fi
 }
 
 prod_status() {
     if command -v podman &> /dev/null; then
-        podman ps -a --filter name=topograph
+        podman ps -a --filter name=it-haldus
     else
-        docker ps -a --filter name=topograph
+        docker ps -a --filter name=it-haldus
     fi
 }
 
@@ -258,31 +258,31 @@ prod_status() {
 show_help() {
     echo "Topograph - Network Topology Discovery Tool"
     echo ""
-    echo "Usage: ./topograph [--dev] <command>"
+    echo "Usage: ./it-haldus [--dev] <command>"
     echo ""
     echo "Development Mode (--dev):"
     echo "  Uses OrbStack VM on Mac with VPN for network access."
     echo "  Source code is mounted for hot reload."
     echo ""
-    echo "  ./topograph --dev start      Start dev server (VM + VPN + container)"
-    echo "  ./topograph --dev stop       Stop dev container"
-    echo "  ./topograph --dev logs       Follow dev logs"
-    echo "  ./topograph --dev status     Show status"
-    echo "  ./topograph --dev shell      Shell into dev container"
-    echo "  ./topograph --dev vm-shell   Shell into VM"
-    echo "  ./topograph --dev vm-stop    Stop the VM entirely"
-    echo "  ./topograph --dev open       Open in browser"
-    echo "  ./topograph --dev exec <cmd> Run command in container"
+    echo "  ./it-haldus --dev start      Start dev server (VM + VPN + container)"
+    echo "  ./it-haldus --dev stop       Stop dev container"
+    echo "  ./it-haldus --dev logs       Follow dev logs"
+    echo "  ./it-haldus --dev status     Show status"
+    echo "  ./it-haldus --dev shell      Shell into dev container"
+    echo "  ./it-haldus --dev vm-shell   Shell into VM"
+    echo "  ./it-haldus --dev vm-stop    Stop the VM entirely"
+    echo "  ./it-haldus --dev open       Open in browser"
+    echo "  ./it-haldus --dev exec <cmd> Run command in container"
     echo ""
     echo "Production Mode (default):"
     echo "  Builds and runs optimized container with VPN."
     echo ""
-    echo "  ./topograph build            Build production image"
-    echo "  ./topograph run              Run production container"
-    echo "  ./topograph start            Build and run"
-    echo "  ./topograph stop             Stop production container"
-    echo "  ./topograph logs             Follow production logs"
-    echo "  ./topograph status           Show container status"
+    echo "  ./it-haldus build            Build production image"
+    echo "  ./it-haldus run              Run production container"
+    echo "  ./it-haldus start            Build and run"
+    echo "  ./it-haldus stop             Stop production container"
+    echo "  ./it-haldus logs             Follow production logs"
+    echo "  ./it-haldus status           Show container status"
     echo ""
 }
 

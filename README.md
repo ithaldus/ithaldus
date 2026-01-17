@@ -1,14 +1,15 @@
-# TopoGraph
+# IT Haldus
 
-Network topology discovery and visualization tool for municipal institutions. Automatically discovers network devices via SSH and maps their interconnections.
+Torva valla IT halduskeskkond. Võrguseadmete kaardistamine, arvutite ja seadmete andmebaas, helpdesk ja turvasündmuste haldamine.
 
-## Features
+## Funktsioonid
 
-- **User Management** - Create and manage users with role-based access
-- **Network Management** - Define networks with root device IP addresses
-- **Credential Store** - Securely store SSH/SNMP credentials for device access
-- **Topology Discovery** - Scan networks and discover device interconnections (coming soon)
-- **MS365 Authentication** - Single sign-on via Microsoft 365
+- **Võrgukaart** - Võrguseadmete automaatne avastamine SSH/SNMP kaudu
+- **Arvutite andmebaas** - Omavalitsuse arvutite register
+- **Seadmete andmebaas** - Muude IT seadmete haldamine
+- **Helpdesk** - Kasutajate pöördumiste haldamine
+- **Turvasündmused** - Intsidentide registreerimine ja jälgimine
+- **MS365 autentimine** - Sisselogimine Microsoft 365 kontoga
 
 ## Prerequisites
 

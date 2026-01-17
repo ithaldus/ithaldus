@@ -72,11 +72,11 @@ export function Login() {
             <div className="flex items-center justify-center gap-3 mb-2">
               <Logo className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
               <h1 className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
-                TopoGraph
+                IT Haldus
               </h1>
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Network Topology Discovery
+              Torva valla IT halduskeskkond
             </p>
           </div>
 
