@@ -148,6 +148,10 @@ This hides sidebar, debug console, and all device labels to minimize DOM element
 ### Dark Mode
 Enabled via `dark:` Tailwind variants. Set via `darkMode: 'class'` in config.
 
+## Git Commits
+
+Do NOT add "Co-Authored-By" lines to commit messages.
+
 ## Environment Variables
 
 Development uses `AUTH_BYPASS=true` for simplified login.
