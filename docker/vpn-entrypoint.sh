@@ -16,17 +16,31 @@ case "$VPN_PROTOCOL" in
       exit 1
     fi
 
+    # Create DHCP up script for tap interfaces (Layer 2 VPN)
+    cat > /etc/openvpn/up-dhcp.sh << 'DHCP_SCRIPT'
+#!/bin/bash
+# Run DHCP client on tap interface to get IP address
+if [[ "$dev" == tap* ]]; then
+  echo "Running DHCP on $dev..."
+  dhclient -v "$dev" 2>&1 &
+fi
+DHCP_SCRIPT
+    chmod +x /etc/openvpn/up-dhcp.sh
+
     # Create auth file from environment variables
+    AUTH_OPTS=""
     if [ -n "$VPN_USERNAME" ] && [ -n "$VPN_PASSWORD" ]; then
       echo "$VPN_USERNAME" > /etc/openvpn/auth.txt
       echo "$VPN_PASSWORD" >> /etc/openvpn/auth.txt
       chmod 600 /etc/openvpn/auth.txt
       echo "OpenVPN credentials configured"
-      exec openvpn --config /etc/openvpn/client.conf --auth-user-pass /etc/openvpn/auth.txt
-    else
-      echo "Starting OpenVPN without auth file (config must handle authentication)"
-      exec openvpn --config /etc/openvpn/client.conf
+      AUTH_OPTS="--auth-user-pass /etc/openvpn/auth.txt"
     fi
+
+    # Run OpenVPN with DHCP script for tap interfaces
+    exec openvpn --config /etc/openvpn/client.conf $AUTH_OPTS \
+      --script-security 2 \
+      --up /etc/openvpn/up-dhcp.sh
     ;;
 
   sstp)

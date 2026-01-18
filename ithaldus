@@ -286,7 +286,12 @@ prod_status() {
 # =============================================================================
 
 get_runtime() {
-    if command -v podman &> /dev/null; then
+    # Check which runtime has the container running
+    if docker ps --filter "name=^ithaldus$" --format '{{.Names}}' 2>/dev/null | grep -q ithaldus; then
+        echo "docker"
+    elif podman ps --filter "name=^ithaldus$" --format '{{.Names}}' 2>/dev/null | grep -q ithaldus; then
+        echo "podman"
+    elif command -v podman &> /dev/null; then
         echo "podman"
     else
         echo "docker"

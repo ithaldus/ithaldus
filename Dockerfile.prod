@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y \
     wireguard-tools \
     iproute2 \
     iputils-ping \
+    isc-dhcp-client \
     supervisor \
     && rm -rf /var/lib/apt/lists/*
 
