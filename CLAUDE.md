@@ -43,7 +43,7 @@ In development, two servers run in parallel:
 - **Vite** on port 5173 - serves frontend with HMR, proxies `/api/*` to Bun
 - **Bun API** on port 3001 - handles all `/api/*` requests
 
-Docker exposes port 5173 → host port (configured via `PORT_WEB`, defaults to 3000). This instance runs on port 3100.
+Docker exposes port 5173 → host port (configured via `PORT_WEB`, defaults to 4263).
 
 ### Project Structure
 ```
@@ -157,8 +157,8 @@ Use conventional commit messages. The commit author is determined by your local 
 Development uses `AUTH_BYPASS=true` for simplified login.
 
 Port configuration (for running multiple instances):
-- `PORT_WEB` - Web server port (default: 3000)
-- `PORT_API` - API/WebSocket port (default: 3001)
+- `PORT_WEB` - Web server port (default: 4263)
+- `PORT_API` - API/WebSocket port (default: 4264)
 - `COMPOSE_PROJECT_NAME` - Docker project name (default: ithaldus)
 
 Production requires:
@@ -227,13 +227,13 @@ Production uses Podman/Docker with OpenVPN for network access.
 
 ```bash
 # Build production image (requires vpn/client.ovpn)
-podman build -t ithaldus -f Dockerfile.prod .
+podman build -t ithaldus .
 
 # Run container
 podman run -d --name ithaldus \
     --cap-add=NET_ADMIN \
     --device=/dev/net/tun \
-    -p 3000:3000 \
+    -p 4263:3000 \
     -v ./data:/data \
     --env-file .env \
     ithaldus

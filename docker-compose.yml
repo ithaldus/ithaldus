@@ -2,8 +2,8 @@ services:
   dev:
     build: .
     ports:
-      - "${PORT_WEB:-3000}:5173"
-      - "${PORT_API:-3001}:3001"
+      - "${PORT_WEB:-4263}:5173"
+      - "${PORT_API:-4264}:3001"
     cap_add:
       - NET_ADMIN
     devices:
@@ -24,7 +24,7 @@ services:
   app:
     build: .
     ports:
-      - "${PORT_WEB:-3000}:3000"
+      - "${PORT_WEB:-4263}:3000"
     cap_add:
       - NET_ADMIN
     devices:
@@ -37,7 +37,7 @@ services:
       - MICROSOFT_TENANT_ID=${MICROSOFT_TENANT_ID}
       - AUTH_BYPASS=${AUTH_BYPASS:-false}
       - SESSION_SECRET=${SESSION_SECRET}
-      - APP_URL=${APP_URL:-http://localhost:3000}
+      - APP_URL=${APP_URL:-http://localhost:4263}
     volumes:
       - ./data:/data
     restart: unless-stopped

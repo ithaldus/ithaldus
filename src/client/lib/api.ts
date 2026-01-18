@@ -694,15 +694,9 @@ export interface VpnResponse {
 // WebSocket URL helper
 export function getScanWebSocketUrl(networkId: string): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-
-  // In development, Vite's WebSocket proxy doesn't work reliably
-  // Connect directly to the API server on port 3001
-  // In production, the app serves from a single port so use the same host
+  // In development, connect directly to API port (Vite's WS proxy is unreliable)
+  // In production, use same host/port (reverse proxy handles routing)
   const isDev = import.meta.env.DEV
-  if (isDev) {
-    // Use same hostname but port 3001 for API WebSocket
-    return `${protocol}//${window.location.hostname}:3001/api/scan/${networkId}/ws`
-  }
-
-  return `${protocol}//${window.location.host}/api/scan/${networkId}/ws`
+  const host = isDev ? `${window.location.hostname}:4264` : window.location.host
+  return `${protocol}//${host}/api/scan/${networkId}/ws`
 }

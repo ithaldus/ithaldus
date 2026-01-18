@@ -88,7 +88,7 @@ dev_start() {
 
     echo ""
     log "Development server started"
-    echo -e "${CYAN}   URL: http://localhost:${PORT_WEB:-3000}${NC}"
+    echo -e "${CYAN}   URL: http://localhost:${PORT_WEB:-4263}${NC}"
     echo ""
     echo "Commands:"
     echo "  ./ithaldus --dev logs     View logs"
@@ -112,7 +112,7 @@ dev_status() {
 
     if echo "$CONTAINER_STATUS" | grep -qi "up"; then
         echo ""
-        echo -e "${CYAN}URL: http://localhost:${PORT_WEB:-3000}${NC}"
+        echo -e "${CYAN}URL: http://localhost:${PORT_WEB:-4263}${NC}"
     fi
 }
 
@@ -181,12 +181,12 @@ prod_run() {
         --name ithaldus \
         --cap-add=NET_ADMIN \
         --device=/dev/net/tun \
-        -p 3000:3000 \
+        -p 4263:3000 \
         -v "$SCRIPT_DIR/data:/data" \
         $ENV_FILE \
         ithaldus
 
-    log "Production server running at http://localhost:3000"
+    log "Production server running at http://localhost:4263"
 }
 
 prod_logs() {
@@ -208,10 +208,10 @@ prod_stop() {
 
 prod_status() {
     # Load port from .env if exists
-    PORT="${PORT_WEB:-3000}"
+    PORT="${PORT_WEB:-4263}"
     if [ -f "$SCRIPT_DIR/.env" ]; then
-        PORT=$(grep -E "^PORT_WEB=" "$SCRIPT_DIR/.env" 2>/dev/null | cut -d'=' -f2 || echo "3000")
-        [ -z "$PORT" ] && PORT="3000"
+        PORT=$(grep -E "^PORT_WEB=" "$SCRIPT_DIR/.env" 2>/dev/null | cut -d'=' -f2 || echo "4263")
+        [ -z "$PORT" ] && PORT="4263"
     fi
 
     # Check dev container (docker-compose)
