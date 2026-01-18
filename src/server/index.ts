@@ -9,6 +9,7 @@ import { scanRoutes } from './routes/scan'
 import { locationRoutes } from './routes/locations'
 import { floorplanRoutes } from './routes/floorplans'
 import { stockImagesRoutes } from './routes/stock-images'
+import { vpnRoutes } from './routes/vpn'
 import { authMiddleware } from './middleware/auth'
 
 const app = new Hono()
@@ -38,6 +39,7 @@ api.route('/scan', scanRoutes)
 api.route('/locations', locationRoutes)
 api.route('/floorplans', floorplanRoutes)
 api.route('/stock-images', stockImagesRoutes)
+api.route('/vpn', vpnRoutes)
 
 app.route('/api', api)
 

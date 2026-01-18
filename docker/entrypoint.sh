@@ -1,7 +1,26 @@
 #!/bin/bash
-# Container entrypoint - starts supervisor which manages VPN and app
-# This script runs INSIDE the container, not on the host.
-# Users should use ./ithaldus commands on the host.
+# Container entrypoint - runs app in dev or prod mode based on NODE_ENV
 set -e
 
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
+echo "Starting ithaldus (NODE_ENV=$NODE_ENV)"
+
+# Ensure data directories exist
+mkdir -p /data/vpn
+
+# Run database migrations
+echo "Running database migrations..."
+bun run db:migrate || true
+
+if [ "$NODE_ENV" = "development" ]; then
+    echo "Starting development servers..."
+    exec bun run dev
+else
+    # Production mode - build if dist/ doesn't exist
+    if [ ! -d "dist" ] || [ ! -f "dist/server/index.js" ]; then
+        echo "Building application..."
+        bun run build
+    fi
+
+    echo "Starting production server..."
+    exec bun run start
+fi

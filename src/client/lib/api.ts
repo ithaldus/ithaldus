@@ -353,6 +353,30 @@ export const api = {
       request<{ success: boolean }>(`/stock-images/${id}`, { method: 'DELETE' }),
   },
 
+  // VPN
+  vpn: {
+    get: () =>
+      request<VpnResponse>('/vpn'),
+    getStatus: () =>
+      request<VpnStatus>('/vpn/status'),
+    update: (config: VpnConfigUpdate) =>
+      request<{ success: boolean; config: VpnConfigSafe }>('/vpn', {
+        method: 'PUT',
+        body: JSON.stringify(config),
+      }),
+    connect: () =>
+      request<{ success: boolean; status: VpnStatus }>('/vpn/connect', { method: 'POST' }),
+    disconnect: () =>
+      request<{ success: boolean; status: VpnStatus }>('/vpn/disconnect', { method: 'POST' }),
+    test: (config: VpnConfigUpdate) =>
+      request<{ success: boolean; ip?: string; error?: string }>('/vpn/test', {
+        method: 'POST',
+        body: JSON.stringify(config),
+      }),
+    getLogs: (lines?: number) =>
+      request<{ logs: string[] }>(`/vpn/logs${lines ? `?lines=${lines}` : ''}`),
+  },
+
   // Scan
   scan: {
     start: (networkId: string) =>
@@ -634,12 +658,51 @@ export type ScanUpdateMessage =
   | { type: 'status'; data: { status: string; error?: string } }
   | { type: 'channels'; data: ChannelInfo[] }
 
+// VPN Types
+export type VpnProtocol = 'openvpn' | 'wireguard' | 'none'
+
+export interface VpnStatus {
+  state: 'connected' | 'connecting' | 'disconnected' | 'error' | 'not_configured'
+  protocol: string
+  ip?: string
+  uptime?: number
+  error?: string
+}
+
+export interface VpnConfigSafe {
+  protocol: VpnProtocol
+  enabled: boolean
+  username?: string
+  hasConfig: boolean
+  hasCredentials: boolean
+}
+
+export interface VpnConfigUpdate {
+  protocol: VpnProtocol
+  enabled?: boolean
+  configData?: string  // Base64-encoded .ovpn file
+  username?: string
+  password?: string
+  wgConfigData?: string  // Base64-encoded .conf file
+}
+
+export interface VpnResponse {
+  config: VpnConfigSafe | null
+  status: VpnStatus
+}
+
 // WebSocket URL helper
 export function getScanWebSocketUrl(networkId: string): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  // In development, connect directly to API port (Vite's WS proxy is unreliable)
-  // In production, use the same host/port as the page
+
+  // In development, Vite's WebSocket proxy doesn't work reliably
+  // Connect directly to the API server on port 3001
+  // In production, the app serves from a single port so use the same host
   const isDev = import.meta.env.DEV
-  const wsHost = isDev ? `${window.location.hostname}:3001` : window.location.host
-  return `${protocol}//${wsHost}/api/scan/${networkId}/ws`
+  if (isDev) {
+    // Use same hostname but port 3001 for API WebSocket
+    return `${protocol}//${window.location.hostname}:3001/api/scan/${networkId}/ws`
+  }
+
+  return `${protocol}//${window.location.host}/api/scan/${networkId}/ws`
 }

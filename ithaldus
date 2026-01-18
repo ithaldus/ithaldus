@@ -80,40 +80,15 @@ dev_ensure_vm() {
 }
 
 dev_start() {
-    dev_ensure_vm
-
-    # Start VPN
-    log "Starting VPN..."
-    orb run -m "$VM_NAME" sudo systemctl start openvpn-client@$VPN_NAME 2>/dev/null || true
-    sleep 2
-
-    # Check VPN status
-    VPN_STATUS=$(orb run -m "$VM_NAME" systemctl is-active openvpn-client@$VPN_NAME 2>/dev/null || echo "inactive")
-    if [ "$VPN_STATUS" != "active" ]; then
-        warn "VPN not running. Network scanning may not work."
-    else
-        log "VPN connected"
-    fi
-
-    # Run development container
     log "Starting development server..."
-    orb run -m "$VM_NAME" docker rm -f "${CONTAINER_NAME}-dev" 2>/dev/null || true
+    docker compose up -d dev
 
-    orb run -m "$VM_NAME" docker run -d \
-        --name "${CONTAINER_NAME}-dev" \
-        --network host \
-        -v "$PROJECT_PATH_IN_VM:/app" \
-        -v "$PROJECT_PATH_IN_VM/data:/data" \
-        -w /app \
-        -e DATABASE_URL=file:/data/ithaldus.db \
-        -e AUTH_BYPASS=true \
-        oven/bun:1 \
-        sh -c "bun install && bun run dev"
+    # Wait for container to start
+    sleep 3
 
-    IP=$(dev_get_ip)
     echo ""
-    log "Development server starting..."
-    echo -e "${CYAN}   URL: http://$IP:5173${NC}"
+    log "Development server started"
+    echo -e "${CYAN}   URL: http://localhost:${PORT_WEB:-3000}${NC}"
     echo ""
     echo "Commands:"
     echo "  ./ithaldus --dev logs     View logs"
@@ -123,39 +98,26 @@ dev_start() {
 
 dev_stop() {
     log "Stopping development container..."
-    orb run -m "$VM_NAME" docker stop "${CONTAINER_NAME}-dev" 2>/dev/null || true
-    orb run -m "$VM_NAME" docker rm "${CONTAINER_NAME}-dev" 2>/dev/null || true
-    log "Stopped. VM still running."
+    docker compose down
+    log "Stopped."
 }
 
 dev_logs() {
-    orb run -m "$VM_NAME" docker logs -f "${CONTAINER_NAME}-dev"
+    docker compose logs -f dev
 }
 
 dev_status() {
-    if ! dev_vm_running; then
-        echo "VM: stopped"
-        return
-    fi
-
-    echo "VM: running"
-    IP=$(dev_get_ip)
-    echo "IP: $IP"
-
-    VPN_STATUS=$(orb run -m "$VM_NAME" systemctl is-active openvpn-client@$VPN_NAME 2>/dev/null || echo "unknown")
-    echo "VPN: $VPN_STATUS"
-
-    CONTAINER_STATUS=$(orb run -m "$VM_NAME" docker inspect -f '{{.State.Status}}' "${CONTAINER_NAME}-dev" 2>/dev/null || echo "not running")
+    CONTAINER_STATUS=$(docker compose ps --format '{{.Status}}' dev 2>/dev/null || echo "not running")
     echo "Container: $CONTAINER_STATUS"
 
-    if [ "$CONTAINER_STATUS" = "running" ]; then
+    if echo "$CONTAINER_STATUS" | grep -qi "up"; then
         echo ""
-        echo -e "${CYAN}URL: http://$IP:5173${NC}"
+        echo -e "${CYAN}URL: http://localhost:${PORT_WEB:-3000}${NC}"
     fi
 }
 
 dev_shell() {
-    orb run -m "$VM_NAME" docker exec -it "${CONTAINER_NAME}-dev" sh
+    docker compose exec dev sh
 }
 
 dev_vm_shell() {
@@ -192,7 +154,7 @@ prod_build() {
         RUNTIME="docker"
     fi
 
-    $RUNTIME build -t ithaldus -f Dockerfile.prod "$SCRIPT_DIR"
+    $RUNTIME build -t ithaldus "$SCRIPT_DIR"
     log "Image built: ithaldus"
 }
 
@@ -245,41 +207,50 @@ prod_stop() {
 }
 
 prod_status() {
-    echo -e "${CYAN}IT Haldus - Status${NC}"
-    echo ""
+    # Load port from .env if exists
+    PORT="${PORT_WEB:-3000}"
+    if [ -f "$SCRIPT_DIR/.env" ]; then
+        PORT=$(grep -E "^PORT_WEB=" "$SCRIPT_DIR/.env" 2>/dev/null | cut -d'=' -f2 || echo "3000")
+        [ -z "$PORT" ] && PORT="3000"
+    fi
 
     # Check dev container (docker-compose)
+    DEV_RUNNING=false
     DEV_STATUS=$(docker compose ps --format json 2>/dev/null | grep -o '"State":"[^"]*"' | head -1 | cut -d'"' -f4)
     if [ -n "$DEV_STATUS" ] && [ "$DEV_STATUS" = "running" ]; then
-        echo -e "Dev:  ${GREEN}running${NC} → http://localhost:3000"
-    else
-        echo -e "Dev:  ${RED}stopped${NC}"
+        DEV_RUNNING=true
     fi
 
     # Check prod container
+    PROD_RUNNING=false
     if command -v podman &> /dev/null; then
         RUNTIME="podman"
     else
         RUNTIME="docker"
     fi
-
     PROD_STATUS=$($RUNTIME ps --filter "name=^ithaldus$" --format '{{.Status}}' 2>/dev/null || true)
     if [ -n "$PROD_STATUS" ]; then
-        echo -e "Prod: ${GREEN}running${NC} ($PROD_STATUS)"
-    else
-        echo -e "Prod: ${RED}stopped${NC}"
+        PROD_RUNNING=true
     fi
 
-    # Check OrbStack dev VM (if on Mac)
-    if command -v orb &> /dev/null; then
-        VM_STATUS=$(orb list 2>/dev/null | grep "$VM_NAME" | awk '{print $2}')
-        if [ "$VM_STATUS" = "running" ]; then
-            VM_IP=$(orb list 2>/dev/null | grep "$VM_NAME" | awk '{print $NF}')
-            echo -e "VM:   ${GREEN}running${NC} ($VM_IP)"
-        else
-            echo -e "VM:   ${RED}stopped${NC}"
+    # Header
+    echo -e "${CYAN}IT Haldus${NC} - Network topology scanner"
+    echo ""
+
+    # Status section
+    if [ "$DEV_RUNNING" = true ] || [ "$PROD_RUNNING" = true ]; then
+        echo -e "  ${GREEN}●${NC} Running"
+        echo ""
+        if [ "$DEV_RUNNING" = true ]; then
+            echo -e "  Dev:  http://localhost:$PORT"
         fi
+        if [ "$PROD_RUNNING" = true ]; then
+            echo -e "  Prod: http://localhost:$PORT"
+        fi
+    else
+        echo -e "  ${RED}●${NC} Stopped"
     fi
+    echo ""
 }
 
 # =============================================================================
@@ -342,38 +313,21 @@ vpn_test() {
 # =============================================================================
 
 show_help() {
-    echo "IT Haldus - Organization IT Management Tool"
+    echo "Usage: ./ithaldus [command]"
     echo ""
-    echo "Usage: ./ithaldus [--dev] <command>"
+    echo "Commands:"
+    echo "  start             Build and start production container"
+    echo "  stop              Stop production container"
+    echo "  logs              Follow production logs"
+    echo "  build             Build production image only"
     echo ""
-    echo "Development Mode (--dev):"
-    echo "  Uses OrbStack VM on Mac with VPN for network access."
-    echo "  Source code is mounted for hot reload."
+    echo "  --dev start       Start dev server (docker-compose)"
+    echo "  --dev stop        Stop dev container"
+    echo "  --dev logs        Follow dev logs"
     echo ""
-    echo "  ./ithaldus --dev start      Start dev server (VM + VPN + container)"
-    echo "  ./ithaldus --dev stop       Stop dev container"
-    echo "  ./ithaldus --dev logs       Follow dev logs"
-    echo "  ./ithaldus --dev status     Show status"
-    echo "  ./ithaldus --dev shell      Shell into dev container"
-    echo "  ./ithaldus --dev vm-shell   Shell into VM"
-    echo "  ./ithaldus --dev vm-stop    Stop the VM entirely"
-    echo "  ./ithaldus --dev open       Open in browser"
-    echo "  ./ithaldus --dev exec <cmd> Run command in container"
-    echo ""
-    echo "Production Mode (default):"
-    echo "  Builds and runs optimized container with VPN."
-    echo ""
-    echo "  ./ithaldus build            Build production image"
-    echo "  ./ithaldus run              Run production container"
-    echo "  ./ithaldus start            Build and run"
-    echo "  ./ithaldus stop             Stop production container"
-    echo "  ./ithaldus logs             Follow production logs"
-    echo "  ./ithaldus status           Show container status"
-    echo ""
-    echo "VPN Commands:"
-    echo "  ./ithaldus vpn-status       Show VPN connection status"
-    echo "  ./ithaldus vpn-logs         Show VPN logs"
-    echo "  ./ithaldus vpn-test <ip>    Test connectivity through VPN"
+    echo "  vpn-status        Show VPN connection status"
+    echo "  vpn-logs          Show VPN logs"
+    echo "  vpn-test <ip>     Test connectivity through VPN"
     echo ""
 }
 
@@ -396,7 +350,7 @@ if [ "${1:-}" = "--dev" ]; then
         *)       error "Unknown command: $CMD"; show_help; exit 1 ;;
     esac
 else
-    CMD="${1:-help}"
+    CMD="${1:-}"
 
     case "$CMD" in
         build)   prod_build ;;
@@ -408,7 +362,8 @@ else
         vpn-status)  vpn_status ;;
         vpn-logs)    vpn_logs ;;
         vpn-test)    vpn_test "$2" ;;
-        help|--help|-h) show_help ;;
+        help|--help|-h) prod_status; show_help ;;
+        "")      prod_status; show_help ;;
         *)       error "Unknown command: $CMD"; show_help; exit 1 ;;
     esac
 fi

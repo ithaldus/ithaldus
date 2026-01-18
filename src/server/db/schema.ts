@@ -262,6 +262,12 @@ export const failedCredentials = sqliteTable('failed_credentials', {
   index('idx_failed_credentials_mac').on(table.mac),
 ])
 
+// Settings table (global app settings as key-value JSON store)
+export const settings = sqliteTable('settings', {
+  key: text('key').primaryKey(),
+  value: text('value'),  // JSON-encoded value
+})
+
 // Type exports for use in application
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -297,3 +303,5 @@ export type Floorplan = typeof floorplans.$inferSelect
 export type NewFloorplan = typeof floorplans.$inferInsert
 export type LocationPolygon = typeof locationPolygons.$inferSelect
 export type NewLocationPolygon = typeof locationPolygons.$inferInsert
+export type Setting = typeof settings.$inferSelect
+export type NewSetting = typeof settings.$inferInsert

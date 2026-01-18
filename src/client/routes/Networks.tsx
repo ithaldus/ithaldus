@@ -5,6 +5,7 @@ import { api, type Network } from '../lib/api'
 import { Plus, Network as NetworkIcon } from 'lucide-react'
 import { NetworkCard } from '../components/networks/NetworkCard'
 import { NetworkModal } from '../components/networks/NetworkModal'
+import { VpnStatusPanel } from '../components/vpn/VpnStatusPanel'
 
 export function Networks() {
   const { user } = useAuth()
@@ -25,20 +26,31 @@ export function Networks() {
     try {
       const data = await api.networks.list()
       setNetworks(data)
-      // Ping all networks to get their online status
-      data.forEach((network) => {
-        api.networks.ping(network.id).then((result) => {
-          setNetworks((prev) =>
-            prev.map((n) =>
-              n.id === network.id ? { ...n, isOnline: result.isOnline } : n
-            )
-          )
-        })
-      })
+      pingAllNetworks(data)
     } catch (err) {
       console.error('Failed to load networks:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  function pingAllNetworks(networkList?: Network[]) {
+    const list = networkList || networks
+    list.forEach((network) => {
+      api.networks.ping(network.id).then((result) => {
+        setNetworks((prev) =>
+          prev.map((n) =>
+            n.id === network.id ? { ...n, isOnline: result.isOnline } : n
+          )
+        )
+      })
+    })
+  }
+
+  function handleVpnStatusChange(state: string) {
+    // Re-ping all networks when VPN connects
+    if (state === 'connected') {
+      pingAllNetworks()
     }
   }
 
@@ -114,6 +126,11 @@ export function Networks() {
               Add Network
             </button>
           )}
+        </div>
+
+        {/* VPN Status Panel */}
+        <div className="mb-6">
+          <VpnStatusPanel onStatusChange={handleVpnStatusChange} />
         </div>
 
         {/* Networks Grid */}

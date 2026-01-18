@@ -1,37 +1,36 @@
-# Build stage
-FROM oven/bun:1 AS builder
+FROM oven/bun:1
 
 WORKDIR /app
 
-# Install dependencies
+# Install VPN clients and network tools
+RUN apt-get update && apt-get install -y \
+    openvpn \
+    wireguard-tools \
+    iproute2 \
+    iputils-ping \
+    jq \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy package files and install dependencies
 COPY package.json bun.lockb* ./
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy source code
 COPY . .
 
-# Build the application
-RUN bun run build
+# Create data directories
+RUN mkdir -p /data/vpn
 
-# Production stage
-FROM oven/bun:1-slim
+# Copy entrypoint
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-WORKDIR /app
-
-# Copy built files
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/node_modules ./node_modules
-
-# Create data directory
-RUN mkdir -p /data
-
-# Set environment
+# Environment defaults
 ENV NODE_ENV=production
 ENV DATABASE_URL=file:/data/ithaldus.db
 
-# Expose port
-EXPOSE 3000
+# Expose ports (5173 for dev, 3000 for prod)
+EXPOSE 3000 5173
 
-# Start the application
-CMD ["bun", "run", "start"]
+ENTRYPOINT ["/entrypoint.sh"]

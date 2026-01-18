@@ -4,15 +4,42 @@
 # Users should use ./ithaldus vpn-* commands on the host.
 set -e
 
-VPN_PROTOCOL="${VPN_PROTOCOL:-none}"
+CONFIG_FILE="/data/vpn/config.json"
+
+# Read config from JSON file if it exists (takes priority over env vars)
+if [ -f "$CONFIG_FILE" ]; then
+  echo "Reading VPN config from $CONFIG_FILE"
+  VPN_PROTOCOL=$(jq -r '.protocol // "none"' "$CONFIG_FILE")
+  VPN_ENABLED=$(jq -r '.enabled // false' "$CONFIG_FILE")
+  VPN_USERNAME=$(jq -r '.username // empty' "$CONFIG_FILE")
+  VPN_PASSWORD=$(jq -r '.password // empty' "$CONFIG_FILE")
+  SSTP_SERVER=$(jq -r '.server // empty' "$CONFIG_FILE")
+
+  # Don't start if not enabled
+  if [ "$VPN_ENABLED" != "true" ]; then
+    echo "VPN is disabled in config"
+    exit 0
+  fi
+else
+  # Fall back to environment variables
+  VPN_PROTOCOL="${VPN_PROTOCOL:-none}"
+fi
 
 echo "VPN Protocol: $VPN_PROTOCOL"
 
 case "$VPN_PROTOCOL" in
   openvpn)
-    if [ ! -f /etc/openvpn/client.conf ]; then
-      echo "ERROR: OpenVPN config not found at /etc/openvpn/client.conf"
-      echo "Please provide vpn/client.ovpn in your project"
+    # Check for config file - first in /data/vpn/, then /etc/openvpn/
+    OVPN_CONFIG=""
+    if [ -f /data/vpn/client.conf ]; then
+      OVPN_CONFIG="/data/vpn/client.conf"
+    elif [ -f /etc/openvpn/client.conf ]; then
+      OVPN_CONFIG="/etc/openvpn/client.conf"
+    fi
+
+    if [ -z "$OVPN_CONFIG" ]; then
+      echo "ERROR: OpenVPN config not found"
+      echo "Please configure VPN in the web interface"
       exit 1
     fi
 
@@ -27,25 +54,29 @@ fi
 DHCP_SCRIPT
     chmod +x /etc/openvpn/up-dhcp.sh
 
-    # Create auth file from environment variables
+    # Check for auth file
     AUTH_OPTS=""
-    if [ -n "$VPN_USERNAME" ] && [ -n "$VPN_PASSWORD" ]; then
+    if [ -f /data/vpn/auth.txt ]; then
+      AUTH_OPTS="--auth-user-pass /data/vpn/auth.txt"
+      echo "OpenVPN credentials configured from /data/vpn/auth.txt"
+    elif [ -n "$VPN_USERNAME" ] && [ -n "$VPN_PASSWORD" ]; then
       echo "$VPN_USERNAME" > /etc/openvpn/auth.txt
       echo "$VPN_PASSWORD" >> /etc/openvpn/auth.txt
       chmod 600 /etc/openvpn/auth.txt
-      echo "OpenVPN credentials configured"
+      echo "OpenVPN credentials configured from environment"
       AUTH_OPTS="--auth-user-pass /etc/openvpn/auth.txt"
     fi
 
+    echo "Using config: $OVPN_CONFIG"
     # Run OpenVPN with DHCP script for tap interfaces
-    exec openvpn --config /etc/openvpn/client.conf $AUTH_OPTS \
+    exec openvpn --config "$OVPN_CONFIG" $AUTH_OPTS \
       --script-security 2 \
       --up /etc/openvpn/up-dhcp.sh
     ;;
 
   sstp)
     if [ -z "$SSTP_SERVER" ]; then
-      echo "ERROR: SSTP_SERVER environment variable not set"
+      echo "ERROR: SSTP_SERVER not configured"
       exit 1
     fi
     if [ -z "$VPN_USERNAME" ] || [ -z "$VPN_PASSWORD" ]; then
@@ -68,9 +99,19 @@ DHCP_SCRIPT
     ;;
 
   wireguard)
-    if [ ! -f /etc/wireguard/wg0.conf ]; then
-      echo "ERROR: WireGuard config not found at /etc/wireguard/wg0.conf"
-      echo "Please provide vpn/wg0.conf in your project"
+    # Check for config file - first in /data/vpn/, then /etc/wireguard/
+    WG_CONFIG=""
+    if [ -f /data/vpn/wg0.conf ]; then
+      WG_CONFIG="/data/vpn/wg0.conf"
+      # Copy to /etc/wireguard for wg-quick
+      cp /data/vpn/wg0.conf /etc/wireguard/wg0.conf
+    elif [ -f /etc/wireguard/wg0.conf ]; then
+      WG_CONFIG="/etc/wireguard/wg0.conf"
+    fi
+
+    if [ -z "$WG_CONFIG" ]; then
+      echo "ERROR: WireGuard config not found"
+      echo "Please configure VPN in the web interface"
       exit 1
     fi
 

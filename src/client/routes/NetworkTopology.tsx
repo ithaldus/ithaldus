@@ -67,6 +67,8 @@ export function NetworkTopology() {
   })
   const [lastScannedAt, setLastScannedAt] = useState<string | null>(null)
   const [scanError, setScanError] = useState<string | null>(null)
+  const [showReachabilityWarning, setShowReachabilityWarning] = useState(false)
+  const [rootOnline, setRootOnline] = useState<boolean | null>(null) // null = unknown/checking
   const topologyRef = useRef<HTMLDivElement>(null)
   // Visibility toggles (FIVEAMPS) - can be set via URL param: ?labels=firmware,vendor,ports
   // Use ?labels= or ?labels=none to hide all labels
@@ -354,6 +356,30 @@ export function NetworkTopology() {
     }
   }
 
+  // Ping root device to check if it's online
+  const pingRootDevice = useCallback(async () => {
+    if (!networkId) return
+    try {
+      const result = await api.networks.ping(networkId)
+      setRootOnline(result.isOnline)
+    } catch {
+      setRootOnline(false)
+    }
+  }, [networkId])
+
+  // Ping root device on load and periodically
+  useEffect(() => {
+    if (!networkId) return
+
+    // Ping immediately
+    pingRootDevice()
+
+    // Then ping every 30 seconds
+    const interval = setInterval(pingRootDevice, 30000)
+
+    return () => clearInterval(interval)
+  }, [networkId, pingRootDevice])
+
   // Connect to WebSocket for real-time scan updates
   // Returns a promise that resolves when the connection is open
   const connectWebSocket = useCallback((): Promise<void> => {
@@ -441,8 +467,24 @@ export function NetworkTopology() {
     }
   }, [])
 
-  async function startScan() {
+  async function startScan(skipReachabilityCheck = false) {
     if (!isAdmin) return
+
+    // First check if root device is reachable (unless user skipped the check)
+    if (!skipReachabilityCheck) {
+      try {
+        const pingResult = await api.networks.ping(networkId!)
+        if (!pingResult.isOnline) {
+          // Root device not reachable - show warning
+          setShowReachabilityWarning(true)
+          return
+        }
+      } catch {
+        // Ping failed - show warning
+        setShowReachabilityWarning(true)
+        return
+      }
+    }
 
     try {
       setLogs([])
@@ -460,6 +502,11 @@ export function NetworkTopology() {
       setScanStatus('error')
       disconnectWebSocket()
     }
+  }
+
+  function handleProceedWithScan() {
+    setShowReachabilityWarning(false)
+    startScan(true) // Skip the reachability check
   }
 
   async function stopScan() {
@@ -1031,8 +1078,25 @@ export function NetworkTopology() {
 
         {/* Collapsible rows - controlled by headerExpanded state */}
         <div className={`mt-1 sm:mt-2 space-y-1 sm:space-y-2 ${headerExpanded ? 'block' : 'hidden'}`}>
-        {/* Device count and scanned date */}
-        <div className="flex items-center gap-3">
+        {/* Root device status, device count and scanned date */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Root device status indicator */}
+          {network?.rootIp && (
+            <Tooltip content={rootOnline === null ? 'Checking...' : rootOnline ? 'Root device is online' : 'Root device is offline'}>
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs">
+                <span
+                  className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${
+                    rootOnline === null
+                      ? 'bg-slate-400 animate-pulse'
+                      : rootOnline
+                        ? 'bg-green-500'
+                        : 'bg-red-500'
+                  }`}
+                />
+                <span className="font-mono text-slate-600 dark:text-slate-300">{network.rootIp}</span>
+              </div>
+            </Tooltip>
+          )}
           {totalDeviceCount > 0 && (
             <div className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
               <Monitor className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
@@ -1071,7 +1135,7 @@ export function NetworkTopology() {
             ) : (
               <Tooltip content="Start network scan" position="bottom">
                 <button
-                  onClick={startScan}
+                  onClick={() => startScan()}
                   className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 xl:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-400 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 text-xs sm:text-sm font-medium transition-colors flex-shrink-0"
                 >
                   <Radar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -1278,6 +1342,53 @@ export function NetworkTopology() {
           onLocationChange={handleLocationChange}
           onAssetTagChange={handleAssetTagChange}
         />
+      )}
+
+      {/* Root Device Unreachable Warning Modal */}
+      {showReachabilityWarning && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl p-8 max-w-md mx-4 text-center relative">
+            <button
+              onClick={() => setShowReachabilityWarning(false)}
+              className="absolute top-4 right-4 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex justify-center mb-4">
+              <div className="p-4 rounded-full bg-amber-100 dark:bg-amber-900/30">
+                <AlertTriangle className="w-10 h-10 text-amber-600 dark:text-amber-400" />
+              </div>
+            </div>
+
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+              Root Device Unreachable
+            </h2>
+
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+              Cannot reach the root device at <span className="font-mono text-slate-900 dark:text-white">{network?.rootIp}</span>.
+            </p>
+
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+              Make sure VPN is connected if the network requires it, or check that the device is online and accessible.
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowReachabilityWarning(false)}
+                className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleProceedWithScan}
+                className="flex-1 px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-colors"
+              >
+                Scan Anyway
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Scan Error Modal */}
