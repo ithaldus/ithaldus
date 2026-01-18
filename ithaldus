@@ -21,6 +21,7 @@ set -e
 # Configuration
 VM_NAME="ithaldus-vm"
 CONTAINER_NAME="ithaldus"
+VPN_NAME="${VPN_NAME:-client}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_PATH_IN_VM="/mnt/mac${SCRIPT_DIR}"
 
@@ -59,7 +60,7 @@ dev_ensure_vm() {
         log "Installing dependencies in VM..."
         orb run -m "$VM_NAME" sudo apt-get update
         orb run -m "$VM_NAME" sudo apt-get install -y openvpn docker.io
-        orb run -m "$VM_NAME" sudo usermod -aG docker \$USER
+        orb run -m "$VM_NAME" bash -c 'sudo usermod -aG docker $(whoami)'
 
         warn "VM created. You need to configure VPN:"
         echo "  1. Copy VPN config to VM:"
