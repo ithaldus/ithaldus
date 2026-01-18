@@ -113,7 +113,7 @@ dev_start() {
     IP=$(dev_get_ip)
     echo ""
     log "Development server starting..."
-    echo -e "${CYAN}   URL: http://$IP:3000${NC}"
+    echo -e "${CYAN}   URL: http://$IP:5173${NC}"
     echo ""
     echo "Commands:"
     echo "  ./ithaldus --dev logs     View logs"
@@ -150,7 +150,7 @@ dev_status() {
 
     if [ "$CONTAINER_STATUS" = "running" ]; then
         echo ""
-        echo -e "${CYAN}URL: http://$IP:3000${NC}"
+        echo -e "${CYAN}URL: http://$IP:5173${NC}"
     fi
 }
 
@@ -170,7 +170,7 @@ dev_vm_stop() {
 
 dev_open() {
     IP=$(dev_get_ip)
-    open "http://$IP:3000"
+    open "http://$IP:5173"
 }
 
 dev_exec() {
